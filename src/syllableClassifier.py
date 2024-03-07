@@ -55,7 +55,7 @@ class syllableClassifier:
             
             # feed each sample of syllable into reservoir and collect resulting states
             for i, sample in enumerate(syllable):
-                self.res.run([sample], t_learn=len(sample), t_wash=0, load=False)
+                self.res.run([sample], learning_steps=len(sample), init_steps=0, load=False)
                 states = np.concatenate((np.squeeze(self.res.TrainArgs.T), sample), axis=1)
                 R_syll[:, i] = np.reshape(states, states.shape[0] * states.shape[1])
             
@@ -132,7 +132,7 @@ class syllableClassifier:
             for sample in syllable:
                 
                 # feed each sample into reservoir and collect the resulting states
-                self.res.run([sample], t_learn=sample.shape[0], t_wash=0, load=False)
+                self.res.run([sample], learning_steps=sample.shape[0], init_steps=0, load=False)
                 states = np.concatenate((np.squeeze(self.res.TrainArgs).T, sample), axis=1)
                 z = np.reshape(states, states.shape[0] * states.shape[1])
 

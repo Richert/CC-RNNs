@@ -104,7 +104,7 @@ class RF_Reservoir:
         
         """ Output Training """    
             
-        self.W_out = functions.RidgeWout(TrainRs, self.TrainOuts, self.TyA_wout)
+        self.W_out = functions.ridge_w_out(TrainRs, self.TrainOuts, self.TyA_wout)
         self.NRMSE_readout = functions.NRMSE(np.dot(self.W_out,TrainRs), self.TrainOuts);
         self.G = functions.RidgeWload(TrainZOld,np.dot(self.G,TrainZOld),TyA_wload)
         

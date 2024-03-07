@@ -1,141 +1,144 @@
-import functions
+from .functions import *
 import numpy as np
+
 
 class Reservoir:
     
-    def __init__(self, N, alpha = 10, NetSR = 1.5, bias_scale = 0.2, inp_scale = 1.5, conn = None):
+    def __init__(self, N: int, n_in: int, alpha: float = 10.0, sr: float = 1.5, bias_scale: float = 0.2,
+                 inp_scale: float = 1.5, density: float = 0.1):
         """
         Initializes the reservoir with the provided parameters.
 
-        :param N: the number of neurons you would like to have in the reservoir
-        :param alpha:
-        :param NetSR:
-        :param bias_scale: scaling of the bias term to be introduced to each neuron
-        :param inp_scale: the scale for the input values
-        :param conn: downscaling of the reservoir connections
+        :param N: the number of neurons you would like to have in the reservoir.
+        :param n_in: The number of inputs to the reservoir
+        :param alpha: The aperture control parameter.
+        :param sr: spectral radius
+        :param bias_scale: scaling of the bias term to be introduced to each neuron.
+        :param inp_scale: the scale for the input weights.
+        :param density: relative fraction of reservoir connections established in the reservoir.
         """
                  
-        self.N = N; self.alpha = alpha; self.NetSR = NetSR; 
-        self.bias_scale = bias_scale; self.inp_scale = inp_scale
-        if not conn:
-            self.conn = 10./self.N
-        else: 
-            self.conn = conn
-        
-        self.W_raw = self.NetSR * functions.IntWeights(self.N,self.N,self.conn)
-        self.W_bias = self.bias_scale*np.random.randn(self.N)
+        self.N = N
+        self.alpha = alpha
+        self.W = sr * IntWeights(self.N, self.N, density)
+        self.W_bias = bias_scale*np.random.randn(self.N)
+        self.W_in = inp_scale*np.random.randn(self.N, n_in)
+        self.W_out = np.zeros((n_in, self.N))
+        self.n_patterns = 0
+        self.readout_error = 0.0
+        self.loading_error = 0.0
+        self.C = []
+        self.y = np.zeros((N,), dtype=np.float64)
 
-        
-    def run(self, patterns, t_learn = 1000, t_wash = 100, TyA_wout = 0.01, TyA_wload = 0.0001, 
-             gradient_load = False, gradient_c = False, load = True, gradient_window = 1, c_adapt_rate = 0.01, gradient_cut = 2.0):
-        
-        self.patterns = patterns; self.t_learn = t_learn; self.t_wash = t_wash; self.TyA_wout = TyA_wout; self.TyA_wload = TyA_wload
-        self.gradient_load = gradient_load; self.gradient_c = gradient_c; self.gradien_cut = gradient_cut; self.c_adapt_rate = c_adapt_rate        
-        self.n_patts = len(self.patterns)
-        
-        if type(self.patterns[0]) == np.ndarray:
-            self.n_ip_dim = len(patterns[0][0])
-        else:
-            if type(self.patterns[0](0)) == np.float64:
-                self.n_ip_dim = 1
-            else:
-               self.n_ip_dim = len(self.patterns[0](0))        
-        
-        self.W_in = self.inp_scale*np.random.randn(self.N,self.n_ip_dim)
-        
-        self.C = []            
-        
-        self.TrainArgs = np.zeros([self.N,self.n_patts*self.t_learn])
-        self.TrainOldArgs = np.zeros([self.N,self.n_patts*self.t_learn])
-        TrainOuts = np.zeros([self.n_ip_dim,self.n_patts*self.t_learn]) 
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        return np.tanh(np.dot(self.W, self.y) + np.dot(self.W_in, x) + self.W_bias)
+
+    def forward_auto(self) -> np.ndarray:
+        return np.tanh(np.dot(self.W, self.y) + self.W_bias)
+
+    def run(self, patterns, learning_steps: int = 1000, init_steps: int = 100, c_adapt_rate: float = None,
+            load_reservoir: bool = True, tychinov_alphas: tuple = (0.01, 0.001), **kwargs):
+
+        # process user input
+        self.n_patterns = len(patterns)
+        n_in = self.W_in.shape[1]
         I = np.eye(self.N)
-      
-        for i,p in zip(range(self.n_patts), self.patterns):
+        gradient_cut = kwargs.pop("gradient_cut", 2.0)
+        sgd = False if c_adapt_rate is None else True
+        
+        # initialize storage matrices
+        states = np.zeros([self.N, self.n_patterns * learning_steps])
+        targets = np.zeros([n_in, self.n_patterns * learning_steps])
+        
+        # train conceptors     
+        for i, p in enumerate(patterns):
 
-            x =         np.zeros([self.N])
-            xColl =     np.zeros([self.N,self.t_learn])  
-            xOldColl =  np.zeros([self.N,self.t_learn])  
-            uColl =     np.zeros([self.n_ip_dim,self.t_learn])    
-            Cc =        np.zeros([self.N,self.N])            
+            y_col = np.zeros([self.N, learning_steps])
+            x_col = np.zeros([n_in, learning_steps])
+            Cc = np.zeros([self.N, self.N])            
 
-            for t in range(self.t_learn+self.t_wash):
+            for step in range(learning_steps+init_steps):
                 
                 if not type(p == np.ndarray):
-                    u = np.reshape(p(t), self.n_ip_dim) 
+                    x = np.reshape(p(step), n_in)
                 else:
-                    u = p[t]
+                    x = p[step]
 
-                xOld = x          
-                
-                x = np.tanh(np.dot(self.W_raw,x)+np.dot(self.W_in,u)+self.W_bias)           
-               
-                if gradient_c:           
-            
-                    grad = x-np.dot(Cc,x)
+                # calculate new state
+                y = self.forward(x)
+
+                if sgd:
+
+                    # SGD conceptor update
+                    grad = x - Cc @ x
                     norm = np.linalg.norm(grad)     
-                    if (norm > self.gradien_cut):
-                        grad = self.gradien_cut/norm * grad 
-                    Cc = Cc + self.c_adapt_rate*(np.outer(grad,x.T)-(self.alpha**-2)*Cc)
+                    if norm > gradient_cut:
+                        grad = gradient_cut/norm * grad
+                    Cc = Cc + c_adapt_rate*(np.outer(grad, x.T) - (self.alpha**-2)*Cc)
                 
-                if (t >= self.t_wash): 
-                
-                    xColl[:,t-self.t_wash] = x
-                    xOldColl[:,t-self.t_wash] = xOld
-                    uColl[:,t-self.t_wash] = u                    
-            
-            if not gradient_c:
+                if step >= init_steps:
 
-                try:
-                    R = np.dot(xColl,np.transpose(xColl))/self.t_learn
-                    U,S,V = np.linalg.svd(R, full_matrices=True)
-                    S = np.diag(S)
-                    S = (np.dot(S,np.linalg.inv(S + (self.alpha**-2)*I)))
-                    self.C.append(np.dot(U,np.dot(S,U.T)))
-                except:
-                    print("SVD did not converge")
-                
+                    # state collection
+                    y_col[:, step-init_steps] = y
+                    x_col[:, step-init_steps] = x
+            
+            if sgd:
+
+                # store SGD-trained conceptor
+                self.C.append(Cc)
+
             else:
-                
-                self.C.append(Cc) 
 
-            self.TrainArgs[:,i*self.t_learn:(i+1)*self.t_learn] = xColl
-            self.TrainOldArgs[:,i*self.t_learn:(i+1)*self.t_learn] = xOldColl
-            TrainOuts[:,i*self.t_learn:(i+1)*self.t_learn] = uColl        
+                # train conceptor on collected states
+                try:
+                    R = np.dot(y_col,np.transpose(y_col)) / learning_steps
+                    U, S, V = np.linalg.svd(R, full_matrices=True)
+                    S = np.diag(S)
+                    S = (np.dot(S, np.linalg.inv(S + (self.alpha**-2)*I)))
+                    self.C.append(np.dot(U, np.dot(S, U.T)))
+                except ValueError:
+                    print("SVD did not converge")
+
+            states[:, i*learning_steps:(i+1)*learning_steps] = y_col
+            targets[:, i*learning_steps:(i+1)*learning_steps] = x_col
         
-        if load:
+        if load_reservoir:
         
-            """ Output Training """    
-                
-            self.W_out = functions.RidgeWout(self.TrainArgs, TrainOuts, self.TyA_wout)
-            self.NRMSE_readout = functions.NRMSE(np.dot(self.W_out,self.TrainArgs), TrainOuts);
-            print(self.NRMSE_readout)
+            # train the readout weights and calculate the readout error
+            self.W_out = ridge(states, targets, tychinov_alphas[0])
+            self.readout_error = nrmse(np.dot(self.W_out, states), targets)
+            print(self.readout_error)
             
-            """ Loading """
-            
-            W_bias_rep = np.tile(self.W_bias,(self.n_patts*self.t_learn,1)).T
-            W_targets = (np.arctanh(self.TrainArgs) - W_bias_rep)
-            self.W = functions.RidgeWload(self.TrainOldArgs, W_targets, self.TyA_wload )
-            self.NRMSE_load =  functions.NRMSE(np.dot(self.W,self.TrainOldArgs),W_targets)
-            print(np.mean(self.NRMSE_load))        
+            # load the
+            W_bias_rep = np.tile(self.W_bias,(self.n_patterns*learning_steps,1)).T
+            W_targets = np.arctanh(states) - W_bias_rep
+            states_old = np.zeros_like(states)
+            states_old[:, 1:] = states[:, :-1]
+            self.W = ridge(states_old, W_targets, tychinov_alphas[1])
+            self.loading_error = nrmse(np.dot(self.W, states_old), W_targets)
+            print(np.mean(self.loading_error))
         
-        self.TrainArgs = np.reshape(self.TrainArgs, [self.n_patts, self.N, self.t_learn])
-        self.TrainOuts = np.reshape(TrainOuts, [self.n_patts, self.n_ip_dim, self.t_learn])
+        states = np.reshape(states, [self.n_patterns, self.N, learning_steps])
+        targets = np.reshape(targets, [self.n_patterns, n_in, learning_steps])
+
+        return states, targets
+
+    def recall(self, recall_steps: int = 200, init_noise: float = 0.5) -> np.ndarray:
         
-    def recall(self, t_recall = 200):
+        z_col = []
         
-        self.Y_recalls = []
-        self.t_recall = t_recall
-        
-        for i in range(self.n_patts):
+        for i in range(self.n_patterns):
             
             Cc = self.C[i]
-            x = 0.5*np.random.randn(self.N)
-            y_recall = np.zeros([self.t_recall, self.n_ip_dim])
+            self.y = init_noise * np.random.randn(self.N)
+            z_recall = np.zeros([recall_steps, self.W_in.shape[1]])
         
-            for t in range(self.t_recall):
+            for step in range(recall_steps):
                 
-                x = np.dot(Cc,np.tanh(np.dot(self.W,x)+self.W_bias))
-                y = np.dot(self.W_out,x)
-                y_recall[t]=y
+                self.y = np.dot(Cc, self.forward_auto())
+                z = np.dot(self.W_out, self.y)
+                z_recall[step] = z
                 
-            self.Y_recalls.append(y_recall)        
+            z_col.append(z_recall)
+
+        return np.asarray(z_col)
