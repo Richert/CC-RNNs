@@ -57,22 +57,15 @@ def checkRecall(patterns, Y_recalls, evalRange = 50):
     return meanError
 
 
-def IntWeights(N: int, M: int, density: float, max_iter: int = 10):
-    
-    succ = False
-    idx = 0
-    while not succ and idx < max_iter:
-        try:
-            W_raw = sparse.rand(N, M, format='lil', density=density)
-            rows, cols = W_raw.nonzero()
-            for row, col in zip(rows, cols):
-                W_raw[row, col] = np.random.randn()
-            specRad, eigenvecs = np.abs(lin.eigs(W_raw,1))
-            W_raw = np.squeeze(np.asarray(W_raw/specRad))
-            succ = True
-            return W_raw
-        except lin.ArpackNoConvergence:
-            idx += 1
+def IntWeights(N: int, M: int, density: float):
+    W_raw = sparse.rand(N, M, format='lil', density=density)
+    W = np.zeros((N, M))
+    rows, cols = W_raw.nonzero()
+    for row, col in zip(rows, cols):
+        W[row, col] = np.random.randn()
+    lambdas = np.abs(np.linalg.eigvals(W))
+    W = np.squeeze(np.asarray(W/np.max(lambdas)))
+    return W
 
 
 def nrmse(y: np.ndarray, target):

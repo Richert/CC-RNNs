@@ -59,27 +59,27 @@ class Reservoir:
 
             for step in range(learning_steps+init_steps):
                 
-                if not type(p == np.ndarray):
-                    x = np.reshape(p(step), n_in)
-                else:
+                if type(p) is np.ndarray:
                     x = p[step]
+                else:
+                    x = np.reshape(p(step), n_in)
 
                 # calculate new state
-                y = self.forward(x)
+                self.y = self.forward(x)
 
                 if sgd:
 
                     # SGD conceptor update
-                    grad = x - Cc @ x
+                    grad = self.y - Cc @ self.y
                     norm = np.linalg.norm(grad)     
                     if norm > gradient_cut:
                         grad = gradient_cut/norm * grad
-                    Cc = Cc + c_adapt_rate*(np.outer(grad, x.T) - (self.alpha**-2)*Cc)
+                    Cc = Cc + c_adapt_rate*(np.outer(grad, self.y.T) - (self.alpha**-2)*Cc)
                 
                 if step >= init_steps:
 
                     # state collection
-                    y_col[:, step-init_steps] = y
+                    y_col[:, step-init_steps] = self.y[:]
                     x_col[:, step-init_steps] = x
             
             if sgd:
@@ -91,7 +91,7 @@ class Reservoir:
 
                 # train conceptor on collected states
                 try:
-                    R = np.dot(y_col,np.transpose(y_col)) / learning_steps
+                    R = np.dot(y_col, np.transpose(y_col)) / learning_steps
                     U, S, V = np.linalg.svd(R, full_matrices=True)
                     S = np.diag(S)
                     S = (np.dot(S, np.linalg.inv(S + (self.alpha**-2)*I)))
@@ -109,8 +109,8 @@ class Reservoir:
             self.readout_error = nrmse(np.dot(self.W_out, states), targets)
             print(self.readout_error)
             
-            # load the
-            W_bias_rep = np.tile(self.W_bias,(self.n_patterns*learning_steps,1)).T
+            # load the input pattern into the reservoir connectivity
+            W_bias_rep = np.tile(self.W_bias, (self.n_patterns*learning_steps, 1)).T
             W_targets = np.arctanh(states) - W_bias_rep
             states_old = np.zeros_like(states)
             states_old[:, 1:] = states[:, :-1]
@@ -123,14 +123,14 @@ class Reservoir:
 
         return states, targets
 
-    def recall(self, recall_steps: int = 200, init_noise: float = 0.5) -> np.ndarray:
+    def recall(self, init_states: np.ndarray, recall_steps: int = 200) -> np.ndarray:
         
         z_col = []
         
         for i in range(self.n_patterns):
             
             Cc = self.C[i]
-            self.y = init_noise * np.random.randn(self.N)
+            self.y = init_states[i]
             z_recall = np.zeros([recall_steps, self.W_in.shape[1]])
         
             for step in range(recall_steps):
