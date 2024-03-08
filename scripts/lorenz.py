@@ -49,13 +49,13 @@ lorenz_indices = [0, 1, 2]
 
 # reservoir parameters
 N = 500
-alpha = 28.0
+alpha = 200.0
 sr = 1.5
 bias = 0.9
 in_scale = 1.2
-density = 0.8
+density = 1.0
 init_steps = 1000
-tychinovs = (0.0001, 0.0001)
+tychinovs = (0.001, 0.001)
 
 # training parameters
 recall_steps = 2000
