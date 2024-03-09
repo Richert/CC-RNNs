@@ -57,7 +57,7 @@ def checkRecall(patterns, Y_recalls, evalRange = 50):
     return meanError
 
 
-def IntWeights(N: int, M: int, density: float):
+def init_weights(N: int, M: int, density: float):
     W_raw = sparse.rand(N, M, format='lil', density=density)
     W = np.zeros((N, M))
     rows, cols = W_raw.nonzero()

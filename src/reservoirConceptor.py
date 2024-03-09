@@ -20,7 +20,7 @@ class Reservoir:
                  
         self.N = N
         self.alpha = alpha
-        self.W = sr * IntWeights(self.N, self.N, density)
+        self.W = sr * init_weights(self.N, self.N, density)
         self.W_bias = bias_scale*np.random.randn(self.N)
         self.W_in = inp_scale*np.random.randn(self.N, n_in)
         self.W_out = np.zeros((n_in, self.N))
