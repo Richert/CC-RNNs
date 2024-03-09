@@ -2,7 +2,7 @@
 Helper functions class
 """
 
-import scipy.sparse.linalg as lin
+import torch
 import scipy.sparse as sparse
 import scipy.interpolate as interpolate
 import matplotlib.pyplot as plt
@@ -63,20 +63,34 @@ def init_weights(N: int, M: int, density: float):
     rows, cols = W_raw.nonzero()
     for row, col in zip(rows, cols):
         W[row, col] = np.random.randn()
-    lambdas = np.abs(np.linalg.eigvals(W))
-    W = np.squeeze(np.asarray(W/np.max(lambdas)))
+    try:
+        lambdas = np.abs(np.linalg.eigvals(W))
+        W = np.squeeze(np.asarray(W/np.max(lambdas)))
+    except np.linalg.LinAlgError:
+        pass
     return W
 
 
-def nrmse(y: np.ndarray, target):
+def nrmse(y: np.ndarray, target: np.ndarray):
     combinedVar = 0.5 * (np.var(target,1) + np.var(y,1))
     error = y-target
     return np.sqrt(np.mean(error**2, axis=1)/combinedVar)
 
 
+def tensor_nrmse(y: torch.tensor, target: torch.tensor) -> torch.tensor:
+    combined_var = 0.5 * (torch.var(target, 0) + torch.var(y, 0))
+    error = y - target
+    return torch.sqrt(torch.mean(error ** 2, dim=0) / combined_var)
+
+
 def ridge(X: np.ndarray, y: np.ndarray, alpha: float) -> np.ndarray:
     I = np.eye(X.shape[0])
     return np.transpose(np.dot(np.linalg.pinv(np.dot(X, X.T) + alpha*I), np.dot(X, y.T)))
+
+
+def tensor_ridge(X: torch.tensor, Y: torch.tensor, alpha: float) -> torch.tensor:
+    I = torch.eye(X.shape[1])
+    return X.T @ Y @ torch.linalg.pinv(X.T @ X + alpha*I)
 
 
 def AND(C,B):
