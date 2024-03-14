@@ -45,7 +45,7 @@ s = 20.0
 r = 28.0
 b = 2.667
 dt = 0.01
-steps = 100000
+steps = 200000
 init_steps = 1000
 
 # reservoir parameters
@@ -58,7 +58,8 @@ in_scale = 1.2
 density = 0.5
 
 # training parameters
-backprop_steps = 200
+backprop_steps = 500
+test_steps = 2000
 lr = 0.1
 betas = (0.9, 0.999)
 
@@ -108,6 +109,7 @@ loss_func = torch.nn.MSELoss()
 optim = torch.optim.Adam(list(rnn.parameters()) + list(readout.parameters()), lr=lr, betas=betas)
 
 # training
+current_loss = 0.0
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
@@ -125,5 +127,36 @@ with torch.enable_grad():
 
             optim.zero_grad()
             loss.backward()
+            current_loss = loss.item()
             optim.step()
             loss = torch.zeros((1,))
+            print(f"Current loss: {current_loss}")
+
+# generate predictions
+predictions = []
+for step in range(test_steps):
+
+    # get RNN output
+    x = rnn.forward(inputs[step])
+    y = readout.forward(x)
+
+    # store results
+    predictions.append(y.cpu().detach().numpy())
+
+predictions = np.asarray(predictions)
+
+# plotting
+##########
+
+fig, axes = plt.subplots(nrows=3, figsize=(12, 6))
+
+for i, ax in enumerate(axes):
+
+    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
+    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
+    if i == 2:
+        ax.set_xlabel("steps")
+        ax.legend()
+
+plt.tight_layout()
+plt.show()
