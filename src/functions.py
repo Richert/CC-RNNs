@@ -78,9 +78,9 @@ def nrmse(y: np.ndarray, target: np.ndarray):
 
 
 def tensor_nrmse(y: torch.tensor, target: torch.tensor) -> torch.tensor:
-    combined_var = 0.5 * (torch.var(target, 0) + torch.var(y, 0))
+    combined_var = 0.5 * (torch.var(target, 1) + torch.var(y, 1))
     error = y - target
-    return torch.sqrt(torch.mean(error ** 2, dim=0) / combined_var)
+    return torch.sqrt(torch.mean(error ** 2, dim=1) / combined_var)
 
 
 def ridge(X: np.ndarray, y: np.ndarray, alpha: float) -> np.ndarray:
@@ -89,8 +89,8 @@ def ridge(X: np.ndarray, y: np.ndarray, alpha: float) -> np.ndarray:
 
 
 def tensor_ridge(X: torch.tensor, Y: torch.tensor, alpha: float) -> torch.tensor:
-    I = torch.eye(X.shape[1])
-    return X.T @ Y @ torch.linalg.pinv(X.T @ X + alpha*I)
+    I = torch.eye(X.shape[0])
+    return (torch.linalg.pinv(X @ X.T + alpha*I) @ X @ Y.T).T
 
 
 def AND(C,B):

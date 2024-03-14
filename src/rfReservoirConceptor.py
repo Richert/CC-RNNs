@@ -13,13 +13,12 @@ class RF_Reservoir:
         self.F = np.random.randn(self.K, self.N)
         self.G = np.random.randn(self.N, self.K)
         
-        sr = np.max(np.abs(sp.linalg.eigvals(np.dot(self.F,self.G))))
+        sr = np.max(np.abs(sp.linalg.eigvals(np.dot(self.F, self.G))))
         
         self.F *= np.sqrt(self.NetSR)/np.sqrt(sr)   
         self.G *= np.sqrt(self.NetSR)/np.sqrt(sr)
         
         self.W_bias = self.bias_scale*np.random.randn(self.N)
-
         
     def load(self, patterns, t_learn = 400, t_cadapt = 2000, t_wash = 200, TyA_wout = 1., TyA_wload = 0.1, 
              gradient_load = False, gradient_c = False, gradient_window = 1, c_adapt_rate = 0.5, gradient_cut = 2.0):

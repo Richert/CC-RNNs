@@ -17,13 +17,12 @@ class RNN(torch.nn.Module):
         self.y = torch.zeros((self.N,), device=device, dtype=dtype)
         self._free_params = {}
 
-    @overload
-    def forward(self, *args):
-        self.y = torch.tanh(self.W @ self.y + self.bias)
-        return self.y
-
     def forward(self, x):
         self.y = torch.tanh(self.W @ self.y + self.W_in @ x + self.bias)
+        return self.y
+
+    def forward_a(self, D):
+        self.y = torch.tanh((self.W + D) @ self.y + self.bias)
         return self.y
 
     def free_param(self, key: str):
@@ -52,6 +51,12 @@ class RNN(torch.nn.Module):
         for p in self._free_params.values():
             yield p
 
+    def load_input(self, u, x, tychinov_alpha: float = 1e-4) -> tuple:
+        assert u.shape[-1] == x.shape[-1]  # time steps
+        targets = self.W_in @ u
+        D = tensor_ridge(x, targets, tychinov_alpha)
+        return D, tensor_nrmse(D @ x, targets)
+
 
 class LowRankRNN(RNN):
 
@@ -62,9 +67,16 @@ class LowRankRNN(RNN):
         self.A = torch.tensor(sr * init_weights(self.N, rank, density), device=device, dtype=dtype)
         self.B = torch.tensor(sr * init_weights(rank, self.N, density), device=device, dtype=dtype)
         self.W = [self.A, self.B]
+        self.z = torch.zeros((rank,), device=device, dtype=dtype)
 
     def forward(self, x):
-        self.y = torch.tanh(self.A @ self.B @ self.y + self.W_in @ x + self.bias)
+        self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
+        self.z = self.B @ self.y
+        return self.y
+
+    def forward_a(self, D):
+        self.y = torch.tanh(self.A @ self.z + D @ self.y + self.bias)
+        self.z = self.B @ self.y
         return self.y
 
 
@@ -89,24 +101,13 @@ class ConceptorRNN(RNN):
     def activate_conceptor(self, key: str):
         self.C = self.conceptors[key]
 
-    @overload
-    def forward_c(self, *args):
-        self.y = self.C @ torch.tanh(self.W @ self.y + self.bias)
-        return self.y
-
     def forward_c(self, x):
-        y = super().forward(x)
-        self.y = self.C @ y
+        self.y = self.C @ super().forward(x)
         return self.y
 
-    def load_pattern(self, x, tychinov_alpha: float = 1e-4) -> float:
-
-        bias = torch.tile(self.bias, (x.shape[0], 1)).T
-        targets = np.arctanh(x) - bias
-        x_old = torch.zeros_like(x)
-        x_old[1:, :] = x[:-1, :]
-        self.W = tensor_ridge(x_old, targets, tychinov_alpha)
-        return tensor_nrmse(x_old @ self.W.T, targets)
+    def forward_c_a(self, D):
+        self.y = self.C @ super().forward_a(D)
+        return self.y
 
 
 class AutoConceptorRNN(ConceptorRNN):
@@ -118,15 +119,14 @@ class AutoConceptorRNN(ConceptorRNN):
         self.lam = lam
         self.alpha_sq = alpha**(-2)
 
-    @overload
-    def forward_c_adapt(self, *args):
-        y = self.C @ super().forward()
+    def forward_c_a_adapt(self, D):
+        y = self.C @ torch.tanh((self.W + D) @ self.y + self.bias)
         self.C = self.C + self.lam * ((self.y - self.C @ self.y) @ self.y.T) - self.C * self.alpha_sq
         self.y = y
         return y
 
     def forward_c_adapt(self, x):
-        y = self.C @ super().forward(x)
+        y = self.C @ torch.tanh(self.W @ self.y + self.W_in @ x + self.bias)
         self.C = self.C + self.lam*((self.y - self.C @ self.y) @ self.y.T) - self.C*self.alpha_sq
         self.y = y
         return y
@@ -144,44 +144,30 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         super().__init__(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
         self.alpha_sq = alpha**(-2)
         self.lam = lam
-        self.C = torch.zeros((rank,), device=device, dtype=dtype)
+        self.C = torch.zeros_like(self.z)
         self.conceptors = {}
-        self.z = torch.zeros_like(self.C)
-
-    @overload
-    def forward(self, *args):
-        self.y = torch.tanh(self.A @ self.z + self.bias)
-        self.z = self.B @ self.y
-        return self.y
-
-    def forward(self, x):
-        self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
-        self.z = self.B @ self.y
-        return self.y
-
-    @overload
-    def forward_c(self, *args):
-        self.y = torch.tanh(self.A @ self.z + self.bias)
-        self.z = torch.diag(self.C) * self.B @ self.y
-        return self.y
 
     def forward_c(self, x):
         self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
-        self.z = torch.diag(self.C) * self.B @ self.y
+        self.z = self.C * (self.B @ self.y)
         return self.y
 
-    @overload
-    def forward_c_adapt(self, *args):
-        self.y = torch.tanh(self.A @ self.z + self.bias)
-        z = torch.diag(self.C) * self.B @ self.y
-        self.C = self.C + self.lam * (z**2 - self.C*z**2 - self.C*self.alpha_sq)
-        self.z = z
+    def forward_c_a(self, D):
+        self.y = torch.tanh(self.A @ self.z + D @ self.y + self.bias)
+        self.z = self.C * (self.B @ self.y)
         return self.y
 
     def forward_c_adapt(self, x):
         self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
         z = torch.diag(self.C) * self.B @ self.y
         self.C = self.C + self.lam * (z ** 2 - self.C * z ** 2 - self.C * self.alpha_sq)
+        self.z = z
+        return self.y
+
+    def forward_c_a_adapt(self, D):
+        self.y = torch.tanh(self.A @ self.z + D @ self.y + self.bias)
+        z = torch.diag(self.C) * self.B @ self.y
+        self.C = self.C + self.lam * (z**2 - self.C*z**2 - self.C*self.alpha_sq)
         self.z = z
         return self.y
 

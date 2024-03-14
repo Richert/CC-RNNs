@@ -39,6 +39,8 @@ def minmax(x: np.ndarray) -> np.ndarray:
 # general
 dtype = torch.float64
 device = "cpu"
+plot_steps = 2000
+lorenz_vars = ["x", "y", "z"]
 
 # lorenz equation parameters
 s = 20.0
@@ -49,9 +51,9 @@ steps = 200000
 init_steps = 1000
 
 # reservoir parameters
-N = 500
+N = 200
 n_in = 3
-k = 1
+k = 2
 sr = 0.99
 bias = 0.9
 in_scale = 1.2
@@ -62,6 +64,7 @@ backprop_steps = 500
 test_steps = 2000
 lr = 0.1
 betas = (0.9, 0.999)
+tychinov_alpha = 1e-4
 
 # generate inputs and targets
 #############################
@@ -69,21 +72,10 @@ betas = (0.9, 0.999)
 # simulation
 y = np.asarray([0.1, 0.9, 1.1])
 y_col = []
-for step in range(steps + init_steps):
+for step in range(steps):
     y = y + dt * lorenz(y[0], y[1], y[2], s=s, r=r, b=b)
     y_col.append(y)
 y_col = np.asarray(y_col)
-
-# plotting
-plot_steps = 2000
-lorenz_vars = ["x", "y", "z"]
-fig, axes = plt.subplots(nrows=3, figsize=(12, 6))
-for i, (ax) in enumerate(axes):
-    ax.plot(y_col[init_steps:init_steps+plot_steps, i])
-    if i == 2:
-        ax.set_xlabel("steps")
-plt.suptitle("Lorenz dynamics")
-plt.tight_layout()
 
 # get inputs and targets
 inputs = torch.tensor(y_col[:-1], device=device, dtype=dtype)
@@ -132,16 +124,50 @@ with torch.enable_grad():
             loss = torch.zeros((1,))
             print(f"Current loss: {current_loss}")
 
-# generate predictions
-predictions = []
-for step in range(test_steps):
+# load input pattern into RNN weights and generate predictions
+##############################################################
+
+y0 = rnn.y[:]
+
+# load input pattern into RNN
+optim = torch.optim.Adam(list(readout.parameters()), lr=lr, betas=betas)
+y_col = []
+for step in range(steps-1):
+
+    y_col.append(rnn.y)
 
     # get RNN output
     x = rnn.forward(inputs[step])
     y = readout.forward(x)
 
-    # store results
-    predictions.append(y.cpu().detach().numpy())
+    # calculate loss
+    loss += loss_func(y, targets[step])
+
+    # make update
+    if (step + 1) % backprop_steps == 0:
+        optim.zero_grad()
+        loss.backward()
+        current_loss = loss.item()
+        optim.step()
+        loss = torch.zeros((1,))
+        print(f"Readout loss: {current_loss}")
+
+# compute input simulation weight matrix
+D, epsilon = rnn.load_input(inputs.T, torch.stack(y_col, dim=0).T, tychinov_alpha)
+print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
+
+# generate predictions
+with torch.no_grad():
+    rnn.y = y0
+    predictions = []
+    for step in range(test_steps):
+
+        # get RNN output
+        x = rnn.forward_a(D)
+        y = readout.forward(x)
+
+        # store results
+        predictions.append(y.cpu().detach().numpy())
 
 predictions = np.asarray(predictions)
 
@@ -154,6 +180,7 @@ for i, ax in enumerate(axes):
 
     ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
     ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
+    ax.set_ylabel(lorenz_vars[i])
     if i == 2:
         ax.set_xlabel("steps")
         ax.legend()
