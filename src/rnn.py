@@ -64,8 +64,13 @@ class LowRankRNN(RNN):
                  rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
 
         super().__init__(N, n_in, sr, density, bias_var, rf_var, device, dtype)
-        self.A = torch.tensor(sr * init_weights(self.N, rank, density), device=device, dtype=dtype)
-        self.B = torch.tensor(sr * init_weights(rank, self.N, density), device=device, dtype=dtype)
+        A = init_weights(N, rank, density)
+        B = init_weights(rank, N, density)
+        sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(A, B))))
+        A *= np.sqrt(sr) / np.sqrt(sr_comb)
+        B *= np.sqrt(sr) / np.sqrt(sr_comb)
+        self.A = torch.tensor(A, device=device, dtype=dtype)
+        self.B = torch.tensor(B, device=device, dtype=dtype)
         self.W = [self.A, self.B]
         self.z = torch.zeros((rank,), device=device, dtype=dtype)
 
@@ -144,7 +149,7 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         super().__init__(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
         self.alpha_sq = alpha**(-2)
         self.lam = lam
-        self.C = torch.zeros_like(self.z)
+        self.C = torch.ones_like(self.z)
         self.conceptors = {}
 
     def forward_c(self, x):
@@ -159,15 +164,15 @@ class RandomFeatureConceptorRNN(LowRankRNN):
 
     def forward_c_adapt(self, x):
         self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
-        z = torch.diag(self.C) * self.B @ self.y
-        self.C = self.C + self.lam * (z ** 2 - self.C * z ** 2 - self.C * self.alpha_sq)
+        z = self.C * (self.B @ self.y)
+        self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
         self.z = z
         return self.y
 
     def forward_c_a_adapt(self, D):
         self.y = torch.tanh(self.A @ self.z + D @ self.y + self.bias)
-        z = torch.diag(self.C) * self.B @ self.y
-        self.C = self.C + self.lam * (z**2 - self.C*z**2 - self.C*self.alpha_sq)
+        z = self.C * (self.B @ self.y)
+        self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
         self.z = z
         return self.y
 
