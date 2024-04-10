@@ -77,7 +77,8 @@ targets = torch.tensor(y_col[1:], device=device, dtype=dtype)
 ##################################################################
 
 # initialize LR-RNN
-rnn = LowRankRNN(N, n_in, k, sr=sr, density=density, bias_var=bias, rf_var=in_scale, device=device, dtype=dtype)
+rnn = LowRankRNN.random_init(N, n_in, k, sr=sr, density=density, bias_var=bias, rf_var=in_scale, device=device,
+                             dtype=dtype)
 readout = torch.nn.Linear(N, n_in, bias=True, device=device, dtype=dtype)
 
 # initial wash-out period
@@ -185,9 +186,11 @@ plt.show()
 # save the network configuration
 ################################
 
-A = rnn.A.detach().cpu().numpy()
-B = rnn.B.detach().cpu().numpy()
-W_in = rnn.W_in.detach().cpu().numpy()
-bias = rnn.bias.detach().cpu().numpy()
-pickle.dump({"omega": omega, "A": A, "B": B, "W_in": W_in, "bias": bias},
-            open(f"../results/lr_stuartlandau_{int(omega)}Hz.pkl", "wb"))
+# A = rnn.A.detach().cpu().numpy()
+# B = rnn.B.detach().cpu().numpy()
+# W_in = rnn.W_in.detach().cpu().numpy()
+# bias = rnn.bias.detach().cpu().numpy()
+# inputs = inputs.detach().cpu().numpy()
+# targets = targets.detach().cpu().numpy()
+# pickle.dump({"omega": omega, "A": A, "B": B, "W_in": W_in, "bias": bias, "inputs": inputs, "targets": targets},
+#             open(f"../results/lr_stuartlandau_{int(omega)}Hz.pkl", "wb"))

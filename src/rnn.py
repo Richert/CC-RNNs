@@ -6,16 +6,26 @@ import torch
 
 class RNN(torch.nn.Module):
 
-    def __init__(self, N: int, n_in: int, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
-                 rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor):
 
         super().__init__()
-        self.N = N
-        self.W = torch.tensor(sr * init_weights(self.N, self.N, density), device=device, dtype=dtype)
-        self.W_in = torch.tensor(rf_var*np.random.randn(self.N, n_in), device=device, dtype=dtype)
-        self.bias = torch.tensor(bias_var*np.random.randn(self.N), device=device, dtype=dtype)
-        self.y = torch.zeros((self.N,), device=device, dtype=dtype)
+        self.N = W.shape[0]
+        self.device = W.device
+        self.dtype = W.dtype
+        self.W = W
+        self.W_in = W_in
+        self.bias = bias
+        self.y = torch.zeros((self.N,), device=self.device, dtype=self.dtype)
         self._free_params = {}
+
+    @classmethod
+    def random_init(cls, N: int, n_in: int, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
+                    rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
+
+        W = torch.tensor(sr * init_weights(N, N, density), device=device, dtype=dtype)
+        W_in = torch.tensor(rf_var * np.random.randn(N, n_in), device=device, dtype=dtype)
+        bias = torch.tensor(bias_var * np.random.randn(N), device=device, dtype=dtype)
+        return cls(W, W_in, bias)
 
     def forward(self, x):
         self.y = torch.tanh(self.W @ self.y + self.W_in @ x + self.bias)
@@ -37,7 +47,10 @@ class RNN(torch.nn.Module):
         try:
             p = getattr(self, key)  # type: torch.tensor
             p.requires_grad = False
-            self._free_params.pop(key)
+            try:
+                self._free_params.pop(key)
+            except KeyError:
+                pass
         except AttributeError:
             print(r"Invalid parameter key {key}. Key should refer to a tensor object available as an attribute on RNN.")
 
@@ -51,50 +64,65 @@ class RNN(torch.nn.Module):
         for p in self._free_params.values():
             yield p
 
-    def load_input(self, u, x, tychinov_alpha: float = 1e-4) -> tuple:
-        assert u.shape[-1] == x.shape[-1]  # time steps
-        targets = self.W_in @ u
-        D = tensor_ridge(x, targets, tychinov_alpha)
-        return D, tensor_nrmse(D @ x, targets)
+    def load_input(self, x, y, tychinov_alpha: float = 1e-4) -> tuple:
+        assert x.shape[-1] == y.shape[-1]  # time steps
+        targets = self.W_in @ x
+        D = tensor_ridge(y, targets, tychinov_alpha)
+        return D, tensor_nrmse(D @ y, targets)
+
+    def detach(self):
+        self.y = self.y.detach()
+
+    @staticmethod
+    def train_readout(y, target, tychinov_alpha: float = 1e-4) -> tuple:
+        W_readout = tensor_ridge(y, target, tychinov_alpha)
+        return W_readout, tensor_nrmse(W_readout @ y, target)
 
 
 class LowRankRNN(RNN):
 
-    def __init__(self, N: int, n_in: int, rank: int = 1, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
-                 rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, W_z: torch.Tensor):
 
-        super().__init__(N, n_in, sr, density, bias_var, rf_var, device, dtype)
-        A = init_weights(N, rank, density)
-        B = init_weights(rank, N, density)
-        sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(A, B))))
-        A *= np.sqrt(sr) / np.sqrt(sr_comb)
-        B *= np.sqrt(sr) / np.sqrt(sr_comb)
-        self.A = torch.tensor(A, device=device, dtype=dtype)
-        self.B = torch.tensor(B, device=device, dtype=dtype)
-        self.W = [self.A, self.B]
-        self.z = torch.zeros((rank,), device=device, dtype=dtype)
+        super().__init__(W, W_in, bias)
+        self.W_z = W_z
+        self.rank = W_z.shape[0]
+        self.z = torch.zeros((self.rank,), device=self.device, dtype=self.dtype)
+
+    @classmethod
+    def random_init(cls, N: int, n_in: int, rank: int = 1, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
+                    rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
+
+        rnn = super().random_init(N, n_in, sr, density, bias_var, rf_var, device, dtype)
+        W = init_weights(N, rank, density)
+        W_z = init_weights(rank, N, density)
+        sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
+        W *= np.sqrt(sr) / np.sqrt(sr_comb)
+        W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
+        return cls(W, rnn.W_in, rnn.bias, W_z)
 
     def forward(self, x):
-        self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
-        self.z = self.B @ self.y
+        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
+        self.z = self.W_z @ self.y
         return self.y
 
     def forward_a(self, D):
-        self.y = torch.tanh(self.A @ self.z + D @ self.y + self.bias)
-        self.z = self.B @ self.y
+        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+        self.z = self.W_z @ self.y
         return self.y
+
+    def detach(self):
+        super().detach()
+        self.z = self.z.detach()
 
 
 class ConceptorRNN(RNN):
 
-    def __init__(self, N: int, n_in: int, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
-                 rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
-
-        super().__init__(N, n_in, sr, density, bias_var, rf_var, device, dtype)
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor):
+        super().__init__(W, W_in, bias)
         self.conceptors = {}
-        self.C = torch.zeros((N, N), device=device, dtype=dtype)
+        self.C = torch.zeros((self.N, self.N), device=self.device, dtype=self.dtype)
 
-    def learn_conceptor(self, key: str, y: torch.tensor, alpha: float = 10.0):
+    def learn_conceptor(self, key, y: torch.tensor, alpha: float = 10.0):
 
         R = (y.T @ y) / y.shape[0]
         U, S, V = torch.linalg.svd(R, full_matrices=True)
@@ -103,7 +131,7 @@ class ConceptorRNN(RNN):
         self.conceptors[key] = U @ S @ U.T
         self.C = self.conceptors[key]
 
-    def activate_conceptor(self, key: str):
+    def activate_conceptor(self, key):
         self.C = self.conceptors[key]
 
     def forward_c(self, x):
@@ -117,12 +145,18 @@ class ConceptorRNN(RNN):
 
 class AutoConceptorRNN(ConceptorRNN):
 
-    def __init__(self, N: int, n_in: int, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0, density: float = 0.2,
-                 bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, lam: float, alpha: float):
 
-        super().__init__(N, n_in, sr, density, bias_var, rf_var, device, dtype)
+        super().__init__(W, W_in, bias)
         self.lam = lam
         self.alpha_sq = alpha**(-2)
+
+    @classmethod
+    def random_init(cls, N: int, n_in: int, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
+                    density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
+                    dtype: torch.dtype = torch.float64):
+        ac = super().random_init(N, n_in, sr, density, bias_var, rf_var, device, dtype)
+        return cls(ac.W, ac.W_in, ac.bias, lam, alpha)
 
     def forward_c_a_adapt(self, D):
         y = self.C @ torch.tanh((self.W + D) @ self.y + self.bias)
@@ -142,42 +176,47 @@ class AutoConceptorRNN(ConceptorRNN):
 
 class RandomFeatureConceptorRNN(LowRankRNN):
 
-    def __init__(self, N: int, n_in: int, rank: int = 1, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
-                 density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
-                 dtype: torch.dtype = torch.float64):
-
-        super().__init__(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
-        self.alpha_sq = alpha**(-2)
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, W_z: torch.Tensor,
+                 lam: float, alpha: float):
+        super().__init__(W, W_in, bias, W_z)
+        self.alpha_sq = alpha ** (-2)
         self.lam = lam
         self.C = torch.ones_like(self.z)
         self.conceptors = {}
 
+    @classmethod
+    def random_init(cls, N: int, n_in: int, rank: int = 1, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
+                    density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
+                    dtype: torch.dtype = torch.float64):
+        lr = super().random_init(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
+        return cls(lr.W, lr.W_in, lr.bias, lr.W_z, lam, alpha)
+
     def forward_c(self, x):
-        self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
-        self.z = self.C * (self.B @ self.y)
+        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
+        self.z = self.C * (self.W_z @ self.y)
         return self.y
 
     def forward_c_a(self, D):
-        self.y = torch.tanh(self.A @ self.z + D @ self.y + self.bias)
-        self.z = self.C * (self.B @ self.y)
+        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+        self.z = self.C * (self.W_z @ self.y)
         return self.y
 
     def forward_c_adapt(self, x):
-        self.y = torch.tanh(self.A @ self.z + self.W_in @ x + self.bias)
-        z = self.C * (self.B @ self.y)
+        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
+        z = self.C * (self.W_z @ self.y)
         self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
         self.z = z
         return self.y
 
     def forward_c_a_adapt(self, D):
-        self.y = torch.tanh(self.A @ self.z + D @ self.y + self.bias)
-        z = self.C * (self.B @ self.y)
+        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+        z = self.C * (self.W_z @ self.y)
         self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
         self.z = z
         return self.y
 
-    def activate_conceptor(self, key: str):
+    def activate_conceptor(self, key):
         self.C = self.conceptors[key]
 
-    def store_conceptor(self, key: str):
+    def store_conceptor(self, key):
         self.conceptors[key] = self.C
