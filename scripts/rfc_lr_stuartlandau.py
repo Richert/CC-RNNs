@@ -38,7 +38,7 @@ plot_steps = 2000
 state_vars = ["x", "y"]
 
 # SL equation parameters
-omegas = [2, 10]
+omegas = [4, 10]
 dt = 0.01
 steps = 1000000
 init_steps = 1000
@@ -209,11 +209,15 @@ for omega in omegas:
 c1 = rnn.conceptors[omegas[0]]
 c2 = rnn.conceptors[omegas[1]]
 interpolation_steps = 4000
-gamma = torch.linspace(0.0, 1.0, interpolation_steps, dtype=dtype, device=device)
+constant_steps = int(interpolation_steps/4)
+ramp_steps = interpolation_steps - constant_steps
+gamma = torch.zeros((interpolation_steps,), dtype=dtype, device=device)
+gamma[constant_steps:ramp_steps] = torch.linspace(0.0, 1.0, steps=ramp_steps - constant_steps)
+gamma[ramp_steps:] = 1.0
 interp_col = []
 with torch.no_grad():
     for step in range(interpolation_steps):
-        rnn.C = (1 - gamma[step])*c1 + gamma[step]*c2
+        rnn.C = gamma[step]*c1 + (1-gamma[step])*c2
         y = W_r @ rnn.forward_c_a(D)
         interp_col.append(y.cpu().detach().numpy())
 interp_col = np.asarray(interp_col)
