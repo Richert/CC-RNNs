@@ -47,8 +47,8 @@ init_steps = 1000
 N = 100
 n_in = len(state_vars)
 k = 5
-sr = 1.2
-bias_scale = 1.2
+sr = 1.1
+bias_scale = 1.1
 in_scale = 1.2
 density = 0.5
 
@@ -185,13 +185,6 @@ for i, omega in enumerate(omegas):
     rnn.activate_conceptor(omega)
     c = rnn.conceptors[omega].detach().cpu().numpy()
     target = target_col[omega]
-
-    # finalize conceptors
-    # with torch.no_grad():
-    #     rnn.y = init_states[omega]
-    #     for step in range(loading_steps):
-    #         rnn.forward_c_a_adapt(D)
-    # rnn.store_conceptor(omega)
     print(f"Conceptor for omega = {omega}: {np.round(c, decimals=2)}")
 
     # generate prediction

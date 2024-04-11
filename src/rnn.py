@@ -182,7 +182,6 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         self.alpha_sq = alpha ** (-2)
         self.lam = lam
         self.C = torch.zeros_like(self.z)
-        self.C_neg = torch.ones_like(self.z)
         self.conceptors = {}
 
     @classmethod
@@ -197,19 +196,9 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         self.z = self.C * (self.W_z @ self.y)
         return self.y
 
-    def forward_c2(self, x):
-        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
-        self.z = self.C * self.C_neg * (self.W_z @ self.y)
-        return self.y
-
     def forward_c_a(self, D):
         self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
         self.z = self.C * (self.W_z @ self.y)
-        return self.y
-
-    def forward_c2_a(self, D):
-        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
-        self.z = self.C * self.C_neg * (self.W_z @ self.y)
         return self.y
 
     def forward_c_adapt(self, x):
@@ -219,23 +208,9 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         self.z = z
         return self.y
 
-    def forward_c2_adapt(self, x):
-        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
-        z = self.C * self.C_neg * (self.W_z @ self.y)
-        self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
-        self.z = z
-        return self.y
-
     def forward_c_a_adapt(self, D):
         self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
         z = self.C * (self.W_z @ self.y)
-        self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
-        self.z = z
-        return self.y
-
-    def forward_c2_a_adapt(self, D):
-        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
-        z = self.C * self.C_neg * (self.W_z @ self.y)
         self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
         self.z = z
         return self.y
@@ -254,16 +229,9 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         else:
             self.C = torch.ones_like(self.z)
 
-    def update_negative_conceptor(self, eps: float = 1e-3):
-        C_all = torch.zeros_like(self.C_neg)
-        for C in self.conceptors.values():
-            C_all = self.combine_conceptors(C_all, C, operation="or", eps=eps)
-        self.C_neg = 1 - C_all
-
     def detach(self):
         super().detach()
         self.C = self.C.detach()
-        self.C_neg = self.C_neg.detach()
 
     @staticmethod
     def combine_conceptors(C1: torch.Tensor, C2: torch.Tensor, operation: str, eps: float = 1e-3) -> torch.Tensor:
