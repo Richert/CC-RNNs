@@ -254,17 +254,42 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         else:
             self.C = torch.ones_like(self.z)
 
-    def update_negative_conceptor(self):
+    def update_negative_conceptor(self, eps: float = 1e-3):
         C_all = torch.zeros_like(self.C_neg)
         for C in self.conceptors.values():
-            idx = (C_all == 1.0) * (C == 1.0)
-            C_all[idx == 1.0] = 1.0
-            C_all_tmp = C_all[idx < 1.0]
-            C_tmp = C[idx < 1.0]
-            C_all[idx < 1.0] = (C_all_tmp + C_tmp - 2*C_all_tmp*C_tmp)/(1 - C_all_tmp*C_tmp)
+            C_all = self.combine_conceptors(C_all, C, operation="or", eps=eps)
         self.C_neg = 1 - C_all
 
     def detach(self):
         super().detach()
         self.C = self.C.detach()
         self.C_neg = self.C_neg.detach()
+
+    @staticmethod
+    def combine_conceptors(C1: torch.Tensor, C2: torch.Tensor, operation: str, eps: float = 1e-3) -> torch.Tensor:
+
+        C_comb = torch.zeros_like(C1)
+        zero = eps
+        one = 1 - eps
+
+        if operation == "and":
+
+            idx = (C1 < zero) * (C2 < zero)
+            C_comb[idx == 1.0] = 0.0
+            C1_tmp = C1[idx < 1.0]
+            C2_tmp = C2[idx < 1.0]
+            C_comb[idx < 1.0] = (C1_tmp * C2_tmp) / (C1_tmp + C2_tmp - C1_tmp * C2_tmp)
+
+        elif operation == "or":
+
+            idx = (C1 > one) * (C2 > one)
+            C_comb[idx == 1.0] = 1.0
+            C1_tmp = C1[idx < 1.0]
+            C2_tmp = C2[idx < 1.0]
+            C_comb[idx < 1.0] = (C1_tmp + C2_tmp - 2 * C1_tmp * C2_tmp) / (1 - C1_tmp * C2_tmp)
+
+        else:
+
+            raise ValueError(f"Invalid operation for combining conceptors: {operation}.")
+
+        return C_comb

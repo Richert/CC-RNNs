@@ -103,8 +103,9 @@ for i, omega in enumerate(omegas):
     input_col[omega] = inputs[:loading_steps]
 
     # initialize new conceptor
-    rnn.init_new_conceptor(init_value="ones")
-    rnn.detach()
+    if i > 0:
+        rnn.init_new_conceptor(init_value="zero")
+        rnn.C = 1 - rnn.conceptors[omegas[i-1]]
 
     # initial wash-out period
     avg_input = torch.mean(inputs, dim=0)
@@ -120,7 +121,7 @@ for i, omega in enumerate(omegas):
         for step in range(steps-1):
 
             # get RNN readout
-            y = readout.forward(rnn.forward_c2_adapt(inputs[step]))
+            y = readout.forward(rnn.forward_c_adapt(inputs[step]))
 
             # calculate loss
             loss += loss_func(y, targets[step])
@@ -137,7 +138,6 @@ for i, omega in enumerate(omegas):
 
     # store final state
     rnn.store_conceptor(omega)
-    rnn.update_negative_conceptor()
     rnn.detach()
     init_states[omega] = rnn.y[:]
 
@@ -158,7 +158,7 @@ with torch.no_grad():
         y_col = []
         for step in range(loading_steps):
             y_col.append(rnn.y)
-            rnn.forward_c2(inputs[step])
+            rnn.forward_c(inputs[step])
         state_col[omega] = torch.stack(y_col, dim=0)
 
     # load input into RNN weights
@@ -178,18 +178,20 @@ with torch.no_grad():
 
 # single frequency oscillation
 prediction_col = {}
-for omega in omegas:
+for i, omega in enumerate(omegas):
 
+    c1, c2 = rnn.conceptors[omega], rnn.conceptors[omegas[1-i]]
+    rnn.conceptors[omega] = rnn.combine_conceptors(c1, 1 - c2, operation="and")
     rnn.activate_conceptor(omega)
     c = rnn.conceptors[omega].detach().cpu().numpy()
     target = target_col[omega]
 
     # finalize conceptors
-    with torch.no_grad():
-        rnn.y = init_states[omega]
-        for step in range(loading_steps):
-            rnn.forward_c2_a_adapt(D)
-    rnn.store_conceptor(omega)
+    # with torch.no_grad():
+    #     rnn.y = init_states[omega]
+    #     for step in range(loading_steps):
+    #         rnn.forward_c_a_adapt(D)
+    # rnn.store_conceptor(omega)
     print(f"Conceptor for omega = {omega}: {np.round(c, decimals=2)}")
 
     # generate prediction

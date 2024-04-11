@@ -92,9 +92,7 @@ with torch.no_grad():
         input_col[omega] = inputs[:loading_steps]
 
         # initialize new conceptor
-        if i > 0:
-            rnn.init_new_conceptor()
-            rnn.C = 1 - rnn.conceptors[omegas[i-1]]
+        rnn.init_new_conceptor(init_value="zero")
 
         # initial wash-out period
         avg_input = torch.mean(inputs, dim=0)
