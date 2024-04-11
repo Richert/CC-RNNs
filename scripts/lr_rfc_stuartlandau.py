@@ -40,14 +40,14 @@ state_vars = ["x", "y"]
 # SL equation parameters
 omegas = [4, 10]
 dt = 0.01
-steps = 1000000
+steps = 200000
 init_steps = 1000
 
 # rnn parameters
-N = 100
+N = 200
 n_in = len(state_vars)
-k = 5
-sr = 1.1
+k = 10
+sr = 1.2
 bias_scale = 1.1
 in_scale = 1.2
 density = 0.5
@@ -62,14 +62,15 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
-backprop_steps = 1000
+backprop_steps = 500
 test_steps = 2000
 loading_steps = int(0.5 * (steps - 1))
-lr = 0.02
-lam = 1e-3
-alpha = 5.0
+lr = 0.005
+lam = 1e-2
+alpha = 2.0
 betas = (0.9, 0.999)
-tychinov = 1e-4
+tychinov = 1e-3
+epsilon = 1e-5
 
 # train LR-RNN weights
 ######################
@@ -103,8 +104,8 @@ for i, omega in enumerate(omegas):
     input_col[omega] = inputs[:loading_steps]
 
     # initialize new conceptor
+    rnn.init_new_conceptor(init_value="random")
     if i > 0:
-        rnn.init_new_conceptor(init_value="zero")
         rnn.C = 1 - rnn.conceptors[omegas[i-1]]
 
     # initial wash-out period
@@ -129,6 +130,7 @@ for i, omega in enumerate(omegas):
             # make update
             if (step + 1) % backprop_steps == 0:
                 optim.zero_grad()
+                loss += epsilon*(torch.sum(rnn.W @ rnn.W_z) + torch.sum(readout.weight))
                 loss.backward()
                 current_loss = loss.item()
                 optim.step()
@@ -180,8 +182,8 @@ with torch.no_grad():
 prediction_col = {}
 for i, omega in enumerate(omegas):
 
-    c1, c2 = rnn.conceptors[omega], rnn.conceptors[omegas[1-i]]
-    rnn.conceptors[omega] = rnn.combine_conceptors(c1, 1 - c2, operation="and")
+    # c1, c2 = rnn.conceptors[omega], rnn.conceptors[omegas[1-i]]
+    # rnn.conceptors[omega] = rnn.combine_conceptors(c1, 1 - c2, operation="and")
     rnn.activate_conceptor(omega)
     c = rnn.conceptors[omega].detach().cpu().numpy()
     target = target_col[omega]
