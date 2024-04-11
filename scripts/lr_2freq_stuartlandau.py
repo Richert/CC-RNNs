@@ -2,7 +2,6 @@ from src import RandomFeatureConceptorRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 from src.functions import init_weights
 
 

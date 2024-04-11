@@ -220,3 +220,10 @@ class RandomFeatureConceptorRNN(LowRankRNN):
 
     def store_conceptor(self, key):
         self.conceptors[key] = self.C
+
+    def init_new_conceptor(self):
+        self.C = torch.ones_like(self.z)
+
+    def detach(self):
+        super().detach()
+        self.C = self.C.detach()
