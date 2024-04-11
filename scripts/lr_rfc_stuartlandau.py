@@ -40,16 +40,17 @@ state_vars = ["x", "y"]
 # SL equation parameters
 omegas = [4, 10]
 dt = 0.01
-steps = 200000
+steps = 1000000
 init_steps = 1000
 
 # rnn parameters
 N = 200
 n_in = len(state_vars)
-k = 10
-sr = 1.2
+k = 20
+sr = 1.4
 bias_scale = 1.1
 in_scale = 1.2
+out_scale = 1.0
 density = 0.5
 
 # initialize rnn matrices
@@ -60,13 +61,14 @@ W_z = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
+W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
-backprop_steps = 500
+backprop_steps = 400
 test_steps = 2000
 loading_steps = int(0.5 * (steps - 1))
-lr = 0.005
-lam = 1e-2
+lr = 0.01
+lam = 2e-3
 alpha = 2.0
 betas = (0.9, 0.999)
 tychinov = 1e-3
@@ -78,7 +80,6 @@ epsilon = 1e-5
 # initialize RFC
 rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
                                 torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
-readout = torch.nn.Linear(N, n_in, bias=False, device=device, dtype=dtype)
 rnn.free_param("W")
 rnn.free_param("W_z")
 
@@ -89,7 +90,7 @@ target_col, input_col, init_states = {}, {}, {}
 for i, omega in enumerate(omegas):
 
     # set up optimizer
-    optim = torch.optim.Adam(list(rnn.parameters()) + list(readout.parameters()), lr=lr, betas=betas)
+    optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
 
     # generate inputs and targets
     y = np.asarray([0.1, 0.9])
@@ -106,7 +107,7 @@ for i, omega in enumerate(omegas):
     # initialize new conceptor
     rnn.init_new_conceptor(init_value="random")
     if i > 0:
-        rnn.C = 1 - rnn.conceptors[omegas[i-1]]
+        rnn.C = rnn.combine_conceptors(rnn.C, 1 - rnn.conceptors[omegas[i-1]], operation="and")
 
     # initial wash-out period
     avg_input = torch.mean(inputs, dim=0)
@@ -122,7 +123,7 @@ for i, omega in enumerate(omegas):
         for step in range(steps-1):
 
             # get RNN readout
-            y = readout.forward(rnn.forward_c_adapt(inputs[step]))
+            y = W_r @ rnn.forward_c_adapt(inputs[step])
 
             # calculate loss
             loss += loss_func(y, targets[step])
@@ -130,7 +131,10 @@ for i, omega in enumerate(omegas):
             # make update
             if (step + 1) % backprop_steps == 0:
                 optim.zero_grad()
-                loss += epsilon*(torch.sum(rnn.W @ rnn.W_z) + torch.sum(readout.weight))
+                W_r_tmp = torch.abs(rnn.W_z)
+                for j in range(k):
+                    W_r_tmp[j, :] *= rnn.C[j]
+                loss += epsilon*torch.sum(torch.abs(rnn.W) @ W_r_tmp)
                 loss.backward()
                 current_loss = loss.item()
                 optim.step()
@@ -141,7 +145,12 @@ for i, omega in enumerate(omegas):
     # store final state
     rnn.store_conceptor(omega)
     rnn.detach()
-    init_states[omega] = rnn.y[:]
+    init_states[omega] = (rnn.y[:], rnn.z[:])
+
+# finalize conceptors
+for i, omega in enumerate(omegas):
+    c1, c2 = rnn.conceptors[omega], rnn.conceptors[omegas[1 - i]]
+    rnn.conceptors[omega] = rnn.combine_conceptors(c1, 1 - c2, operation="and")
 
 # load input into RNN weights and train readout
 ###############################################
@@ -154,7 +163,7 @@ with torch.no_grad():
         # apply condition
         inputs = input_col[omega]
         rnn.activate_conceptor(omega)
-        rnn.y = init_states[omega]
+        rnn.y, rnn.z = init_states[omega]
 
         # harvest states
         y_col = []
@@ -182,8 +191,6 @@ with torch.no_grad():
 prediction_col = {}
 for i, omega in enumerate(omegas):
 
-    # c1, c2 = rnn.conceptors[omega], rnn.conceptors[omegas[1-i]]
-    # rnn.conceptors[omega] = rnn.combine_conceptors(c1, 1 - c2, operation="and")
     rnn.activate_conceptor(omega)
     c = rnn.conceptors[omega].detach().cpu().numpy()
     target = target_col[omega]
@@ -192,7 +199,7 @@ for i, omega in enumerate(omegas):
     # generate prediction
     with torch.no_grad():
 
-        rnn.y = init_states[omega]
+        rnn.y, rnn.z = init_states[omega]
         predictions = []
         for step in range(test_steps):
 
@@ -216,8 +223,9 @@ gamma[constant_steps:ramp_steps] = torch.linspace(0.0, 1.0, steps=ramp_steps - c
 gamma[ramp_steps:] = 1.0
 interp_col = []
 with torch.no_grad():
+    rnn.y, rnn.z = init_states[omegas[0]]
     for step in range(interpolation_steps):
-        rnn.C = gamma[step]*c1 + (1-gamma[step])*c2
+        rnn.C = gamma[step]*c2 + (1-gamma[step])*c1
         y = W_r @ rnn.forward_c_a(D)
         interp_col.append(y.cpu().detach().numpy())
 interp_col = np.asarray(interp_col)
