@@ -181,7 +181,8 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         super().__init__(W, W_in, bias, W_z)
         self.alpha_sq = alpha ** (-2)
         self.lam = lam
-        self.C = torch.ones_like(self.z)
+        self.C = torch.zeros_like(self.z)
+        self.C_neg = torch.ones_like(self.z)
         self.conceptors = {}
 
     @classmethod
@@ -196,14 +197,31 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         self.z = self.C * (self.W_z @ self.y)
         return self.y
 
+    def forward_c2(self, x):
+        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
+        self.z = self.C * self.C_neg * (self.W_z @ self.y)
+        return self.y
+
     def forward_c_a(self, D):
         self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
         self.z = self.C * (self.W_z @ self.y)
         return self.y
 
+    def forward_c2_a(self, D):
+        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+        self.z = self.C * self.C_neg * (self.W_z @ self.y)
+        return self.y
+
     def forward_c_adapt(self, x):
         self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
         z = self.C * (self.W_z @ self.y)
+        self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
+        self.z = z
+        return self.y
+
+    def forward_c2_adapt(self, x):
+        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
+        z = self.C * self.C_neg * (self.W_z @ self.y)
         self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
         self.z = z
         return self.y
@@ -215,15 +233,38 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         self.z = z
         return self.y
 
+    def forward_c2_a_adapt(self, D):
+        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+        z = self.C * self.C_neg * (self.W_z @ self.y)
+        self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
+        self.z = z
+        return self.y
+
     def activate_conceptor(self, key):
         self.C = self.conceptors[key]
 
     def store_conceptor(self, key):
         self.conceptors[key] = self.C
 
-    def init_new_conceptor(self):
-        self.C = torch.ones_like(self.z)
+    def init_new_conceptor(self, init_value: str = "zero"):
+        if init_value == "zero":
+            self.C = torch.zeros_like(self.z)
+        elif init_value == "random":
+            self.C = torch.rand(size=self.z.size(), dtype=self.z.dtype, device=self.z.device)
+        else:
+            self.C = torch.ones_like(self.z)
+
+    def update_negative_conceptor(self):
+        C_all = torch.zeros_like(self.C_neg)
+        for C in self.conceptors.values():
+            idx = (C_all == 1.0) * (C == 1.0)
+            C_all[idx == 1.0] = 1.0
+            C_all_tmp = C_all[idx < 1.0]
+            C_tmp = C[idx < 1.0]
+            C_all[idx < 1.0] = (C_all_tmp + C_tmp - 2*C_all_tmp*C_tmp)/(1 - C_all_tmp*C_tmp)
+        self.C_neg = 1 - C_all
 
     def detach(self):
         super().detach()
         self.C = self.C.detach()
+        self.C_neg = self.C_neg.detach()

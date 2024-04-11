@@ -46,8 +46,8 @@ init_steps = 1000
 # rnn parameters
 N = 100
 n_in = len(state_vars)
-k = 5
-sr = 1.2
+k = 500
+sr = 1.1
 bias_scale = 1.2
 in_scale = 1.2
 density = 0.5
@@ -62,13 +62,10 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
-backprop_steps = 1000
 test_steps = 2000
-loading_steps = int(0.5 * (steps - 1))
-lr = 0.02
-lam = 1e-3
-alpha = 5.0
-betas = (0.9, 0.999)
+loading_steps = int(0.1 * (steps - 1))
+lam = 5e-3
+alpha = 20.0
 tychinov = 1e-4
 
 # train LR-RNN weights
@@ -77,69 +74,41 @@ tychinov = 1e-4
 # initialize RFC
 rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
                                 torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
-readout = torch.nn.Linear(N, n_in, bias=False, device=device, dtype=dtype)
-rnn.free_param("W")
-rnn.free_param("W_z")
-
-# set up loss function
-loss_func = torch.nn.MSELoss()
 
 target_col, input_col, init_states = {}, {}, {}
-for i, omega in enumerate(omegas):
+with torch.no_grad():
+    for i, omega in enumerate(omegas):
 
-    # set up optimizer
-    optim = torch.optim.Adam(list(rnn.parameters()) + list(readout.parameters()), lr=lr, betas=betas)
+        # generate inputs and targets
+        y = np.asarray([0.1, 0.9])
+        y_col = []
+        for step in range(steps):
+            y = y + dt * stuart_landau(y[0], y[1], omega=omega)
+            y_col.append(y)
+        y_col = np.asarray(y_col)
+        inputs = torch.tensor(y_col[:-1], device=device, dtype=dtype)
+        targets = torch.tensor(y_col[1:], device=device, dtype=dtype)
+        target_col[omega] = targets[:loading_steps]
+        input_col[omega] = inputs[:loading_steps]
 
-    # generate inputs and targets
-    y = np.asarray([0.1, 0.9])
-    y_col = []
-    for step in range(steps):
-        y = y + dt * stuart_landau(y[0], y[1], omega=omega)
-        y_col.append(y)
-    y_col = np.asarray(y_col)
-    inputs = torch.tensor(y_col[:-1], device=device, dtype=dtype)
-    targets = torch.tensor(y_col[1:], device=device, dtype=dtype)
-    target_col[omega] = targets[:loading_steps]
-    input_col[omega] = inputs[:loading_steps]
+        # initialize new conceptor
+        if i > 0:
+            rnn.init_new_conceptor()
+            rnn.C = 1 - rnn.conceptors[omegas[i-1]]
 
-    # initialize new conceptor
-    rnn.init_new_conceptor(init_value="ones")
-    rnn.detach()
+        # initial wash-out period
+        avg_input = torch.mean(inputs, dim=0)
+        with torch.no_grad():
+            for step in range(init_steps):
+                rnn.forward_c(avg_input)
 
-    # initial wash-out period
-    avg_input = torch.mean(inputs, dim=0)
-    with torch.no_grad():
-        for step in range(init_steps):
-            rnn.forward(avg_input)
-
-    # train the RNN weights and the conceptor simultaneously
-    current_loss = 0.0
-    with torch.enable_grad():
-
-        loss = torch.zeros((1,))
+        # train the conceptor
         for step in range(steps-1):
+            rnn.forward_c_adapt(inputs[step])
 
-            # get RNN readout
-            y = readout.forward(rnn.forward_c2_adapt(inputs[step]))
-
-            # calculate loss
-            loss += loss_func(y, targets[step])
-
-            # make update
-            if (step + 1) % backprop_steps == 0:
-                optim.zero_grad()
-                loss.backward()
-                current_loss = loss.item()
-                optim.step()
-                loss = torch.zeros((1,))
-                rnn.detach()
-                print(f"Training phase I loss (omega = {omega}): {current_loss}")
-
-    # store final state
-    rnn.store_conceptor(omega)
-    rnn.update_negative_conceptor()
-    rnn.detach()
-    init_states[omega] = rnn.y[:]
+        # store final state
+        rnn.store_conceptor(omega)
+        init_states[omega] = rnn.y[:]
 
 # load input into RNN weights and train readout
 ###############################################
@@ -158,7 +127,7 @@ with torch.no_grad():
         y_col = []
         for step in range(loading_steps):
             y_col.append(rnn.y)
-            rnn.forward_c2(inputs[step])
+            rnn.forward_c(inputs[step])
         state_col[omega] = torch.stack(y_col, dim=0)
 
     # load input into RNN weights
@@ -181,15 +150,15 @@ prediction_col = {}
 for omega in omegas:
 
     rnn.activate_conceptor(omega)
-    c = rnn.conceptors[omega].detach().cpu().numpy()
     target = target_col[omega]
 
     # finalize conceptors
     with torch.no_grad():
         rnn.y = init_states[omega]
         for step in range(loading_steps):
-            rnn.forward_c2_a_adapt(D)
+            rnn.forward_c_a_adapt(D)
     rnn.store_conceptor(omega)
+    c = rnn.conceptors[omega].detach().cpu().numpy()
     print(f"Conceptor for omega = {omega}: {np.round(c, decimals=2)}")
 
     # generate prediction

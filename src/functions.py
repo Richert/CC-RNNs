@@ -150,16 +150,20 @@ def sNOT(c):
 def sAND(c,b):
     d = np.zeros([len(c)])
     for i in range(len(c)):
-        if (c[i] == 0 and b[i] == 0): d[i] = 0
-        else:                         d[i] = c[i]*b[i]/(c[i]+b[i]-c[i]*b[i])
+        if (c[i] == 0 and b[i] == 0):
+            d[i] = 0
+        else:
+            d[i] = c[i]*b[i]/(c[i]+b[i]-c[i]*b[i])
     return d
 
 
 def sOR(c,b):
     d = np.zeros([len(c)])
     for i in range(len(c)):
-        if (c[i] == 1 and c[i] == b[i]): d[i] = 1
-        else:                            d[i] = (c[i]+b[i]-2*c[i]*b[i])/(1-c[i]*b[i])   
+        if (c[i] == 1 and c[i] == b[i]):
+            d[i] = 1
+        else:
+            d[i] = (c[i]+b[i]-2*c[i]*b[i])/(1-c[i]*b[i])
     return d
 
 
