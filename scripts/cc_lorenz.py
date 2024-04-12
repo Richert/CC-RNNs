@@ -42,14 +42,13 @@ s = 20.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 4000000
+steps = 1000000
 init_steps = 1000
 
 # reservoir parameters
 N = 400
 n_in = len(state_vars)
-k = 10
-sr = 1.2
+sr = 1.3
 bias_scale = 0.9
 in_scale = 1.2
 density = 0.2
@@ -58,18 +57,15 @@ out_scale = 1.0
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
-W = init_weights(N, k, density)
-W_z = init_weights(k, N, density)
-sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
+W = init_weights(N, N, density)
+sr_comb = np.max(np.abs(np.linalg.eigvals(W)))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
-W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
-W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
-backprop_steps = 8000
+backprop_steps = 500
 loading_steps = int(0.2*steps)
 test_steps = 2000
-lr = 0.2
+lr = 0.05
 betas = (0.9, 0.999)
 tychinov_alpha = 1e-3
 
@@ -125,7 +121,6 @@ with torch.enable_grad():
         if (step + 1) % backprop_steps == 0:
 
             optim.zero_grad()
-            loss /= backprop_steps
             loss.backward()
             current_loss = loss.item()
             optim.step()
@@ -135,8 +130,10 @@ with torch.enable_grad():
 # load input pattern into RNN weights and generate predictions
 ##############################################################
 
+y0 = rnn.y[:]
+
 # load input pattern into RNN
-optim = torch.optim.Adam(list(readout.parameters()), lr=lr, betas=betas)
+optim = torch.optim.Adam(list(readout.parameters()), lr=0.01, betas=betas)
 y_col = []
 
 for step in range(loading_steps):
@@ -153,7 +150,6 @@ for step in range(loading_steps):
     # make update
     if (step + 1) % backprop_steps == 0:
         optim.zero_grad()
-        loss /= backprop_steps
         loss.backward()
         current_loss = loss.item()
         optim.step()
@@ -165,13 +161,14 @@ D, epsilon = rnn.load_input(inputs[:loading_steps].T, torch.stack(y_col, dim=0).
 print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
-drive_steps = 0  #int(test_steps/2)
 with torch.no_grad():
+    rnn.y = y0
     predictions = []
+    y = readout.forward(rnn.y)
     for step in range(test_steps):
 
         # get RNN output
-        if step < drive_steps:
+        if step < 1000:
             x = rnn.forward(inputs[step])
         else:
             x = rnn.forward_a(D)

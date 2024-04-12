@@ -121,5 +121,3 @@ if plot_recall:
         plt.suptitle("RNN recall")
     plt.tight_layout()
     plt.show()
-
-
