@@ -14,6 +14,7 @@ class RNN(torch.nn.Module):
         self.dtype = W.dtype
         self.W = W
         self.W_in = W_in
+        self.D = None
         self.bias = bias
         self.y = torch.zeros((self.N,), device=self.device, dtype=self.dtype)
         self._free_params = {}
@@ -31,8 +32,8 @@ class RNN(torch.nn.Module):
         self.y = torch.tanh(self.W @ self.y + self.W_in @ x + self.bias)
         return self.y
 
-    def forward_a(self, D):
-        self.y = torch.tanh((self.W + D) @ self.y + self.bias)
+    def forward_a(self):
+        self.y = torch.tanh(self.W @ self.y + self.D @ self.y + self.bias)
         return self.y
 
     def free_param(self, key: str):
@@ -64,17 +65,20 @@ class RNN(torch.nn.Module):
         for p in self._free_params.values():
             yield p
 
-    def load_input(self, x, y, tychinov_alpha: float = 1e-4) -> tuple:
-        assert x.shape[-1] == y.shape[-1]  # time steps
-        targets = self.W_in @ x
-        D = tensor_ridge(y, targets, tychinov_alpha)
-        return D, tensor_nrmse(D @ y, targets)
+    def load_input(self, y, target, tychinov_alpha: float = 1e-4, overwrite: bool = False) -> tuple:
+        D, epsilon = self.train_readout(y, target, tychinov_alpha=tychinov_alpha)
+        if overwrite or self.D is None:
+            self.D = self.W_in @ D
+        else:
+            self.D += self.W_in @ D
+        return D, epsilon
 
     def detach(self):
         self.y = self.y.detach()
 
     @staticmethod
     def train_readout(y, target, tychinov_alpha: float = 1e-4) -> tuple:
+        assert target.shape[-1] == y.shape[-1]  # time steps
         W_readout = tensor_ridge(y, target, tychinov_alpha)
         return W_readout, tensor_nrmse(W_readout @ y, target)
 
@@ -105,8 +109,8 @@ class LowRankRNN(RNN):
         self.z = self.W_z @ self.y
         return self.y
 
-    def forward_a(self, D):
-        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+    def forward_a(self):
+        self.y = torch.tanh(self.W @ self.z + self.D @ self.y + self.bias)
         self.z = self.W_z @ self.y
         return self.y
 
@@ -138,8 +142,8 @@ class ConceptorRNN(RNN):
         self.y = self.C @ super().forward(x)
         return self.y
 
-    def forward_c_a(self, D):
-        self.y = self.C @ super().forward_a(D)
+    def forward_c_a(self):
+        self.y = self.C @ super().forward_a()
         return self.y
 
 
