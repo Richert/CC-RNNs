@@ -1,4 +1,4 @@
-from src import LowRankRNN
+from src import ConceptorRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,17 +42,16 @@ s = 20.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 1000000
+steps = 500000
 init_steps = 1000
 
 # reservoir parameters
-N = 400
+N = 200
 n_in = len(state_vars)
-sr = 1.3
-bias_scale = 0.9
-in_scale = 1.2
-density = 0.2
-out_scale = 1.0
+sr = 0.99
+bias_scale = 0.01
+in_scale = 0.01
+density = 0.1
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -67,6 +66,7 @@ loading_steps = int(0.2*steps)
 test_steps = 2000
 lr = 0.05
 betas = (0.9, 0.999)
+alpha = 200.0
 tychinov_alpha = 1e-3
 
 # generate inputs and targets
@@ -87,8 +87,8 @@ targets = torch.tensor(y_col[1:], device=device, dtype=dtype)
 # train low-rank RNN to predict next time step of Lorenz attractor
 ##################################################################
 
-# initialize LR-RNN
-rnn = LowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias, torch.tensor(W_z, device=device, dtype=dtype))
+# initialize C-RNN
+rnn = ConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias)
 readout = torch.nn.Linear(N, n_in, bias=True, device=device, dtype=dtype)
 
 # initial wash-out period
@@ -101,14 +101,18 @@ with torch.no_grad():
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.parameters()) + list(readout.parameters()), lr=lr, betas=betas)
+optim = torch.optim.Adam(readout.parameters(), lr=lr, betas=betas)
 
 # training
 current_loss = 0.0
+y_col = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
     for step in range(steps-1):
+
+        # get RNN state
+        y_col.append(rnn.y)
 
         # get RNN output
         x = rnn.forward(inputs[step])
@@ -125,7 +129,13 @@ with torch.enable_grad():
             current_loss = loss.item()
             optim.step()
             loss = torch.zeros((1,))
-            print(f"Current loss: {current_loss}")
+            print(f"Readout loss (no conceptor): {current_loss}")
+
+# calculate conceptor
+#####################
+
+y_col = torch.stack(y_col, dim=0)
+rnn.learn_conceptor("c1", y_col, alpha)
 
 # load input pattern into RNN weights and generate predictions
 ##############################################################
@@ -141,7 +151,7 @@ for step in range(loading_steps):
     y_col.append(rnn.y)
 
     # get RNN output
-    x = rnn.forward(inputs[step])
+    x = rnn.forward_c(inputs[step])
     y = readout.forward(x)
 
     # calculate loss
@@ -154,24 +164,23 @@ for step in range(loading_steps):
         current_loss = loss.item()
         optim.step()
         loss = torch.zeros((1,))
-        print(f"Readout loss: {current_loss}")
+        print(f"Readout loss (conceptor-controlled): {current_loss}")
 
 # compute input simulation weight matrix
-D, epsilon = rnn.load_input(inputs[:loading_steps].T, torch.stack(y_col, dim=0).T, tychinov_alpha)
+D, epsilon = rnn.load_input(torch.stack(y_col, dim=0).T, inputs[:loading_steps].T, tychinov_alpha)
 print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 with torch.no_grad():
     rnn.y = y0
     predictions = []
-    y = readout.forward(rnn.y)
     for step in range(test_steps):
 
         # get RNN output
         if step < 1000:
-            x = rnn.forward(inputs[step])
+            x = rnn.forward_c(inputs[step])
         else:
-            x = rnn.forward_a(D)
+            x = rnn.forward_c_a()
         y = readout.forward(x)
 
         # store results

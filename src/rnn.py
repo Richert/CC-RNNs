@@ -134,6 +134,7 @@ class ConceptorRNN(RNN):
         S = S @ torch.linalg.inv(S + torch.eye(self.N)/alpha**2)
         self.conceptors[key] = U @ S @ U.T
         self.C = self.conceptors[key]
+        return self.C
 
     def activate_conceptor(self, key):
         self.C = self.conceptors[key]
@@ -200,8 +201,8 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         self.z = self.C * (self.W_z @ self.y)
         return self.y
 
-    def forward_c_a(self, D):
-        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+    def forward_c_a(self):
+        self.y = torch.tanh(self.W @ self.z + self.D @ self.y + self.bias)
         self.z = self.C * (self.W_z @ self.y)
         return self.y
 
@@ -212,8 +213,8 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         self.z = z
         return self.y
 
-    def forward_c_a_adapt(self, D):
-        self.y = torch.tanh(self.W @ self.z + D @ self.y + self.bias)
+    def forward_c_a_adapt(self):
+        self.y = torch.tanh(self.W @ self.z + self.D @ self.y + self.bias)
         z = self.C * (self.W_z @ self.y)
         self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
         self.z = z

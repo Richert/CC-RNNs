@@ -48,10 +48,10 @@ N = 200
 n_in = len(state_vars)
 k = 20
 sr = 1.4
-bias_scale = 1.1
-in_scale = 1.2
+bias_scale = 0.1
+in_scale = 1.0
 out_scale = 1.0
-density = 0.5
+density = 0.2
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -175,7 +175,7 @@ with torch.no_grad():
     # load input into RNN weights
     inputs = torch.cat([input_col[omega] for omega in omegas], dim=0)
     states = torch.cat([state_col[omega] for omega in omegas], dim=0)
-    D, epsilon = rnn.load_input(inputs.T, states.T, tychinov)
+    D, epsilon = rnn.load_input(states.T, inputs.T, tychinov, overwrite=False)
     print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
     # train readout
@@ -204,7 +204,7 @@ for i, omega in enumerate(omegas):
         for step in range(test_steps):
 
             # get RNN readout
-            y = W_r @ rnn.forward_c_a(D)
+            y = W_r @ rnn.forward_c_a()
 
             # store results
             predictions.append(y.cpu().detach().numpy())
@@ -226,7 +226,7 @@ with torch.no_grad():
     rnn.y, rnn.z = init_states[omegas[0]]
     for step in range(interpolation_steps):
         rnn.C = gamma[step]*c2 + (1-gamma[step])*c1
-        y = W_r @ rnn.forward_c_a(D)
+        y = W_r @ rnn.forward_c_a()
         interp_col.append(y.cpu().detach().numpy())
 interp_col = np.asarray(interp_col)
 

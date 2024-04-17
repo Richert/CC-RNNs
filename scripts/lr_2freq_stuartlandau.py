@@ -169,7 +169,7 @@ with torch.no_grad():
     # load input into RNN weights
     inputs = torch.cat([input_col[omega] for omega in omegas], dim=0)
     states = torch.cat([state_col[omega] for omega in omegas], dim=0)
-    D, epsilon = rnn.load_input(inputs.T, states.T, tychinov)
+    D, epsilon = rnn.load_input(states.T, inputs.T, tychinov)
     print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
     # train readout
@@ -196,7 +196,7 @@ for omega in omegas:
         for step in range(test_steps):
 
             # get RNN readout
-            y = W_r @ rnn.forward_c_a(D)
+            y = W_r @ rnn.forward_c_a()
 
             # store results
             predictions.append(y.cpu().detach().numpy())
@@ -217,7 +217,7 @@ interp_col = []
 with torch.no_grad():
     for step in range(interpolation_steps):
         rnn.C = gamma[step]*c1 + (1-gamma[step])*c2
-        y = W_r @ rnn.forward_c_a(D)
+        y = W_r @ rnn.forward_c_a()
         interp_col.append(y.cpu().detach().numpy())
 interp_col = np.asarray(interp_col)
 

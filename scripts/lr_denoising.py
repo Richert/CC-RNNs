@@ -132,7 +132,7 @@ with torch.enable_grad():
 
 y0 = rnn.y[:]
 
-# load input pattern into RNN
+# finalize readout
 optim = torch.optim.Adam(list(readout.parameters()), lr=0.01, betas=betas)
 y_col = []
 
