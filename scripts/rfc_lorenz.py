@@ -42,17 +42,17 @@ s = 20.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 2000000
+steps = 200000
 init_steps = 1000
 
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
 k = 600
-sr = 1.3
-bias_scale = 0.9
-in_scale = 1.2
-density = 0.2
+sr = 0.99
+bias_scale = 0.01
+in_scale = 0.01
+density = 0.1
 
 # matrix initialization
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -66,8 +66,8 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 # training parameters
 test_steps = 2000
 loading_steps = int(0.5 * (steps - 1))
-lam = 0.001
-alpha = 2.0
+lam = 0.002
+alpha = 5.0
 betas = (0.9, 0.999)
 tychinov = 1e-3
 
@@ -107,34 +107,32 @@ with torch.no_grad():
 
 # harvest states
 y_col = []
-y0, z0 = rnn.y[:], rnn.z[:]
 for step in range(loading_steps):
-    y_col.append(rnn.y)
     rnn.forward_c(inputs[step])
+    y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
 # load input into RNN weights
-D, epsilon = rnn.load_input(inputs[:loading_steps].T, y_col.T, tychinov)
+D, epsilon = rnn.load_input(y_col.T, inputs[1:loading_steps+1].T, tychinov)
 print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # train readout
-W_r, epsilon2 = rnn.train_readout(y_col[1:].T, targets[:loading_steps-1].T, tychinov)
+W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
 print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
 
 # finalize conceptors
 # with torch.no_grad():
 #     rnn.y, rnn.z = y0, z0
 #     for step in range(loading_steps):
-#         rnn.forward_c_a_adapt(D)
-c = rnn.C
-print(f"Conceptor: {np.round(c, decimals=2)}")
+#         rnn.forward_c_a_adapt()
+c = rnn.C.cpu().detach().numpy()
+print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions
-rnn.y, rnn.z = y0, z0
 with torch.no_grad():
     predictions = []
     for step in range(test_steps):
-        y = rnn.forward_c_a(D)
+        y = rnn.forward_c_a()
         y = W_r @ y
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)

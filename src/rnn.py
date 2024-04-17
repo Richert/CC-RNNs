@@ -33,7 +33,7 @@ class RNN(torch.nn.Module):
         return self.y
 
     def forward_a(self):
-        self.y = torch.tanh(self.W @ self.y + self.D @ self.y + self.bias)
+        self.y = torch.tanh((self.W + self.D) @ self.y + self.bias)
         return self.y
 
     def free_param(self, key: str):

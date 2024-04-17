@@ -42,17 +42,17 @@ s = 20.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 4000000
+steps = 500000
 init_steps = 1000
 
 # reservoir parameters
-N = 400
+N = 200
 n_in = len(state_vars)
-k = 10
-sr = 1.2
-bias_scale = 0.9
-in_scale = 1.2
-density = 0.2
+k = 3
+sr = 0.99
+bias_scale = 0.01
+in_scale = 0.01
+density = 0.1
 out_scale = 1.0
 
 # rnn matrices
@@ -66,10 +66,10 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
-backprop_steps = 8000
-loading_steps = int(0.2*steps)
+backprop_steps = 500
+loading_steps = int(0.6*steps)
 test_steps = 2000
-lr = 0.2
+lr = 0.05
 betas = (0.9, 0.999)
 tychinov_alpha = 1e-3
 
@@ -130,7 +130,7 @@ with torch.enable_grad():
             current_loss = loss.item()
             optim.step()
             loss = torch.zeros((1,))
-            print(f"Current loss: {current_loss}")
+            print(f"Training phase I loss: {current_loss}")
 
 # load input pattern into RNN weights and generate predictions
 ##############################################################
@@ -158,14 +158,14 @@ for step in range(loading_steps):
         current_loss = loss.item()
         optim.step()
         loss = torch.zeros((1,))
-        print(f"Readout loss: {current_loss}")
+        print(f"Training phase II loss: {current_loss}")
 
 # compute input simulation weight matrix
-D, epsilon = rnn.load_input(inputs[:loading_steps].T, torch.stack(y_col, dim=0).T, tychinov_alpha)
+D, epsilon = rnn.load_input(torch.stack(y_col, dim=0).T, inputs[:loading_steps].T, tychinov_alpha)
 print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
-drive_steps = 0  #int(test_steps/2)
+drive_steps = 1000  #int(test_steps/2)
 with torch.no_grad():
     predictions = []
     for step in range(test_steps):
@@ -174,7 +174,7 @@ with torch.no_grad():
         if step < drive_steps:
             x = rnn.forward(inputs[step])
         else:
-            x = rnn.forward_a(D)
+            x = rnn.forward_a()
         y = readout.forward(x)
 
         # store results
