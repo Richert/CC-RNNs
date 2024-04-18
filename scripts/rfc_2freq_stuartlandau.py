@@ -40,7 +40,7 @@ state_vars = ["x", "y"]
 # SL equation parameters
 omegas = [1.0, 10.0]
 dt = 0.01
-steps = 1000000
+steps = 500000
 init_steps = 1000
 lag = 1
 
