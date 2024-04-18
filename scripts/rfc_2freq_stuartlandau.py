@@ -38,19 +38,20 @@ plot_steps = 2000
 state_vars = ["x", "y"]
 
 # SL equation parameters
-omegas = [4, 10]
+omegas = [1.0, 10.0]
 dt = 0.01
 steps = 1000000
 init_steps = 1000
+lag = 1
 
 # rnn parameters
 N = 100
 n_in = len(state_vars)
 k = 500
-sr = 1.1
-bias_scale = 1.2
-in_scale = 1.2
-density = 0.5
+sr = 1.05
+bias_scale = 0.01
+in_scale = 1.0
+density = 0.05
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -63,9 +64,9 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
 test_steps = 2000
-loading_steps = int(0.1 * (steps - 1))
-lam = 5e-3
-alpha = 20.0
+loading_steps = int(0.6 * steps)
+lam = 0.01
+alpha = 2.0
 tychinov = 1e-4
 
 # train LR-RNN weights
@@ -92,7 +93,7 @@ with torch.no_grad():
         input_col[omega] = inputs[:loading_steps]
 
         # initialize new conceptor
-        rnn.init_new_conceptor(init_value="zero")
+        rnn.init_new_conceptor(init_value="random")
 
         # initial wash-out period
         avg_input = torch.mean(inputs, dim=0)
@@ -107,6 +108,11 @@ with torch.no_grad():
         # store final state
         rnn.store_conceptor(omega)
         init_states[omega] = rnn.y[:]
+
+# finalize conceptors
+# cs = [rnn.conceptors[omega][:] for omega in omegas]
+# for i in range(len(omegas)):
+#     rnn.conceptors[omegas[i]] = rnn.combine_conceptors(cs[i], 1 - cs[1-i], "and")
 
 # load input into RNN weights and train readout
 ###############################################
@@ -131,7 +137,7 @@ with torch.no_grad():
     # load input into RNN weights
     inputs = torch.cat([input_col[omega] for omega in omegas], dim=0)
     states = torch.cat([state_col[omega] for omega in omegas], dim=0)
-    D, epsilon = rnn.load_input(inputs.T, states.T, tychinov)
+    D, epsilon = rnn.load_input(states.T, inputs.T, tychinov)
     print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
     # train readout
@@ -151,13 +157,13 @@ for omega in omegas:
     target = target_col[omega]
 
     # finalize conceptors
-    with torch.no_grad():
-        rnn.y = init_states[omega]
-        for step in range(loading_steps):
-            rnn.forward_c_a_adapt(D)
-    rnn.store_conceptor(omega)
+    # with torch.no_grad():
+    #     rnn.y = init_states[omega]
+    #     for step in range(loading_steps):
+    #         rnn.forward_c_a_adapt()
+    # rnn.store_conceptor(omega)
     c = rnn.conceptors[omega].detach().cpu().numpy()
-    print(f"Conceptor for omega = {omega}: {np.round(c, decimals=2)}")
+    print(f"Conceptor for omega = {omega}: {np.sum(c)}")
 
     # generate prediction
     with torch.no_grad():
@@ -167,7 +173,7 @@ for omega in omegas:
         for step in range(test_steps):
 
             # get RNN readout
-            y = W_r @ rnn.forward_c_a(D)
+            y = W_r @ rnn.forward_c_a()
 
             # store results
             predictions.append(y.cpu().detach().numpy())
@@ -188,7 +194,7 @@ interp_col = []
 with torch.no_grad():
     for step in range(interpolation_steps):
         rnn.C = gamma[step]*c1 + (1-gamma[step])*c2
-        y = W_r @ rnn.forward_c_a(D)
+        y = W_r @ rnn.forward_c_a()
         interp_col.append(y.cpu().detach().numpy())
 interp_col = np.asarray(interp_col)
 
@@ -207,8 +213,10 @@ for i in range(len(omegas)):
         if i == k-1:
             ax.set_xlabel("steps")
             ax.legend()
-plt.tight_layout()
+        if i == 0:
+            ax.set_title(f"Reconstruction of f = {omegas[i]}")
 fig.suptitle("Model Predictions")
+plt.tight_layout()
 plt.show()
 
 # interpolation figure
@@ -217,5 +225,6 @@ ax.plot(interp_col[:, 0], label="x")
 ax.plot(interp_col[:, 1], label="y")
 ax.legend()
 ax.set_xlabel("steps")
+fig.suptitle(f"Frequency interpolation: f2 = {omegas[1]} <--> f1 = {omegas[0]}")
 plt.tight_layout()
 plt.show()
