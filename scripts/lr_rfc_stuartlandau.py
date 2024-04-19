@@ -38,20 +38,20 @@ plot_steps = 2000
 state_vars = ["x", "y"]
 
 # SL equation parameters
-omegas = [4, 10]
+omegas = [2, 8]
 dt = 0.01
-steps = 1000000
+steps = 500000
 init_steps = 1000
 
 # rnn parameters
 N = 200
 n_in = len(state_vars)
-k = 20
-sr = 1.4
-bias_scale = 0.1
+k = 50
+sr = 1.05
+bias_scale = 0.01
 in_scale = 1.0
-out_scale = 1.0
-density = 0.2
+out_scale = 0.5
+density = 0.1
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -64,14 +64,14 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
-backprop_steps = 400
+backprop_steps = 500
 test_steps = 2000
-loading_steps = int(0.5 * (steps - 1))
+loading_steps = int(0.6 * steps)
 lr = 0.01
-lam = 2e-3
-alpha = 2.0
+lam = 0.005
+alpha = 5.0
 betas = (0.9, 0.999)
-tychinov = 1e-3
+tychinov = 1e-4
 epsilon = 1e-5
 
 # train LR-RNN weights
@@ -105,9 +105,9 @@ for i, omega in enumerate(omegas):
     input_col[omega] = inputs[:loading_steps]
 
     # initialize new conceptor
-    rnn.init_new_conceptor(init_value="random")
-    if i > 0:
-        rnn.C = rnn.combine_conceptors(rnn.C, 1 - rnn.conceptors[omegas[i-1]], operation="and")
+    rnn.init_new_conceptor(init_value="zeros")
+    # if i > 0:
+    #     rnn.C = rnn.combine_conceptors(rnn.C, 1 - rnn.conceptors[omegas[i-1]], operation="and")
 
     # initial wash-out period
     avg_input = torch.mean(inputs, dim=0)
@@ -148,9 +148,12 @@ for i, omega in enumerate(omegas):
     init_states[omega] = (rnn.y[:], rnn.z[:])
 
 # finalize conceptors
-for i, omega in enumerate(omegas):
-    c1, c2 = rnn.conceptors[omega], rnn.conceptors[omegas[1 - i]]
-    rnn.conceptors[omega] = rnn.combine_conceptors(c1, 1 - c2, operation="and")
+with torch.no_grad():
+    for omega in omegas:
+        inputs = input_col[omega]
+        rnn.activate_conceptor(omega)
+        for step in range(loading_steps):
+            rnn.forward_c_adapt(inputs[step])
 
 # load input into RNN weights and train readout
 ###############################################
@@ -245,8 +248,10 @@ for i in range(len(omegas)):
         if i == k-1:
             ax.set_xlabel("steps")
             ax.legend()
-plt.tight_layout()
+        if i == 0:
+            ax.set_title(f"Reconstruction of f = {omegas[i]}")
 fig.suptitle("Model Predictions")
+plt.tight_layout()
 plt.show()
 
 # interpolation figure
@@ -255,5 +260,6 @@ ax.plot(interp_col[:, 0], label="x")
 ax.plot(interp_col[:, 1], label="y")
 ax.legend()
 ax.set_xlabel("steps")
+fig.suptitle(f"Frequency interpolation: f2 = {omegas[1]} <--> f1 = {omegas[0]}")
 plt.tight_layout()
 plt.show()
