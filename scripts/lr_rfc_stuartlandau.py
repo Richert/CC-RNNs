@@ -67,12 +67,12 @@ W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dt
 backprop_steps = 500
 test_steps = 2000
 loading_steps = int(0.6 * steps)
-lr = 0.01
-lam = 0.005
+lr = 0.005
+lam = 0.002
 alpha = 5.0
 betas = (0.9, 0.999)
 tychinov = 1e-4
-epsilon = 1e-5
+epsilon = 1e-4
 
 # train LR-RNN weights
 ######################
@@ -105,7 +105,7 @@ for i, omega in enumerate(omegas):
     input_col[omega] = inputs[:loading_steps]
 
     # initialize new conceptor
-    rnn.init_new_conceptor(init_value="zeros")
+    rnn.init_new_conceptor(init_value="random")
     # if i > 0:
     #     rnn.C = rnn.combine_conceptors(rnn.C, 1 - rnn.conceptors[omegas[i-1]], operation="and")
 
