@@ -38,7 +38,7 @@ plot_steps = 2000
 state_vars = ["x", "y"]
 
 # SL equation parameters
-omegas = [1.0, 10.0]
+omegas = [4.0, 8.0]
 dt = 0.01
 steps = 500000
 init_steps = 1000
