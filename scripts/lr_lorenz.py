@@ -3,6 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
+import pickle
 
 
 # function definitions
@@ -34,11 +35,12 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 2000
+plot_steps = 4000
 state_vars = ["x", "y", "z"]
+lag = 1
 
 # lorenz equation parameters
-s = 20.0
+s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
@@ -68,7 +70,7 @@ W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dt
 # training parameters
 backprop_steps = 500
 loading_steps = int(0.6*steps)
-test_steps = 2000
+test_steps = 4500
 lr = 0.05
 betas = (0.9, 0.999)
 tychinov_alpha = 1e-3
@@ -85,8 +87,8 @@ for step in range(steps):
 y_col = np.asarray(y_col)
 
 # get inputs and targets
-inputs = torch.tensor(y_col[:-1], device=device, dtype=dtype)
-targets = torch.tensor(y_col[1:], device=device, dtype=dtype)
+inputs = torch.tensor(y_col[:-lag], device=device, dtype=dtype)
+targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
 
 # train low-rank RNN to predict next time step of Lorenz attractor
 ##################################################################
@@ -112,7 +114,7 @@ current_loss = 0.0
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
-    for step in range(steps-1):
+    for step in range(steps-lag):
 
         # get RNN output
         x = rnn.forward(inputs[step])
@@ -181,6 +183,11 @@ with torch.no_grad():
         predictions.append(y.cpu().detach().numpy())
 
 predictions = np.asarray(predictions)
+
+# save results
+results = {"targets": targets, "predictions": predictions,
+           "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag}}
+pickle.dump(results, open("../results/lr_lorenz.pkl", "wb"))
 
 # plotting
 ##########

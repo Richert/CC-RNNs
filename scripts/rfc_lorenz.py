@@ -3,6 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
+import pickle
 
 
 # function definitions
@@ -34,11 +35,12 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 2000
+plot_steps = 4000
 state_vars = ["x", "y", "z"]
+lag = 1
 
 # lorenz equation parameters
-s = 20.0
+s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
@@ -64,7 +66,7 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
-test_steps = 2000
+test_steps = 4500
 loading_steps = int(0.5 * (steps - 1))
 lam = 0.002
 alpha = 5.0
@@ -83,8 +85,8 @@ for step in range(steps):
 y_col = np.asarray(y_col)
 
 # get inputs and targets
-inputs = torch.tensor(y_col[:-1], device=device, dtype=dtype)
-targets = torch.tensor(y_col[1:], device=device, dtype=dtype)
+inputs = torch.tensor(y_col[:-lag], device=device, dtype=dtype)
+targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
 
 # train RFC-RNN to predict next time step of Lorenz attractor
 #############################################################
@@ -102,7 +104,7 @@ with torch.no_grad():
 
 # train the conceptor
 with torch.no_grad():
-    for step in range(steps-1):
+    for step in range(steps-lag):
         x = rnn.forward_c_adapt(inputs[step])
 
 # harvest states
@@ -136,6 +138,12 @@ with torch.no_grad():
         y = W_r @ y
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
+
+# save results
+results = {"targets": targets, "predictions": predictions,
+           "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lam": lam,
+                      "alpha": alpha, "lag": lag}}
+pickle.dump(results, open("../results/rfc_lorenz.pkl", "wb"))
 
 # plotting
 ##########

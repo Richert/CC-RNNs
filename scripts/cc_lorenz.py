@@ -63,7 +63,7 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 # training parameters
 backprop_steps = 500
 loading_steps = int(0.2*steps)
-test_steps = 2000
+test_steps = 3000
 lr = 0.05
 betas = (0.9, 0.999)
 alpha = 200.0
@@ -177,7 +177,7 @@ with torch.no_grad():
     for step in range(test_steps):
 
         # get RNN output
-        if step < 1000:
+        if step < 500:
             x = rnn.forward_c(inputs[step])
         else:
             x = rnn.forward_c_a()
