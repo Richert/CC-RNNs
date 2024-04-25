@@ -44,7 +44,7 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 400000
+steps = 500000
 init_steps = 1000
 
 # reservoir parameters
@@ -54,7 +54,7 @@ k = 10
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
-out_scale = 0.5
+out_scale = 1.0
 density = 0.1
 
 # matrix initialization
@@ -68,15 +68,15 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
-test_steps = 4500
+test_steps = 5000
 loading_steps = int(0.5*steps)
-backprop_steps = 500
+backprop_steps = 5000
 lam = 0.002
-lr = 0.01
+lr = 0.02
 alpha = 4.0
 betas = (0.9, 0.999)
 tychinov = 1e-3
-epsilon = 1e-6
+epsilon = 1e-8
 
 # generate inputs and targets
 #############################
@@ -135,6 +135,7 @@ with torch.enable_grad():
             for j in range(k):
                 W_r_tmp[j, :] *= rnn.C[j]
             loss += epsilon*torch.sum(torch.abs(rnn.W) @ W_r_tmp)
+            loss /= backprop_steps
             loss.backward()
             current_loss = loss.item()
             optim.step()
@@ -153,9 +154,9 @@ for step in range(loading_steps):
     y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
-# load input into RNN weights
-D, epsilon = rnn.load_input(y_col.T, inputs[1:loading_steps+1].T, tychinov)
-print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
+# # load input into RNN weights
+# D, epsilon = rnn.load_input(y_col.T, inputs[1:loading_steps+1].T, tychinov)
+# print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # train readout
 W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
@@ -172,9 +173,9 @@ print(f"Conceptor: {np.sum(c)}")
 # generate predictions
 with torch.no_grad():
     predictions = []
+    y = W_r @ rnn.y
     for step in range(test_steps):
-        y = rnn.forward_c_a()
-        y = W_r @ y
+        y = W_r @ rnn.forward_c(y)
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
 

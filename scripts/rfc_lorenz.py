@@ -133,9 +133,9 @@ print(f"Conceptor: {np.sum(c)}")
 # generate predictions
 with torch.no_grad():
     predictions = []
+    y = W_r @ rnn.forward_c_a()
     for step in range(test_steps):
-        y = rnn.forward_c_a()
-        y = W_r @ y
+        y = W_r @ rnn.forward_c(y)
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
 
