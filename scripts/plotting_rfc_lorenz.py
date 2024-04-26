@@ -24,9 +24,9 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 ##############################
 
 files = os.listdir("../results/rfc_lorenz")
-df = pd.DataFrame(columns=["alpha", "rep", "wd", "k", "dim"], index=np.arange(0, len(files)))
+df = pd.DataFrame(columns=["alpha", "rep", "wd", "k", "dim"], index=np.arange(0, len(files)), dtype=np.float64)
 n_bins = 200
-
+eps = 1e-10
 for n, file in enumerate(files):
 
     # load data
@@ -36,7 +36,7 @@ for n, file in enumerate(files):
 
     # calculate dimensionality
     k_star = np.sum(data["c"])
-    dim = np.sum(data["c"] > 0.0)
+    dim = np.sum(data["c"] > eps)
 
     # calculate wasserstein distance
     wd = 0.0
@@ -105,13 +105,14 @@ subfigs[0].suptitle("RFC reconstruction quality and dimensionality")
 data = trajectories + [targets]
 titles = [fr"$\alpha = {alpha}$" for alpha in alphas] + ["Lorenz equations"]
 colors = ["darkgreen", "darkblue", "darkred", "black"]
+lvars = [0, 2]
 axes = subfigs[1].subplots(ncols=len(titles))
 for i in range(len(titles)):
 
     ax = axes[i]
-    ax.plot(data[i][plot_start:plot_stop, idx[0]], data[i][plot_start:plot_stop, idx[1]], color=colors[i])
-    ax.set_xlabel(fr"$u_{idx[0] + 1}$")
-    ax.set_ylabel(fr"$u_{idx[1] + 1}$")
+    ax.plot(data[i][plot_start:plot_stop, lvars[0]], data[i][plot_start:plot_stop, lvars[1]], color=colors[i])
+    ax.set_xlabel(fr"$u_{lvars[0] + 1}$")
+    ax.set_ylabel(fr"$u_{lvars[1] + 1}$")
     ax.set_title(titles[i])
 
 subfigs[1].suptitle("Examples of RFC reconstructions")
