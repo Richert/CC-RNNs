@@ -1,7 +1,6 @@
 import sys
 sys.path.append('../')
 import torch
-import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
 from src import RandomFeatureConceptorRNN
@@ -71,7 +70,7 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
-test_steps = 10000
+test_steps = 50000
 loading_steps = int(0.5 * steps)
 alpha = 4.0
 lam = 0.002
@@ -148,20 +147,3 @@ results = {"targets": targets[loading_steps:loading_steps+test_steps], "predicti
            "condition": {"k": k, "repetition": rep},
            "training_error": epsilon}
 pickle.dump(results, open(f"../results/rfc_lorenz/k{int(k)}_{rep}.pkl", "wb"))
-
-# plotting
-##########
-
-# fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
-#
-# for i, ax in enumerate(axes):
-#
-#     ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-#     ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-#     ax.set_ylabel(state_vars[i])
-#     if i == n_in-1:
-#         ax.set_xlabel("steps")
-#         ax.legend()
-#
-# plt.tight_layout()
-# plt.show()
