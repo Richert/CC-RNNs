@@ -1,10 +1,10 @@
-import os
 import pickle
 import matplotlib.pyplot as plt
 import seaborn as sb
 import numpy as np
 from scipy.stats import wasserstein_distance
 import os
+import pandas as pd
 
 
 def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
@@ -20,42 +20,27 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
     return wd, x_hist, y_hist, bin_edges
 
 
-# load data
-results = {}
-for file in os.listdir("../results/rfc_lorenz"):
-
-    data = pickle.load(open(f"../results/rfc_lorenz/{file}.pkl", "rb"))
-    alpha = data["condition"]["alpha"]
-    if alpha in results:
-        results[alpha].append(data)
-    else:
-        results[alpha] = [data]
-
-# get effective dimensionality and reconstruction quality as a function of alpha
-k_stars = []
-dimensionalities = []
-distances = []
-alphas = list(results.keys())
+# get effective dimensionality and reconstruction quality for each condition
+files = os.listdir("../results/rfc_lorenz")
+df = pd.DataFrame(columns=["alpha", "rep", "wd", "k", "dim"], index=np.arange(0, len(files)))
 n_bins = 200
-for alpha in alphas:
+for n, file in enumerate(files):
 
-    k_col = []
-    dim_col = []
-    wd_col = []
+    # load data
+    data = pickle.load(open(f"../results/rfc_lorenz/{file}", "rb"))
+    alpha = data["condition"]["alpha"]
+    rep = data["condition"]["repitition"]
 
-    for data in results[alpha]:
+    # calculate dimensionality
+    k_star = np.sum(data["c"])
+    dim = np.sum(data["c"] > 0.0)
 
-        k_col.append(np.sum(data["c"]))
-        dim_col.append(np.sum(data["c"] > 0.0))
+    # calculate wasserstein distance
+    wd = 0.0
+    for i in range(data["targets"].shape[1]):
+        targets = data["targets"][:, i]
+        predictions = data["predictions"][:, i]
+        wd_tmp, *_ = wasserstein(targets, predictions, n_bins=n_bins)
+        wd += wd_tmp
 
-        wd = 0.0
-        for i in range(data["targets"].shape[1]):
-            targets = data["targets"][:, i]
-            predictions = data["predictions"][:, i]
-            wd_tmp, *_ = wasserstein(targets, predictions, n_bins=n_bins)
-            wd += wd_tmp
-        wd_col.append(wd)
-
-    k_stars.append(k_col)
-    dimensionalities.append(dim_col)
-    distances.append(wd_col)
+    df.loc[n, :] = (alpha, rep, wd, k_star, dim)

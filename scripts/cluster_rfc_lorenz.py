@@ -130,7 +130,7 @@ print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy(
 #         rnn.forward_c_a_adapt()
 c = rnn.C.cpu().detach().numpy()
 k_star = np.sum(c)
-print(f"k_star: {c}")
+print(f"k_star: {k_star}")
 
 # generate predictions
 with torch.no_grad():
@@ -144,7 +144,7 @@ predictions = np.asarray(predictions)
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions, "c": c,
            "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag},
-           "condition": {"alpha": alpha, "repitition": rep},
+           "condition": {"alpha": alpha, "repetition": rep},
            "training_error": epsilon}
 pickle.dump(results, open(f"../results/rfc_lorenz/alpha{int(alpha)}_{rep}.pkl", "wb"))
 
