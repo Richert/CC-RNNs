@@ -52,7 +52,7 @@ for n, file in enumerate(files):
     df.loc[n, :] = (alpha, rep, wd, k_star, dim, error)
 
 # collect representative trajectories for target alphas
-alphas = [2.0, 4.0, 8.0]
+alphas = [2.0, 6.0, 10.0]
 trajectories = []
 for alpha in alphas:
 
@@ -91,7 +91,7 @@ subfigs = fig.subfigures(nrows=2)
 
 # violin plots
 x = "alpha"
-ys = ["train_error", "k", "dim"]
+ys = ["wd", "k", "dim"]
 titles = ["Wasserstein Distance", r"$k^*$", "d"]
 axes = subfigs[0].subplots(ncols=3)
 for i in range(len(ys)):
