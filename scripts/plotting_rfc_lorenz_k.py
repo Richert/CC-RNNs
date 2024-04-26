@@ -26,7 +26,7 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 files = [f for f in os.listdir("../results/rfc_lorenz") if f[0] == "k"]
 df = pd.DataFrame(columns=["k", "rep", "wd", "k_star", "dim", "train_error"],
                   index=np.arange(0, len(files)), dtype=np.float64)
-n_bins = 200
+n_bins = 50
 eps = 1e-10
 for n, file in enumerate(files):
 
