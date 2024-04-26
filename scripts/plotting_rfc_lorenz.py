@@ -79,8 +79,8 @@ plt.rcParams['axes.titlesize'] = 12
 plt.rcParams['axes.labelsize'] = 12
 plt.rcParams['lines.linewidth'] = 1.0
 markersize = 8
-plot_start = 1000
-plot_stop = 9000
+plot_start = 2000
+plot_stop = 7000
 
 # figure layout
 fig = plt.figure(figsize=(12, 8))
