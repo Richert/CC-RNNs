@@ -141,9 +141,10 @@ with torch.no_grad():
 predictions = np.asarray(predictions)
 
 # save results
-results = {"targets": targets, "predictions": predictions, "training_error": epsilon,
+results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag},
-           "condition": {"alpha": alpha, "repitition": rep}}
+           "condition": {"alpha": alpha, "repitition": rep},
+           "training_error": epsilon}
 pickle.dump(results, open(f"../results/rfc_lorenz/alpha{int(alpha)}_{rep}.pkl", "wb"))
 
 # plotting
