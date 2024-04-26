@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# set condition
+alphas=( 1.0 2.0 4.0 8.0 16.0 32.0 64.0)
+n=10
+batch_size=2
+range_end=$(($n-1))
+
+# limit amount of threads that each Python process can work with
+n_threads=10
+export OMP_NUM_THREADS=$n_threads
+export OPENBLAS_NUM_THREADS=$n_threads
+export MKL_NUM_THREADS=$n_threads
+export NUMEXPR_NUM_THREADS=$n_threads
+export VECLIB_MAXIMUM_THREADS=$n_threads
+
+# execute python scripts in batches of batch_size
+for alpha in "${alphas[@]}"; do
+  for IDX in `seq 0 $range_end`; do
+
+    # python calls
+    (
+    echo "Starting job #$(($IDX+1)) of ${n} jobs for alpha=${alpha}."
+    python cluster_rfc_lorenz.py $alpha $IDX
+    sleep 1
+    ) &
+
+    # batch control
+    if [[ $(jobs -r -p | wc -l) -ge $batch_size ]]; then
+          wait -n
+    fi
+
+  done
+done
+
+wait
+echo "All jobs finished."

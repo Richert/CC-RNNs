@@ -44,7 +44,7 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 200000
+steps = 500000
 init_steps = 1000
 
 # reservoir parameters
@@ -66,8 +66,8 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
-test_steps = 4500
-loading_steps = int(0.5 * (steps - 1))
+test_steps = 10000
+loading_steps = int(0.5 * steps)
 lam = 0.002
 alpha = 5.0
 betas = (0.9, 0.999)

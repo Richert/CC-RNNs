@@ -43,7 +43,7 @@ lag = 1
 s = 10.0
 r = 28.0
 b = 8/3
-dt = 0.02
+dt = 0.01
 steps = 500000
 init_steps = 1000
 
@@ -70,8 +70,8 @@ W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dt
 # training parameters
 backprop_steps = 5000
 loading_steps = int(0.5*steps)
-test_steps = 5000
-lr = 0.02
+test_steps = 10000
+lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
 

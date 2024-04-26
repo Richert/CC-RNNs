@@ -21,7 +21,7 @@ plt.rcParams['axes.labelsize'] = 12
 plt.rcParams['lines.linewidth'] = 1.0
 markersize = 8
 plot_start = 1000
-plot_stop = 4000
+plot_stop = 9000
 
 # plotting
 ##########
@@ -32,7 +32,7 @@ subfigs = fig.subfigures(nrows=4)
 
 # plot lorenz dynamics
 combinations = [[0, 1], [0, 2], [1, 2]]
-titles = ["Lorenz equations", "LR-RNN", "RFC", "CC-LR-RNN"]
+titles = [r"\textbf{(A)} Lorenz equations", r"\textbf{(B)} LR-RNN", r"\textbf{(C)} RFC", r"\textbf{(D)} CC-LR-RNN"]
 colors = ["black", "darkgreen", "darkblue", "darkred"]
 for i, c in enumerate(["lorenz"] + conditions):
 
@@ -46,8 +46,8 @@ for i, c in enumerate(["lorenz"] + conditions):
         idx = combinations[j]
 
         ax.plot(s[plot_start:plot_stop, idx[0]], s[plot_start:plot_stop, idx[1]], color=colors[i])
-        ax.set_xlabel(f"y{idx[0]+1}")
-        ax.set_ylabel(f"y{idx[1]+1}")
+        ax.set_xlabel(fr"$u_{idx[0]+1}$")
+        ax.set_ylabel(fr"$u_{idx[1]+1}$")
 
     fig_tmp.suptitle(titles[i])
 
