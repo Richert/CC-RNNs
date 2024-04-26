@@ -95,7 +95,7 @@ for i in range(len(ys)):
 
     ax = axes[i]
     sb.violinplot(x=x, y=ys[i], data=df, color="0.8", ax=ax)
-    sb.stripplot(x=x, y=ys[i], data=df, jitter=True, zorder=1)
+    sb.stripplot(x=x, y=ys[i], data=df, jitter=True, zorder=1, ax=ax)
     ax.set_xlabel(r"$\alpha$")
     ax.set_ylabel(titles[i])
 
