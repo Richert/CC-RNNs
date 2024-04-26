@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # set condition
-alphas=( 1.0 2.0 4.0 8.0 16.0 32.0 64.0)
+alphas=( 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 )
 n=10
-batch_size=4
+batch_size=5
 range_end=$(($n-1))
 
 # limit amount of threads that each Python process can work with
