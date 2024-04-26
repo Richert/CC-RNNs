@@ -35,7 +35,7 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
 ######################
 
 # batch condition
-alpha = float(sys.argv[-2])
+k = int(sys.argv[-2])
 rep = int(sys.argv[-1])
 
 # general
@@ -56,7 +56,6 @@ init_steps = 1000
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 600
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
@@ -74,6 +73,7 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 # training parameters
 test_steps = 10000
 loading_steps = int(0.5 * steps)
+alpha = 4.0
 lam = 0.002
 betas = (0.9, 0.999)
 tychinov = 1e-3
@@ -121,7 +121,8 @@ y_col = torch.stack(y_col, dim=0)
 
 # train readout
 W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
+epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
+print(f"Readout training error: {epsilon}")
 
 # finalize conceptors
 # with torch.no_grad():

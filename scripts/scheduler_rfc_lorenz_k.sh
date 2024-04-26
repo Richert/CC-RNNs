@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # set condition
-ks=( 4 8 16 32 64 128 256 512 1024 )
-n=10
+ks=( 50 100 150 200 250 300 350 400 450 500 550 600 )
+n=25
 batch_size=5
 range_end=$(($n-1))
 
@@ -15,13 +15,13 @@ export NUMEXPR_NUM_THREADS=$n_threads
 export VECLIB_MAXIMUM_THREADS=$n_threads
 
 # execute python scripts in batches of batch_size
-for alpha in "${alphas[@]}"; do
+for k in "${ks[@]}"; do
   for IDX in `seq 0 $range_end`; do
 
     # python calls
     (
-    echo "Starting job #$(($IDX+1)) of ${n} jobs for alpha=${alpha}."
-    python cluster_rfc_lorenz_alpha.py $alpha $IDX
+    echo "Starting job #$(($IDX+1)) of ${n} jobs for k=${k}."
+    python cluster_rfc_lorenz_k.py $k $IDX
     sleep 1
     ) &
 
