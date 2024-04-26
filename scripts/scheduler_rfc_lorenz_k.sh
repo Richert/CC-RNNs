@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # set condition
-ks=( 50 100 150 200 250 300 350 400 450 500 550 600 )
-n=25
+ks=( 10 20 40 80 160 320 640 )
+n=50
 batch_size=5
 range_end=$(($n-1))
 
