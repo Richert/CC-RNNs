@@ -32,7 +32,7 @@ for n, file in enumerate(files):
     # load data
     data = pickle.load(open(f"../results/rfc_lorenz/{file}", "rb"))
     alpha = data["condition"]["alpha"]
-    rep = data["condition"]["repitition"]
+    rep = data["condition"]["repetition"]
 
     # calculate dimensionality
     k_star = np.sum(data["c"])
