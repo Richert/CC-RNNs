@@ -1,22 +1,24 @@
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.special import rel_entr
+from scipy.stats import wasserstein_distance
 
 
-def kld(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
+def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 
     # get histograms of arrays
-    x_hist, bin_edges = np.histogram(x, bins=n_bins)
-    y_hist, _ = np.histogram(y, bins=bin_edges)
+    x_hist, bin_edges = np.histogram(x, bins=n_bins, density=True)
+    y_hist, _ = np.histogram(y, bins=bin_edges, density=True)
+    x_hist /= np.sum(x_hist)
+    y_hist /= np.sum(y_hist)
 
     # calculate KLD
-    kl_div = np.sum(rel_entr(x, y))
-    return kl_div, x_hist, y_hist, bin_edges
+    wd = wasserstein_distance(x_hist, y_hist)
+    return wd, x_hist, y_hist, bin_edges
 
 
 # load data
-file = "alpha1_0"
+file = "alpha1_1"
 data = pickle.load(open(f"../results/rfc_lorenz/{file}.pkl", "rb"))
 n_in = data["targets"].shape[1]
 
@@ -24,10 +26,10 @@ n_in = data["targets"].shape[1]
 n_bins = 200
 distributions = []
 for i in range(n_in):
-    targets = data["targets"][:, i]
+    targets = data["targets"][:10000, i]
     predictions = data["predictions"][:, i]
-    kl_div, pred_dist, targ_dist, edges = kld(predictions, targets, n_bins=n_bins)
-    distributions.append({"kld": kl_div, "predictions": pred_dist, "targets": targ_dist, "edges": edges})
+    wd, pred_dist, targ_dist, edges = wasserstein(predictions, targets, n_bins=n_bins)
+    distributions.append({"wd": wd, "predictions": pred_dist, "targets": targ_dist, "edges": edges})
 
 # plotting of trajectories in state space
 plot_steps = 4000
@@ -52,7 +54,10 @@ for i, ax in enumerate(axes):
     ax.bar(distributions[i]["edges"][1:], distributions[i]["predictions"], width=-0.5, align="edge",
            color="darkorange", label="prediction")
     ax.set_xlabel(f"u_{i+1}")
-    ax.set_ylabel("count")
+    ax.set_ylabel("p")
+    ax.set_title(f"Wasserstein distance = {distributions[i]['wd']}")
+    if i == n_in - 1:
+        ax.legend()
 
 plt.tight_layout()
 plt.show()

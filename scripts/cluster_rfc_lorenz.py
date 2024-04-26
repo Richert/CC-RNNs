@@ -129,7 +129,8 @@ print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy(
 #     for step in range(loading_steps):
 #         rnn.forward_c_a_adapt()
 c = rnn.C.cpu().detach().numpy()
-print(f"Conceptor: {np.sum(c)}")
+k_star = np.sum(c)
+print(f"k_star: {c}")
 
 # generate predictions
 with torch.no_grad():
@@ -141,7 +142,7 @@ with torch.no_grad():
 predictions = np.asarray(predictions)
 
 # save results
-results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
+results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions, "c": c,
            "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag},
            "condition": {"alpha": alpha, "repitition": rep},
            "training_error": epsilon}
