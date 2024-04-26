@@ -21,7 +21,7 @@ for alpha in "${alphas[@]}"; do
     # python calls
     (
     echo "Starting job #$(($IDX+1)) of ${n} jobs for alpha=${alpha}."
-    python cluster_rfc_lorenz.py $alpha $IDX
+    python cluster_rfc_lorenz_alpha.py $alpha $IDX
     sleep 1
     ) &
 

@@ -23,8 +23,9 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 # data collection and analysis
 ##############################
 
-files = os.listdir("../results/rfc_lorenz")
-df = pd.DataFrame(columns=["alpha", "rep", "wd", "k", "dim"], index=np.arange(0, len(files)), dtype=np.float64)
+files = [f for f in os.listdir("../results/rfc_lorenz") if "alpha" in f]
+df = pd.DataFrame(columns=["alpha", "rep", "wd", "k", "dim", "train_error"],
+                  index=np.arange(0, len(files)), dtype=np.float64)
 n_bins = 100
 eps = 1e-10
 for n, file in enumerate(files):
@@ -33,6 +34,7 @@ for n, file in enumerate(files):
     data = pickle.load(open(f"../results/rfc_lorenz/{file}", "rb"))
     alpha = data["condition"]["alpha"]
     rep = data["condition"]["repetition"]
+    error = data["training_error"]
 
     # calculate dimensionality
     k_star = np.sum(data["c"])
@@ -46,7 +48,7 @@ for n, file in enumerate(files):
         wd_tmp, *_ = wasserstein(targets, predictions, n_bins=n_bins)
         wd += wd_tmp
 
-    df.loc[n, :] = (alpha, rep, wd, k_star, dim)
+    df.loc[n, :] = (alpha, rep, wd, k_star, dim, error)
 
 # collect representative trajectories for target alphas
 alphas = [2.0, 4.0, 8.0]
@@ -55,8 +57,8 @@ for alpha in alphas:
 
     # find representative sample
     idx = np.round(df.loc[:, "alpha"].values, decimals=1) == alpha
-    wd_mean = np.mean(df.loc[idx, "wd"].values)
-    idx = np.argmin(np.abs(df.loc[:, "wd"].values - wd_mean))
+    error = np.mean(df.loc[idx, "train_error"].values)
+    idx = np.argmin(np.abs(df.loc[:, "train_error"].values - error))
     rep = df.at[idx, "rep"]
 
     # load data
@@ -88,7 +90,7 @@ subfigs = fig.subfigures(nrows=2)
 
 # violin plots
 x = "alpha"
-ys = ["wd", "k", "dim"]
+ys = ["train_error", "k", "dim"]
 titles = ["Wasserstein Distance", r"$k^*$", "d"]
 axes = subfigs[0].subplots(ncols=3)
 for i in range(len(ys)):
@@ -122,5 +124,5 @@ fig.set_constrained_layout_pads(w_pad=0.05, h_pad=0.05, hspace=0.02, wspace=0.02
 
 # saving/plotting
 fig.canvas.draw()
-plt.savefig(f'../results/rfc_lorenz.svg')
+plt.savefig(f'../results/rfc_lorenz_alpha.svg')
 plt.show()
