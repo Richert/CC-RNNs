@@ -7,6 +7,17 @@ import os
 import pandas as pd
 
 
+def get_kld(ps: np.ndarray, qs: np.ndarray) -> float:
+    kld = np.zeros_like(ps)
+    n = len(kld)
+    for i, (p, q) in enumerate(zip(ps, qs)):
+        if p > 0 and q > 0:
+            kld[i] = p * np.log(p/q)
+        elif p > 0:
+            kld[i] = n
+    return np.sum(kld)
+
+
 def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 
     # get histograms of arrays
@@ -16,7 +27,7 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
     y_hist /= np.sum(y_hist)
 
     # calculate KLD
-    wd = wasserstein_distance(x, y)
+    wd = get_kld(x_hist, y_hist)
     return wd, x_hist, y_hist, bin_edges
 
 
@@ -45,7 +56,7 @@ for n, file in enumerate(files):
     for i in range(data["targets"].shape[1]):
         targets = data["targets"][:, i]
         predictions = data["predictions"][:, i]
-        wd_tmp, *_ = wasserstein(targets, predictions, n_bins=n_bins)
+        wd_tmp, *_ = wasserstein(predictions, targets, n_bins=n_bins)
         wd += wd_tmp
 
     df.loc[n, :] = (k, rep, wd, k_star, dim, error)
