@@ -3,11 +3,11 @@
 # set condition
 alphas=( 2.0 4.0 6.0 8.0 10.0 12.0 )
 n=50
-batch_size=5
+batch_size=8
 range_end=$(($n-1))
 
 # limit amount of threads that each Python process can work with
-n_threads=12
+n_threads=10
 export OMP_NUM_THREADS=$n_threads
 export OPENBLAS_NUM_THREADS=$n_threads
 export MKL_NUM_THREADS=$n_threads
