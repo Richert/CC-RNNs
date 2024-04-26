@@ -35,7 +35,6 @@ for n, file in enumerate(files):
     k = data["condition"]["k"]
     rep = data["condition"]["repetition"]
     error = data["training_error"]
-    error = float(np.mean(error.cpu().detach().numpy()))
 
     # calculate dimensionality
     k_star = np.sum(data["c"])
