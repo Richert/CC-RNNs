@@ -28,7 +28,7 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 
     # calculate KLD
     bins = np.diff(bin_edges)
-    wd = wasserstein_distance(bins, bins, x_hist, y_hist)
+    wd = wasserstein_distance(u_values=bins, v_values=bins, u_weights=x_hist, v_weights=y_hist)
     return wd, x_hist, y_hist, bin_edges
 
 
