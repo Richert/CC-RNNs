@@ -38,6 +38,7 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
+noise_lvl = 0.6
 
 # lorenz equation parameters
 s = 10.0
@@ -73,7 +74,7 @@ loading_steps = int(0.5*steps)
 backprop_steps = 5000
 lam = 0.002
 lr = 0.01
-alpha = 3.0
+alpha = 4.0
 betas = (0.9, 0.999)
 tychinov = 1e-3
 epsilon = 1e-8
@@ -123,7 +124,7 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN readout
-        y = W_r @ rnn.forward_c_adapt(inputs[step])
+        y = W_r @ rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # calculate loss
         loss += loss_func(y, targets[step])
@@ -150,7 +151,7 @@ rnn.detach()
 # harvest states
 y_col = []
 for step in range(loading_steps):
-    rnn.forward_c(inputs[step])
+    rnn.forward_c(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
     y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 

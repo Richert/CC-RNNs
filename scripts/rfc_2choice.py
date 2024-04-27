@@ -36,21 +36,18 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
 dtype = torch.float64
 device = "cpu"
 plot_steps = 4000
-state_vars = ["x", "y", "z"]
-lag = 1
-noise_lvl = 1.0
 
-# lorenz equation parameters
-s = 10.0
-r = 28.0
-b = 8/3
-dt = 0.01
-steps = 500000
-init_steps = 1000
+# input parameters
+in_vars = ["x", "y"]
+n_epochs = 200
+epoch_steps = 1000
+signal_scale = 1.0
+noise_scale = 0.1
+steps = int(n_epochs*epoch_steps)
 
 # reservoir parameters
 N = 200
-n_in = len(state_vars)
+n_in = len(in_vars)
 k = 400
 sr = 0.99
 bias_scale = 0.01
@@ -77,17 +74,17 @@ tychinov = 1e-3
 # generate inputs and targets
 #############################
 
-# simulation
-y = np.asarray([0.1, 0.9, 0.5])
-y_col = []
-for step in range(steps):
-    y = y + dt * lorenz(y[0], y[1], y[2], s=s, r=r, b=b)
-    y_col.append(y)
-y_col = np.asarray(y_col)
+inputs, targets = [], []
+for n in range(n_epochs):
 
-# get inputs and targets
-inputs = torch.tensor(y_col[:-lag], device=device, dtype=dtype)
-targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
+    mus = signal_scale * torch.randn((n_in,), device=device, dtype=dtype)
+    inp = torch.zeros((epoch_steps, n_in), device=device, dtype=dtype)
+    for i, mu in enumerate(mus):
+        inp[:, i] += mu + noise_scale * torch.randn((epoch_steps,), device=device, dtype=dtype)
+    targ = torch.zeros_like(inp)
+    targ[:, torch.argmax(mus)] = 1.0
+    inputs.append(inp)
+    targets.append(targ)
 
 # train RFC-RNN to predict next time step of Lorenz attractor
 #############################################################
@@ -98,21 +95,24 @@ rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_i
 rnn.init_new_conceptor(init_value="random")
 
 # initial wash-out period
-avg_input = torch.mean(inputs, dim=0)
+avg_input = torch.mean(inputs[0], dim=0)
 with torch.no_grad():
-    for step in range(init_steps):
+    for step in range(epoch_steps):
         rnn.forward_c(avg_input)
 
 # train the conceptor
 with torch.no_grad():
-    for step in range(steps-lag):
-        x = rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn(size=(n_in,), device=device, dtype=dtype))
+    for epoch in range(n_epochs):
+        for step in range(epoch_steps):
+            x = rnn.forward_c_adapt(inputs[epoch][step])
 
 # harvest states
 y_col = []
-for step in range(loading_steps):
-    rnn.forward_c(inputs[step] + noise_lvl*torch.randn(size=(n_in,), device=device, dtype=dtype))
-    y_col.append(rnn.y)
+with torch.no_grad():
+    for epoch in range(n_epochs):
+        for step in range(epoch_steps):
+            rnn.forward_c(inputs[epoch][step])
+            y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
