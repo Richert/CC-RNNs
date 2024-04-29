@@ -35,21 +35,22 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 4000
+plot_steps = 8000
 
 # input parameters
 in_vars = ["x", "y"]
-n_epochs = 200
-epoch_steps = 1000
-signal_scale = 1.0
+n_epochs = 550
+train_epochs = 500
+epoch_steps = 500
+signal_scale = 0.5
 noise_scale = 0.1
 steps = int(n_epochs*epoch_steps)
 
 # reservoir parameters
 N = 200
 n_in = len(in_vars)
-k = 400
-sr = 0.99
+k = 512
+sr = 1.1
 bias_scale = 0.01
 in_scale = 0.01
 density = 0.1
@@ -63,13 +64,13 @@ sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
-# training parameters
-test_steps = 10000
-loading_steps = int(0.5 * steps)
+# training parameters1
+loss_start = 400
+loss_epochs = 10
 lam = 0.002
-alpha = 4.0
+lr = 0.01
+alpha = 6.0
 betas = (0.9, 0.999)
-tychinov = 1e-3
 
 # generate inputs and targets
 #############################
@@ -93,6 +94,8 @@ for n in range(n_epochs):
 rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
                                 torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
 rnn.init_new_conceptor(init_value="random")
+readout = torch.nn.Linear(in_features=N, out_features=n_in, bias=False, device=device, dtype=dtype)
+activation_func = torch.nn.Softmax()
 
 # initial wash-out period
 avg_input = torch.mean(inputs[0], dim=0)
@@ -102,39 +105,54 @@ with torch.no_grad():
 
 # train the conceptor
 with torch.no_grad():
-    for epoch in range(n_epochs):
+    for epoch in range(train_epochs):
         for step in range(epoch_steps):
-            x = rnn.forward_c_adapt(inputs[epoch][step])
-
-# harvest states
-y_col = []
-with torch.no_grad():
-    for epoch in range(n_epochs):
-        for step in range(epoch_steps):
-            rnn.forward_c(inputs[epoch][step])
-            y_col.append(rnn.y)
-y_col = torch.stack(y_col, dim=0)
+            rnn.forward_c_adapt(inputs[epoch][step])
 
 # train readout
-W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
+loss_func = torch.nn.CrossEntropyLoss()
+optim = torch.optim.Adam(readout.parameters(), lr=lr, betas=betas)
+current_loss = 0.0
+with torch.enable_grad():
 
-# finalize conceptors
-# with torch.no_grad():
-#     rnn.y, rnn.z = y0, z0
-#     for step in range(loading_steps):
-#         rnn.forward_c_a_adapt()
+    loss = torch.zeros((1,))
+    for epoch in range(train_epochs):
+        for step in range(epoch_steps):
+
+            # get RNN output
+            y = activation_func(readout.forward(rnn.forward(inputs[epoch][step])))
+
+            # calculate loss
+            if step > loss_start:
+                loss += loss_func(y, targets[epoch][step])
+
+        # make update
+        if (epoch + 1) % loss_epochs == 0:
+            optim.zero_grad()
+            loss.backward()
+            current_loss = loss.item()
+            optim.step()
+            rnn.detach()
+            loss = torch.zeros((1,))
+            print(f"Readout training loss: {current_loss}")
+
+# inspect conceptor
 c = rnn.C.cpu().detach().numpy()
 print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions
 with torch.no_grad():
-    predictions = []
-    y = W_r @ rnn.y
-    for step in range(test_steps):
-        y = W_r @ rnn.forward_c(y)
-        predictions.append(y.cpu().detach().numpy())
+    predictions, test_targets, test_inputs = [], [], []
+    for epoch in range(n_epochs-train_epochs):
+        for step in range(epoch_steps):
+            inp = inputs[train_epochs+epoch][step]
+            y = activation_func( readout.forward(rnn.forward(inp)))
+            predictions.append(y.cpu().detach().numpy())
+            test_targets.append(targets[train_epochs+epoch][step].cpu().detach().numpy())
+            test_inputs.append(inp.cpu().detach().numpy())
 predictions = np.asarray(predictions)
+test_targets = np.asarray(test_targets)
+test_inputs = np.asarray(test_inputs)
 
 # save results
 # results = {"targets": targets, "predictions": predictions,
@@ -149,9 +167,10 @@ fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
 
 for i, ax in enumerate(axes):
 
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
+    # ax.plot(test_inputs[:plot_steps, i], color="black", label="input", alpha=0.5)
+    ax.plot(test_targets[:plot_steps, i], color="royalblue", label="target")
     ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(state_vars[i])
+    ax.set_ylabel(in_vars[i])
     if i == n_in-1:
         ax.set_xlabel("steps")
         ax.legend()

@@ -38,7 +38,7 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 1.0
+noise_lvl = 0.6
 
 # lorenz equation parameters
 s = 10.0
@@ -137,10 +137,10 @@ with torch.no_grad():
 predictions = np.asarray(predictions)
 
 # save results
-# results = {"targets": targets, "predictions": predictions,
-#            "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lam": lam,
-#                       "alpha": alpha, "lag": lag}}
-# pickle.dump(results, open("../results/rfc_lorenz.pkl", "wb"))
+results = {"targets": targets, "predictions": predictions,
+           "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lam": lam,
+                      "alpha": alpha, "lag": lag}}
+pickle.dump(results, open("../results/rfc_lorenz.pkl", "wb"))
 
 # plotting
 ##########

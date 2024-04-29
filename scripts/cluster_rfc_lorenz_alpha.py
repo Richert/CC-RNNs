@@ -43,6 +43,7 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
+noise_lvl = 1.2
 
 # lorenz equation parameters
 s = 10.0
@@ -109,12 +110,12 @@ with torch.no_grad():
 # train the conceptor
 with torch.no_grad():
     for step in range(steps-lag):
-        x = rnn.forward_c_adapt(inputs[step])
+        x = rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
 # harvest states
 y_col = []
 for step in range(loading_steps):
-    rnn.forward_c(inputs[step])
+    rnn.forward_c(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
     y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
