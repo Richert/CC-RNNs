@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set condition
-alphas=( 2.0 4.0 6.0 8.0 10.0 12.0 )
+alphas=( 2.0 4.0 6.0 8.0 10.0 )
 n=50
 batch_size=8
 range_end=$(($n-1))
