@@ -62,7 +62,7 @@ for n, file in enumerate(files):
     df.loc[n, :] = (k, rep, wd, k_star, dim, error)
 
 # collect representative trajectories for target alphas
-ks = [100, 200, 400]
+ks = [2, 32, 128]
 trajectories = []
 for k in ks:
 

@@ -39,9 +39,9 @@ plot_steps = 8000
 
 # input parameters
 in_vars = ["x", "y"]
-n_epochs = 550
-train_epochs = 500
-epoch_steps = 500
+n_epochs = 2050
+train_epochs = 2000
+epoch_steps = 200
 signal_scale = 0.5
 noise_scale = 0.1
 steps = int(n_epochs*epoch_steps)
@@ -50,7 +50,7 @@ steps = int(n_epochs*epoch_steps)
 N = 200
 n_in = len(in_vars)
 k = 512
-sr = 1.1
+sr = 1.05
 bias_scale = 0.01
 in_scale = 0.01
 density = 0.1
@@ -64,12 +64,12 @@ sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
-# training parameters1
-loss_start = 400
-loss_epochs = 10
+# training parameters
+loss_start = int(0.5*epoch_steps)
+loss_epochs = 15
 lam = 0.002
-lr = 0.01
-alpha = 6.0
+lr = 0.05
+alpha = 15.0
 betas = (0.9, 0.999)
 
 # generate inputs and targets
@@ -95,7 +95,6 @@ rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_i
                                 torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
 rnn.init_new_conceptor(init_value="random")
 readout = torch.nn.Linear(in_features=N, out_features=n_in, bias=False, device=device, dtype=dtype)
-activation_func = torch.nn.Softmax()
 
 # initial wash-out period
 avg_input = torch.mean(inputs[0], dim=0)
@@ -120,7 +119,7 @@ with torch.enable_grad():
         for step in range(epoch_steps):
 
             # get RNN output
-            y = activation_func(readout.forward(rnn.forward(inputs[epoch][step])))
+            y = readout.forward(rnn.forward(inputs[epoch][step]))
 
             # calculate loss
             if step > loss_start:
@@ -134,7 +133,7 @@ with torch.enable_grad():
             optim.step()
             rnn.detach()
             loss = torch.zeros((1,))
-            print(f"Readout training loss: {current_loss}")
+            print(f"Readout training loss (epoch {epoch}): {current_loss}")
 
 # inspect conceptor
 c = rnn.C.cpu().detach().numpy()
@@ -142,15 +141,15 @@ print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions
 with torch.no_grad():
-    predictions, test_targets, test_inputs = [], [], []
+    evidences, test_targets, test_inputs = [], [], []
     for epoch in range(n_epochs-train_epochs):
         for step in range(epoch_steps):
             inp = inputs[train_epochs+epoch][step]
-            y = activation_func( readout.forward(rnn.forward(inp)))
-            predictions.append(y.cpu().detach().numpy())
+            y = readout.forward(rnn.forward(inp))
+            evidences.append(y.cpu().detach().numpy())
             test_targets.append(targets[train_epochs+epoch][step].cpu().detach().numpy())
             test_inputs.append(inp.cpu().detach().numpy())
-predictions = np.asarray(predictions)
+evidences = np.asarray(evidences)
 test_targets = np.asarray(test_targets)
 test_inputs = np.asarray(test_inputs)
 
@@ -169,7 +168,8 @@ for i, ax in enumerate(axes):
 
     # ax.plot(test_inputs[:plot_steps, i], color="black", label="input", alpha=0.5)
     ax.plot(test_targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
+    ax.plot(evidences[:plot_steps, i] / np.max(evidences[:plot_steps, i]), color="darkorange", label="evidence")
+    ax.plot(evidences[:plot_steps, i] > evidences[:plot_steps, 1-i], color="darkgreen", label="prediction")
     ax.set_ylabel(in_vars[i])
     if i == n_in-1:
         ax.set_xlabel("steps")
