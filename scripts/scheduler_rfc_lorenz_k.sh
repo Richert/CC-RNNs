@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set condition
-ks=( 10 20 40 80 160 320 640 )
+ks=( 2 4 8 16 32 64 128 )
 n=50
 batch_size=8
 range_end=$(($n-1))
