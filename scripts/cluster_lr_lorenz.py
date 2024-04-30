@@ -1,9 +1,10 @@
+import sys
+sys.path.append('../')
 from src import LowRankRNN
 import torch
 import numpy as np
 from src.functions import init_weights
 import pickle
-import sys
 
 
 # function definitions
