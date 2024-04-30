@@ -8,16 +8,15 @@ import pandas as pd
 
 
 def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
-
     # get histograms of arrays
-    x_hist, bin_edges = np.histogram(x, bins=n_bins, density=True)
-    y_hist, _ = np.histogram(y, bins=bin_edges, density=True)
+    x_hist, x_edges = np.histogram(x, bins=n_bins, density=True)
+    y_hist, y_edges = np.histogram(y, bins=n_bins, density=True)
     x_hist /= np.sum(x_hist)
     y_hist /= np.sum(y_hist)
 
     # calculate KLD
-    wd = wasserstein_distance(x_hist, y_hist)
-    return wd, x_hist, y_hist, bin_edges
+    wd = wasserstein_distance(u_values=x_edges[:-1], v_values=y_edges[:-1], u_weights=x_hist, v_weights=y_hist)
+    return wd, x_hist, y_hist, x_edges, y_edges
 
 
 # data collection and analysis
