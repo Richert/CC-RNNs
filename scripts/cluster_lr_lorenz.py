@@ -137,7 +137,6 @@ with torch.enable_grad():
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
-            print(f"Training phase I loss: {current_loss}")
 
 # train final readout and generate predictions
 ##############################################

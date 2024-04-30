@@ -145,7 +145,6 @@ with torch.enable_grad():
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
-            print(f"Training phase loss: {current_loss}")
 
 # store conceptor
 rnn.store_conceptor("lorenz")
