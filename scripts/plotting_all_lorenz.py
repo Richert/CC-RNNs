@@ -51,7 +51,7 @@ for file in files:
             wd_tmp, *_ = wasserstein(predictions, targets, n_bins=n_bins)
             wd += wd_tmp
 
-        df.loc[n, :] = (steps, rep, wd, k_star, dim, error)
+        df.loc[n, :] = (model, steps, rep, wd, k_star, dim, error)
         n += 1
 
 # collect representative trajectories for target steps
