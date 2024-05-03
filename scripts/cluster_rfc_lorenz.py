@@ -72,7 +72,7 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 # training parameters
 test_steps = 50000
 loading_steps = int(0.5 * steps)
-alpha = 6.0
+alpha = 5.0
 lam = 0.002
 betas = (0.9, 0.999)
 tychinov = 1e-3
