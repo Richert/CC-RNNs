@@ -23,10 +23,10 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 # data collection and analysis
 ##############################
 
-files = [f for f in os.listdir("../results/lr_lorenz") if f[0] == "k"]
+files = [f for f in os.listdir("../results/lr_lorenz") if f[0] == "n"]
 models = ["rfc", "lr", "clr"]
 df = pd.DataFrame(columns=["model", "steps", "rep", "wd", "k_star", "dim", "train_error"],
-                  index=np.arange(0, len(files)), dtype=np.float64)
+                  index=np.arange(0, len(files)))
 n_bins = 1000
 eps = 1e-10
 n = 0
@@ -40,8 +40,12 @@ for file in files:
         error = data["training_error"]
 
         # calculate dimensionality
-        k_star = np.sum(data["c"])
-        dim = np.sum(data["c"] > eps)
+        try:
+            k_star = np.sum(data["c"])
+            dim = np.sum(data["c"] > eps)
+        except KeyError:
+            k_star = data["config"]["k"]
+            dim = k_star
 
         # calculate wasserstein distance
         wd = 0.0
@@ -59,15 +63,15 @@ steps = [100000, 300000, 500000]
 trajectories = {model: [] for model in models}
 for n_steps in steps:
 
-    df_tmp = df.where(df.loc[:, "steps"] == n_steps)
+    df_tmp = df.loc[df.loc[:, "steps"] == n_steps, :]
 
     for model in models:
 
         # find representative sample
-        df_tmp = df_tmp.where(df.loc[:, "model"] == model)
-        error = np.mean(df_tmp.loc[:, "train_error"].values)
-        idx = np.argmin(np.abs(df_tmp.loc[:, "train_error"].values - error))
-        rep = df_tmp.at[idx, "rep"]
+        df_tmp2 = df_tmp.loc[df_tmp.loc[:, "model"] == model, :]
+        error = np.mean(df_tmp2.loc[:, "train_error"].values)
+        idx = np.argmin(np.abs(df_tmp2.loc[:, "train_error"].values - error))
+        rep = df_tmp2.loc[df_tmp2.index[idx], "rep"]
 
         # load data
         data = pickle.load(open(f"../results/{model}_lorenz/n{n_steps}_{int(rep)}.pkl", "rb"))
