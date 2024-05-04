@@ -109,7 +109,7 @@ for i in range(len(ys)):
 
     ax = axes[i]
     sb.lineplot(x=x, y=ys[i], hue="model", data=df, color="0.8", ax=ax)
-    sb.stripplot(x=x, y=ys[i], hue="model", data=df, jitter=True, zorder=1, ax=ax)
+    # sb.stripplot(x=x, y=ys[i], hue="model", data=df, jitter=True, zorder=1, ax=ax)
     ax.set_xlabel("steps")
     ax.set_ylabel(titles[i])
 
