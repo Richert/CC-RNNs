@@ -59,7 +59,7 @@ for file in files:
         n += 1
 
 # collect representative trajectories for target steps
-steps = [100000, 300000, 500000]
+steps = [10000, 40000, 160000]
 trajectories = {model: [] for model in models}
 for n_steps in steps:
 
