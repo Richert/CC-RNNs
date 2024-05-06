@@ -38,25 +38,25 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 0.6
+noise_lvl = 0.8
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 500000
+steps = 100000
 init_steps = 1000
 
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 3
+k = 5
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
 density = 0.1
-out_scale = 1.0
+out_scale = 0.8
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -69,7 +69,7 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
-backprop_steps = 5000
+backprop_steps = 10000
 loading_steps = int(0.5*steps)
 test_steps = 10000
 lr = 0.01
@@ -141,9 +141,10 @@ with torch.enable_grad():
 
 # harvest states
 y_col = []
-for step in range(loading_steps):
-    y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
-    y_col.append(rnn.y)
+with torch.no_grad():
+    for step in range(loading_steps):
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+        y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
@@ -160,9 +161,9 @@ with torch.no_grad():
 predictions = np.asarray(predictions)
 
 # save results
-results = {"targets": targets, "predictions": predictions,
-           "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag}}
-pickle.dump(results, open("../results/lr_lorenz.pkl", "wb"))
+# results = {"targets": targets, "predictions": predictions,
+#            "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag}}
+# pickle.dump(results, open("../results/lr_lorenz.pkl", "wb"))
 
 # plotting
 ##########
