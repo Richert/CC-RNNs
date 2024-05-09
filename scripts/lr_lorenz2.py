@@ -56,7 +56,6 @@ sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
 density = 0.1
-out_scale = 0.5
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -66,7 +65,6 @@ W_z = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
-W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
 backprop_steps = 5000
@@ -75,7 +73,7 @@ test_steps = 10000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 0.1
+alpha = 3e-4
 
 # generate inputs and targets
 #############################
@@ -120,10 +118,10 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = W_r @ rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # calculate loss
-        loss += loss_func(y, targets[step])
+        loss += loss_func(y, rnn.W @ rnn.W_z @ y)
 
         # make update
         if (step + 1) % backprop_steps == 0:
@@ -193,4 +191,3 @@ ax.set_xlabel("neuron")
 ax.set_ylabel("neuron")
 plt.tight_layout()
 plt.show()
-

@@ -38,14 +38,14 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 0.8
+noise_lvl = 1.0
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 200000
+steps = 600000
 init_steps = 1000
 
 # reservoir parameters
@@ -55,7 +55,7 @@ k = 10
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
-out_scale = 1.0
+out_scale = 0.5
 density = 0.1
 
 # matrix initialization
@@ -70,14 +70,14 @@ W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dt
 
 # training parameters
 test_steps = 10000
-loading_steps = int(0.5*steps)
+loading_steps = 99999
 backprop_steps = 5000
 lam = 0.002
 lr = 0.01
 alpha = 4.0
 betas = (0.9, 0.999)
 tychinov = 1e-3
-epsilon = 1e-8
+epsilon = 0.1
 
 # generate inputs and targets
 #############################
@@ -114,7 +114,7 @@ with torch.no_grad():
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
 
 # train the RNN weights and the conceptor simultaneously
 current_loss = 0.0
@@ -132,11 +132,11 @@ with torch.enable_grad():
         # make update
         if (step + 1) % backprop_steps == 0:
             optim.zero_grad()
-            W_r_tmp = torch.abs(rnn.W_z)
+            W_z_tmp = torch.abs(rnn.W_z)
             for j in range(k):
-                W_r_tmp[j, :] *= rnn.C[j]
-            loss += epsilon*torch.sum(torch.abs(rnn.W) @ W_r_tmp)
+                W_z_tmp[j, :] *= rnn.C[j]
             loss /= backprop_steps
+            loss += epsilon * (torch.sum(torch.abs(rnn.W) @ W_z_tmp))
             loss.backward()
             current_loss = loss.item()
             optim.step()

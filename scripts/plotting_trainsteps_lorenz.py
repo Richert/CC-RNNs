@@ -27,7 +27,7 @@ files = [f for f in os.listdir("../results/lr_lorenz") if f[0] == "n"]
 models = ["rfc", "lr", "clr"]
 df = pd.DataFrame(columns=["model", "steps", "rep", "wd", "k_star", "dim", "train_error"],
                   index=np.arange(0, len(files)))
-n_bins = 1000
+n_bins = 500
 eps = 1e-10
 n = 0
 for file in files:
