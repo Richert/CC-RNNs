@@ -59,7 +59,7 @@ for file in files:
         n += 1
 
 # collect representative trajectories for target steps
-steps = [10000, 40000, 160000]
+steps = [100000, 300000, 500000]
 trajectories = {model: [] for model in models}
 for n_steps in steps:
 
@@ -144,5 +144,5 @@ fig.set_constrained_layout_pads(w_pad=0.05, h_pad=0.05, hspace=0.02, wspace=0.02
 
 # saving/plotting
 fig.canvas.draw()
-plt.savefig(f'../results/lorenz_all.svg')
+plt.savefig(f'../results/lorenz_trainsteps.svg')
 plt.show()
