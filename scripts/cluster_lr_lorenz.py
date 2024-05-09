@@ -42,7 +42,7 @@ dtype = torch.float64
 device = "cpu"
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 0.6
+noise_lvl = 1.0
 
 # lorenz equation parameters
 s = 10.0

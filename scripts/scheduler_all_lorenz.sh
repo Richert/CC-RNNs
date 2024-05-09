@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set condition
-steps=( 10000 20000 40000 80000 160000 320000 )
+steps=( 100000 200000 300000 400000 500000 600000 )
 n=20
 batch_size=8
 range_end=$(($n-1))

@@ -38,20 +38,20 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 0.8
+noise_lvl = 1.0
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 100000
+steps = 600000
 init_steps = 1000
 
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 5
+k = 3
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
@@ -69,7 +69,7 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
-backprop_steps = 10000
+backprop_steps = 5000
 loading_steps = int(0.5*steps)
 test_steps = 10000
 lr = 0.01

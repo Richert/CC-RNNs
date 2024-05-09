@@ -38,14 +38,14 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 1.5
+noise_lvl = 1.0
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 500000
+steps = 100000
 init_steps = 1000
 
 # reservoir parameters

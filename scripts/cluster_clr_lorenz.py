@@ -42,7 +42,7 @@ dtype = torch.float64
 device = "cpu"
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 0.6
+noise_lvl = 1.0
 
 # lorenz equation parameters
 s = 10.0
@@ -77,7 +77,7 @@ loading_steps = int(0.5*steps)
 backprop_steps = 5000
 lam = 0.002
 lr = 0.01
-alpha = 5.0
+alpha = 4.0
 betas = (0.9, 0.999)
 tychinov = 1e-3
 epsilon = 1e-8
