@@ -23,7 +23,7 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 # data collection and analysis
 ##############################
 
-files = [f for f in os.listdir("../results/lr_lorenz") if f[0] == "n"]
+files = [f for f in os.listdir("../results/lr_lorenz") if f[0] == "lag"]
 models = ["lr", "lri"]
 df = pd.DataFrame(columns=["model", "lag", "rep", "wd", "k_star", "dim", "train_error"],
                   index=np.arange(0, len(files)))
