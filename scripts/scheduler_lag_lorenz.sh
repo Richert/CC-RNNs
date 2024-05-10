@@ -3,7 +3,7 @@
 # set condition
 lags=( 1 2 3 4 5 6 )
 n=20
-batch_size=8
+batch_size=5
 range_end=$(($n-1))
 
 # limit amount of threads that each Python process can work with
