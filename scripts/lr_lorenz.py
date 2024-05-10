@@ -37,21 +37,19 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
-lag = 1
-noise_lvl = 0.8
+lag = 5
+noise_lvl = 0.2
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 500000
-init_steps = 1000
 
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 4
+k = 3
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
@@ -69,13 +67,15 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
+steps = 500000
+init_steps = 1000
 backprop_steps = 5000
 loading_steps = 99999
 test_steps = 10000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 0.1
+epsilon = 0.1
 
 # generate inputs and targets
 #############################
@@ -130,7 +130,7 @@ with torch.enable_grad():
 
             optim.zero_grad()
             loss /= backprop_steps
-            loss += alpha * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += epsilon * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
             optim.step()

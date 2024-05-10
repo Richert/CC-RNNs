@@ -1,6 +1,7 @@
+import sys
+sys.path.append('../')
 from src import LowRankRNN
 import torch
-import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
 import pickle
@@ -32,19 +33,22 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
 # parameter definition
 ######################
 
+# batch condition
+lag = int(sys.argv[-2])
+rep = int(sys.argv[-1])
+
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 4000
 state_vars = ["x", "y", "z"]
-lag = 5
-noise_lvl = 0.2
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
+init_steps = 1000
+noise_lvl = 0.2
 
 # reservoir parameters
 N = 200
@@ -66,14 +70,13 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
 steps = 500000
-init_steps = 1000
 backprop_steps = 5000
-loading_steps = 99999
-test_steps = 10000
+loading_steps = int(0.5*steps)
+test_steps = 50000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 3e-4
+epsilon = 1e-4
 
 # generate inputs and targets
 #############################
@@ -125,35 +128,29 @@ with torch.enable_grad():
 
         # make update
         if (step + 1) % backprop_steps == 0:
-
             optim.zero_grad()
             loss /= backprop_steps
-            loss += alpha * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += epsilon * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
-            print(f"Training phase I loss: {current_loss}")
-
-W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
-W_abs = (torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy()
-print(f"Summed trained synaptic weights: {np.round(np.sum(W_abs), decimals=1)}")
 
 # train final readout and generate predictions
 ##############################################
 
 # harvest states
 y_col = []
-with torch.no_grad():
-    for step in range(loading_steps):
-        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
-        y_col.append(rnn.y)
+for step in range(loading_steps):
+    y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+    y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
-W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
+W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
+epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
+print(f"Readout training error: {epsilon}")
 
 # generate predictions
 with torch.no_grad():
@@ -165,29 +162,8 @@ with torch.no_grad():
 predictions = np.asarray(predictions)
 
 # save results
-# results = {"targets": targets, "predictions": predictions,
-#            "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag}}
-# pickle.dump(results, open("../results/lr_lorenz.pkl", "wb"))
-
-# plotting
-##########
-
-# dynamics
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
-for i, ax in enumerate(axes):
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(state_vars[i])
-    if i == n_in-1:
-        ax.set_xlabel("steps")
-        ax.legend()
-plt.tight_layout()
-
-# trained weights
-fig, ax = plt.subplots(figsize=(6, 6))
-im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
-plt.colorbar(im, ax=ax)
-ax.set_xlabel("neuron")
-ax.set_ylabel("neuron")
-plt.tight_layout()
-plt.show()
+results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
+           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k},
+           "condition": {"lag": lag, "repetition": rep},
+           "training_error": epsilon}
+pickle.dump(results, open(f"../results/lri_lorenz/lag{lag}_{rep}.pkl", "wb"))

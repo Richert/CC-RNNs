@@ -34,7 +34,7 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
 ######################
 
 # batch condition
-noise_lvl = int(sys.argv[-2])
+noise_lvl = float(sys.argv[-2])
 rep = int(sys.argv[-1])
 
 # general
