@@ -63,7 +63,7 @@ lags = [1, 3, 5]
 trajectories = {model: [] for model in models}
 for lag in lags:
 
-    df_tmp = df.loc[df.loc[:, "lag"] == lag, :]
+    df_tmp = df.loc[(df.loc[:, "lag"] - lag) < eps, :]
 
     for model in models:
 
