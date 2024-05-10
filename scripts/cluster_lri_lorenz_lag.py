@@ -71,7 +71,7 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 # training parameters
 steps = 500000
 backprop_steps = 5000
-loading_steps = int(0.5*steps)
+loading_steps = 100000
 test_steps = 50000
 lr = 0.01
 betas = (0.9, 0.999)
