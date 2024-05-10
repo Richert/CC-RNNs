@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set condition
-lags=( 1 2 3 4 5 )
+lags=( 1 2 3 4 5 6 )
 n=20
 batch_size=8
 range_end=$(($n-1))
