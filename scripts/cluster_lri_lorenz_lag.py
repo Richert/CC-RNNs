@@ -72,11 +72,11 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 steps = 500000
 backprop_steps = 5000
 loading_steps = 100000
-test_steps = 50000
+test_steps = 10000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-epsilon = 1e-4
+epsilon = 3e-4
 
 # generate inputs and targets
 #############################

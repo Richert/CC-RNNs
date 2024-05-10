@@ -58,7 +58,7 @@ sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
 density = 0.1
-out_scale = 1.0
+out_scale = 0.5
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -74,7 +74,7 @@ W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dt
 steps = 500000
 backprop_steps = 5000
 loading_steps = 100000
-test_steps = 50000
+test_steps = 10000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
@@ -113,7 +113,7 @@ with torch.no_grad():
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
 
 # training
 current_loss = 0.0

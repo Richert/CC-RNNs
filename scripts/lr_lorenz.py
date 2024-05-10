@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
 import pickle
+from scipy.stats import wasserstein_distance
 
 
 # function definitions
@@ -29,6 +30,19 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
     return np.asarray([x_dot, y_dot, z_dot])
 
 
+def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
+
+    # get histograms of arrays
+    x_hist, x_edges = np.histogram(x, bins=n_bins, density=True)
+    y_hist, y_edges = np.histogram(y, bins=n_bins, density=True)
+    x_hist /= np.sum(x_hist)
+    y_hist /= np.sum(y_hist)
+
+    # calculate KLD
+    wd = wasserstein_distance(u_values=x_edges[:-1], v_values=y_edges[:-1], u_weights=x_hist, v_weights=y_hist)
+    return wd, x_hist, y_hist, x_edges, y_edges
+
+
 # parameter definition
 ######################
 
@@ -39,6 +53,7 @@ plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 5
 noise_lvl = 0.2
+n_bins = 500
 
 # lorenz equation parameters
 s = 10.0
@@ -70,7 +85,7 @@ W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dt
 steps = 500000
 init_steps = 1000
 backprop_steps = 5000
-loading_steps = 99999
+loading_steps = 100000
 test_steps = 10000
 lr = 0.01
 betas = (0.9, 0.999)
@@ -166,10 +181,15 @@ with torch.no_grad():
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
 
-# save results
-# results = {"targets": targets, "predictions": predictions,
-#            "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lag": lag}}
-# pickle.dump(results, open("../results/lr_lorenz.pkl", "wb"))
+# calculate wasserstein distance and get probability distributions
+wd = 0.0
+target_dist = []
+prediction_dist = []
+for i in range(n_in):
+    wd_tmp, x_hist, y_hist, x_edges, y_edges = wasserstein(predictions, targets.cpu().detach().numpy(), n_bins=n_bins)
+    wd += wd_tmp
+    prediction_dist.append((x_edges, x_hist))
+    target_dist.append((y_edges, y_hist))
 
 # plotting
 ##########
@@ -192,5 +212,16 @@ plt.colorbar(im, ax=ax)
 ax.set_xlabel("neuron")
 ax.set_ylabel("neuron")
 plt.tight_layout()
-plt.show()
 
+# distributions
+fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
+for i, ax in enumerate(axes):
+    ax.bar(target_dist[i][0][:-1], target_dist[i][1], color="royalblue", label="target")
+    ax.bar(prediction_dist[i][0][1:], prediction_dist[i][1], color="darkorange", label="prediction")
+    ax.set_ylabel("p")
+    ax.set_xlabel(state_vars[i])
+    if i == n_in-1:
+        ax.legend()
+fig.suptitle(f"WD = {wd}")
+plt.tight_layout()
+plt.show()
