@@ -23,7 +23,7 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 # data collection and analysis
 ##############################
 
-files = [f for f in os.listdir("../results/lr_lorenz") if f[0] == "lag"]
+files = [f for f in os.listdir("../results/lr_lorenz") if f[:3] == "lag"]
 models = ["lr", "lri"]
 df = pd.DataFrame(columns=["model", "lag", "rep", "wd", "k_star", "dim", "train_error"],
                   index=np.arange(0, len(files)))
@@ -63,7 +63,7 @@ lags = [1, 3, 5]
 trajectories = {model: [] for model in models}
 for lag in lags:
 
-    df_tmp = df.loc[df.loc[:, "lag"].round() == lag, :]
+    df_tmp = df.loc[df.loc[:, "lag"] == lag, :]
 
     for model in models:
 
