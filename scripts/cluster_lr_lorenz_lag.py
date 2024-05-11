@@ -74,7 +74,7 @@ W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dt
 steps = 500000
 backprop_steps = 5000
 loading_steps = 100000
-test_steps = 10000
+test_steps = 20000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
