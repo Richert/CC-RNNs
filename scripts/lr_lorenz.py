@@ -51,7 +51,7 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
-lag = 5
+lag = 3
 n_bins = 500
 
 # lorenz equation parameters
@@ -59,7 +59,7 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-noise_lvl = 0.2
+noise_lvl = 1.0
 
 # reservoir parameters
 N = 200
@@ -154,7 +154,7 @@ with torch.enable_grad():
             print(f"Training phase I loss: {current_loss}")
 
 W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
-W_abs = (torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################

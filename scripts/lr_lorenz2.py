@@ -50,7 +50,7 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
-lag = 5
+lag = 3
 n_bins = 500
 
 # lorenz equation parameters
@@ -58,7 +58,7 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-noise_lvl = 0.2
+noise_lvl = 0.8
 
 # reservoir parameters
 N = 200
@@ -87,7 +87,7 @@ test_steps = 10000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 2e-4
+alpha = 5e-4
 
 # generate inputs and targets
 #############################
