@@ -76,7 +76,7 @@ test_steps = 20000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-epsilon = 3e-4
+alpha = 2e-4
 
 # generate inputs and targets
 #############################
@@ -130,12 +130,16 @@ with torch.enable_grad():
         if (step + 1) % backprop_steps == 0:
             optim.zero_grad()
             loss /= backprop_steps
-            loss += epsilon * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += alpha * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
+
+# calculate average trained weights
+W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################
@@ -163,7 +167,7 @@ predictions = np.asarray(predictions)
 
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
-           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k},
+           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alpha": alpha},
            "condition": {"lag": lag, "repetition": rep},
-           "training_error": epsilon}
+           "training_error": epsilon, "avg_weights": W_abs}
 pickle.dump(results, open(f"../results/lri_lorenz/lag{lag}_{rep}.pkl", "wb"))

@@ -52,7 +52,6 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 5
-noise_lvl = 0.2
 n_bins = 500
 
 # lorenz equation parameters
@@ -60,6 +59,7 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
+noise_lvl = 0.2
 
 # reservoir parameters
 N = 200
@@ -90,7 +90,7 @@ test_steps = 10000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-epsilon = 0.1
+alpha = 2e-4
 
 # generate inputs and targets
 #############################
@@ -145,7 +145,7 @@ with torch.enable_grad():
 
             optim.zero_grad()
             loss /= backprop_steps
-            loss += epsilon * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += alpha * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
             optim.step()
@@ -155,7 +155,6 @@ with torch.enable_grad():
 
 W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
 W_abs = (torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy()
-print(f"Summed trained synaptic weights: {np.round(np.sum(W_abs), decimals=1)}")
 
 # train final readout and generate predictions
 ##############################################
@@ -211,6 +210,7 @@ im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
 plt.colorbar(im, ax=ax)
 ax.set_xlabel("neuron")
 ax.set_ylabel("neuron")
+fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
 plt.tight_layout()
 
 # distributions
