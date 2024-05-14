@@ -58,7 +58,7 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-noise_lvl = 0.8
+noise_lvl = 0.5
 
 # reservoir parameters
 N = 200

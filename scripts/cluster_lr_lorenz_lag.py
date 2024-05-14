@@ -48,7 +48,7 @@ r = 28.0
 b = 8/3
 dt = 0.01
 init_steps = 1000
-noise_lvl = 0.2
+noise_lvl = 0.5
 
 # reservoir parameters
 N = 200
@@ -78,7 +78,7 @@ test_steps = 20000
 lr = 0.01
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 0.1
+alpha = 5e-4
 
 # generate inputs and targets
 #############################
