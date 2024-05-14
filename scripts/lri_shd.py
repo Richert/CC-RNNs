@@ -112,7 +112,7 @@ n_epochs = 500
 n_samples = 10
 init_steps = 100
 test_samples = 100
-lr = 0.001
+lr = 0.002
 betas = (0.9, 0.999)
 alphas = (1e-4, 1e-2)
 

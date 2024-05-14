@@ -90,11 +90,11 @@ plot_steps = 4000
 
 # reservoir parameters
 N = 200
-k = 5
-sr = 1.05
+k = 10
+sr = 1.2
 bias_scale = 0.01
-in_scale = 1.0
-density = 0.5
+in_scale = 0.005
+density = 0.2
 out_scale = 0.5
 
 # rnn matrices
@@ -114,7 +114,7 @@ init_steps = 1000
 test_samples = 100
 lr = 0.005
 betas = (0.9, 0.999)
-alphas = (1e-2, 1e-2)
+alphas = (1e-3, 1e-2)
 
 # model training
 ################
