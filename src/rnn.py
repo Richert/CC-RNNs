@@ -53,7 +53,7 @@ class RNN(torch.nn.Module):
             except KeyError:
                 pass
         except AttributeError:
-            print(r"Invalid parameter key {key}. Key should refer to a tensor object available as an attribute on RNN.")
+            print(f"Invalid parameter key {key}. Key should refer to a tensor object available as an attribute on RNN.")
 
     def set_param(self, key: str, val: torch.tensor):
         try:
