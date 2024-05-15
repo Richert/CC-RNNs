@@ -53,7 +53,7 @@ out_scale = 0.5
 density = 0.2
 
 # training parameters
-steps = 500000
+steps = 200000
 init_steps = 1000
 backprop_steps = 1000
 test_steps = 2000
@@ -115,14 +115,13 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = W_r @ rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # calculate loss
-        loss += loss_func(y, targets[step])
+        loss += loss_func(y, rnn.W @ rnn.W_z @ y)
 
         # make update
         if (step + 1) % backprop_steps == 0:
-
             optim.zero_grad()
             loss /= backprop_steps
             loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))

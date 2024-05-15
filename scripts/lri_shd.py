@@ -90,11 +90,11 @@ plot_steps = 4000
 
 # reservoir parameters
 N = 200
-k = 10
-sr = 1.2
-bias_scale = 0.002
-in_scale = 0.002
-density = 0.1
+k = 6
+sr = 1.1
+bias_scale = 0.01
+in_scale = 0.01
+density = 0.2
 out_scale = 0.5
 
 # rnn matrices
@@ -108,13 +108,13 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_epochs = 500
+n_epochs = 200
 n_samples = 10
-init_steps = 100
+init_steps = int(0.5*n_steps)
 test_samples = 100
-lr = 0.002
+lr = 0.001
 betas = (0.9, 0.999)
-alphas = (1e-4, 1e-2)
+alphas = (1e-6, 1e-3)
 
 # model training
 ################
@@ -130,7 +130,7 @@ loss_func = torch.nn.CrossEntropyLoss()
 loss_func_ident = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam([W_r], lr=lr*20, betas=betas)
+optim = torch.optim.Adam([W_r], lr=lr, betas=betas)
 optim_ident = torch.optim.Adam(rnn.parameters(), lr=lr, betas=betas)
 
 # training the intrinsic weights
@@ -138,17 +138,16 @@ epoch_loss1 = []
 avg_input = torch.zeros((n_in,), device=device, dtype=dtype)
 for epoch in range(n_epochs):
 
-    loss = torch.zeros((1,))
     for sample, (X, y_t) in enumerate(
             data_generator(X_data, gender, speaker, n_samples,
                            n_steps=n_steps, n_inp=n_in, device=device, dtype=dtype, shuffle=True)
     ):
 
         # get initial state
-        rnn.detach()
         for step in range(init_steps):
             rnn.forward(avg_input)
 
+        loss = torch.zeros((1,))
         for step in range(n_steps):
 
             # get RNN output
@@ -157,13 +156,14 @@ for epoch in range(n_epochs):
             # calculate loss
             loss += loss_func_ident(y, rnn.W @ rnn.W_z @ y)
 
-    # update of weights
-    optim_ident.zero_grad()
-    loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
-    loss.backward()
-    optim_ident.step()
-    epoch_loss1.append(loss.item())
-    print(f"Phase I - Loss after epoch {epoch + 1}: {epoch_loss1[-1]}")
+        # update of weights
+        optim_ident.zero_grad()
+        loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+        loss.backward()
+        optim_ident.step()
+        epoch_loss1.append(loss.item())
+        rnn.detach()
+        print(f"Phase I - Loss after epoch {epoch + 1}: {epoch_loss1[-1]}")
 
 # training the readout weights
 epoch_loss2 = []
@@ -176,7 +176,6 @@ for epoch in range(n_epochs):
     ):
 
         # get initial state
-        rnn.detach()
         for step in range(init_steps):
             rnn.forward(avg_input)
 
@@ -194,11 +193,24 @@ for epoch in range(n_epochs):
     loss += alphas[1] * torch.sum(torch.abs(W_r))
     loss.backward()
     optim.step()
-    rnn.detach()
     epoch_loss2.append(loss.item())
+    rnn.detach()
     print(f"Phase II - Loss after epoch {epoch + 1}: {epoch_loss2[-1]}")
 
-# training
+# get trained weights
+W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
+lambdas = np.abs(np.linalg.eigvals(W))
+sr_trained = np.max(lambdas)
+
+# plot trained weights
+fig, ax = plt.subplots(figsize=(6, 6))
+im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
+plt.colorbar(im, ax=ax)
+ax.set_xlabel("neuron")
+ax.set_ylabel("neuron")
+fig.suptitle(f"Trained SR: {np.round(sr_trained, decimals=1)}")
+plt.tight_layout()
+
 # plot training performance
 fig, axes = plt.subplots(nrows=2, figsize=(12, 5))
 ax = axes[0]
@@ -232,6 +244,7 @@ with torch.no_grad():
         # get initial state
         for step in range(init_steps):
             rnn.forward(avg_input)
+            dynamics.append(rnn.y.cpu().detach().numpy())
 
         for step in range(n_steps):
 

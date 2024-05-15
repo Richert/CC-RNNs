@@ -90,10 +90,10 @@ plot_steps = 4000
 
 # reservoir parameters
 N = 200
-k = 10
-sr = 1.2
+k = 6
+sr = 1.1
 bias_scale = 0.01
-in_scale = 0.005
+in_scale = 0.015
 density = 0.2
 out_scale = 0.5
 
@@ -108,13 +108,13 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_epochs = 1000
+n_epochs = 300
 n_samples = 10
-init_steps = 1000
+init_steps = int(0.5*n_steps)
 test_samples = 100
-lr = 0.005
+lr = 0.001
 betas = (0.9, 0.999)
-alphas = (1e-3, 1e-2)
+alphas = (0.1, 1e-3)
 
 # model training
 ################
@@ -127,9 +127,6 @@ activation_func = torch.nn.Softmax()
 
 # initial wash-out period
 avg_input = torch.zeros((n_in,), device=device, dtype=dtype)
-with torch.no_grad():
-    for step in range(init_steps):
-        rnn.forward(avg_input)
 
 # set up loss function
 loss_func = torch.nn.CrossEntropyLoss()
@@ -147,6 +144,9 @@ for epoch in range(n_epochs):
             data_generator(X_data, gender, speaker, n_samples,
                            n_steps=n_steps, n_inp=n_in, device=device, dtype=dtype, shuffle=True)
     ):
+
+        for step in range(init_steps):
+            rnn.forward(avg_input)
 
         for step in range(n_steps):
 
@@ -166,6 +166,20 @@ for epoch in range(n_epochs):
     rnn.detach()
     print(f"Loss after epoch {epoch + 1}: {epoch_loss[-1]}")
 
+# get trained weights
+W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
+lambdas = np.abs(np.linalg.eigvals(W))
+sr_trained = np.max(lambdas)
+
+# plot trained weights
+fig, ax = plt.subplots(figsize=(6, 6))
+im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
+plt.colorbar(im, ax=ax)
+ax.set_xlabel("neuron")
+ax.set_ylabel("neuron")
+fig.suptitle(f"Trained SR: {np.round(sr_trained, decimals=1)}")
+plt.tight_layout()
+
 # plot training performance
 fig, ax = plt.subplots(figsize=(12, 4))
 ax.plot(epoch_loss)
@@ -184,14 +198,18 @@ gender = data["extra"]["meta_info"]["gender"]
 speaker = data["extra"]["speaker"]
 
 # get model predictions
-test_loss, predictions, targets = [], [], []
+test_loss, predictions, targets, dynamics = [], [], [], []
 with torch.no_grad():
     for X, y_t in data_generator(X_data, gender, speaker, test_samples,
                                  n_steps=n_steps, n_inp=n_in, device=device, dtype=dtype):
 
+        # get initial state
+        for step in range(init_steps):
+            rnn.forward(avg_input)
+            dynamics.append(rnn.y.cpu().detach().numpy())
+
         for step in range(n_steps):
 
-            # forward step
             rnn.forward(X[step, :])
 
             # get prediction
@@ -199,8 +217,6 @@ with torch.no_grad():
 
             # calculate loss
             loss = loss_func(y, y_t[0])
-
-            # collect prediction and target
             predictions.append(y.cpu().detach().numpy())
             target = np.zeros((n_out,))
             target[y_t.item()] = 1.0
@@ -209,9 +225,14 @@ with torch.no_grad():
             # collect loss
             test_loss.append(loss.item())
 
+            # collect dynamics
+            dynamics.append(rnn.y.cpu().detach().numpy())
+
 targets = np.asarray(targets)
 predictions = np.asarray(predictions)
 performance = np.mean(np.argmax(targets, axis=1) == np.argmax(predictions, axis=1))
+dynamics = np.asarray(dynamics)
+
 
 # plot test performance
 _, ax = plt.subplots(figsize=(12, 4))
@@ -231,5 +252,14 @@ for i in range(n_out):
     ax.set_ylabel("probability")
     ax.set_title(f"Speaker class: {labels[i]}")
 fig.suptitle(f"Average classification performance: {performance}")
+plt.tight_layout()
+
+# plot network dynamics
+_, ax = plt.subplots(figsize=(12, 4))
+im = ax.imshow(dynamics.T, aspect="auto", interpolation="none", cmap="viridis", vmax=1.0, vmin=-1.0)
+plt.colorbar(im, ax=ax, shrink=0.7)
+ax.set_xlabel("steps")
+ax.set_ylabel("neuron")
+ax.set_title("Network dynamics on test samples")
 plt.tight_layout()
 plt.show()
