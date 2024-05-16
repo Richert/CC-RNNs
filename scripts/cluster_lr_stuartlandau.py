@@ -1,8 +1,10 @@
+import sys
+sys.path.append('../')
 from src import LowRankRNN
 from src.functions import init_weights
 import torch
-import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 
 
 # function definitions
@@ -30,17 +32,20 @@ def stuart_landau(x: float, y: float, omega: float = 10.0) -> np.ndarray:
 # parameter definition
 ######################
 
+# batch condition
+noise_lvl = int(sys.argv[-3])
+lag = int(sys.argv[-2])
+rep = int(sys.argv[-1])
+
 # general
 dtype = torch.float64
 device = "cpu"
 plot_steps = 2000
 state_vars = ["x", "y"]
-lag = 4
 
 # SL equation parameters
 omega = 6.0
 dt = 0.01
-noise_lvl = 0.9
 
 # reservoir parameters
 N = 200
@@ -131,10 +136,6 @@ with torch.enable_grad():
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
-            print(f"Training phase I loss: {current_loss}")
-
-W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################
@@ -148,8 +149,8 @@ with torch.no_grad():
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
-W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
-print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
+W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
+print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 with torch.no_grad():
@@ -160,29 +161,9 @@ with torch.no_grad():
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
 
-# plotting
-##########
-
-# plotting
-##########
-
-# dynamics
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
-for i, ax in enumerate(axes):
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(state_vars[i])
-    if i == n_in-1:
-        ax.set_xlabel("steps")
-        ax.legend()
-plt.tight_layout()
-
-# trained weights
-fig, ax = plt.subplots(figsize=(6, 6))
-im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
-plt.colorbar(im, ax=ax)
-ax.set_xlabel("neuron")
-ax.set_ylabel("neuron")
-fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
-plt.tight_layout()
-plt.show()
+# save results
+results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
+           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
+           "condition": {"lag": lag, "repetition": rep, "noise": noise_lvl},
+           "training_error": epsilon, "W": (rnn.W @ rnn.W_z).cpu().detach().numpy()}
+pickle.dump(results, open(f"../results/lr_lorenz/lag{lag}_{rep}.pkl", "wb"))

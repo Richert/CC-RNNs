@@ -35,12 +35,12 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 2000
 state_vars = ["x", "y"]
-lag = 20
+lag = 4
 
 # SL equation parameters
 omega = 6.0
 dt = 0.01
-noise_lvl = 0.1
+noise_lvl = 0.8
 
 # reservoir parameters
 N = 200
