@@ -165,4 +165,4 @@ results = {"targets": targets[loading_steps:loading_steps+test_steps], "predicti
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"lag": lag, "repetition": rep, "noise": noise_lvl},
            "training_error": epsilon, "W": (rnn.W @ rnn.W_z).cpu().detach().numpy()}
-pickle.dump(results, open(f"../results/lri_lorenz/lag{lag}_{rep}.pkl", "wb"))
+pickle.dump(results, open(f"../results/lri_lorenz/lag{lag}_n{int(noise_lvl*10)}_{rep}.pkl", "wb"))
