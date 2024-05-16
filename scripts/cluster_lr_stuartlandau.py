@@ -33,7 +33,7 @@ def stuart_landau(x: float, y: float, omega: float = 10.0) -> np.ndarray:
 ######################
 
 # batch condition
-noise_lvl = int(sys.argv[-3])
+noise_lvl = float(sys.argv[-3])
 lag = int(sys.argv[-2])
 rep = int(sys.argv[-1])
 
