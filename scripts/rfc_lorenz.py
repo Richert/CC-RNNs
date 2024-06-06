@@ -38,20 +38,19 @@ device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
-noise_lvl = 1.0
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-steps = 100000
-init_steps = 1000
+input_idx = np.asarray([2])
 
 # reservoir parameters
 N = 200
-n_in = len(state_vars)
-k = 400
+n_in = len(input_idx)
+n_out = len(state_vars)
+k = 600
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
@@ -67,10 +66,12 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
+steps = 500000
+init_steps = 1000
 test_steps = 10000
-loading_steps = int(0.5 * steps)
+loading_steps = 100000
 lam = 0.002
-alpha = 4.0
+alpha = 8.0
 betas = (0.9, 0.999)
 tychinov = 1e-3
 
@@ -86,7 +87,7 @@ for step in range(steps):
 y_col = np.asarray(y_col)
 
 # get inputs and targets
-inputs = torch.tensor(y_col[:-lag], device=device, dtype=dtype)
+inputs = torch.tensor(y_col[:-lag, input_idx], device=device, dtype=dtype)
 targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
 
 # train RFC-RNN to predict next time step of Lorenz attractor
@@ -106,12 +107,12 @@ with torch.no_grad():
 # train the conceptor
 with torch.no_grad():
     for step in range(steps-lag):
-        x = rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn(size=(n_in,), device=device, dtype=dtype))
+        x = rnn.forward_c_adapt(inputs[step])
 
 # harvest states
 y_col = []
 for step in range(loading_steps):
-    rnn.forward_c(inputs[step] + noise_lvl*torch.randn(size=(n_in,), device=device, dtype=dtype))
+    rnn.forward_c(inputs[step])
     y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
@@ -132,7 +133,7 @@ with torch.no_grad():
     predictions = []
     y = W_r @ rnn.y
     for step in range(test_steps):
-        y = W_r @ rnn.forward_c(y)
+        y = W_r @ rnn.forward_c(y[input_idx])
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
 
@@ -145,14 +146,14 @@ pickle.dump(results, open("../results/rfc_lorenz.pkl", "wb"))
 # plotting
 ##########
 
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
+fig, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
 
 for i, ax in enumerate(axes):
 
     ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
     ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
     ax.set_ylabel(state_vars[i])
-    if i == n_in-1:
+    if i == n_out-1:
         ax.set_xlabel("steps")
         ax.legend()
 
