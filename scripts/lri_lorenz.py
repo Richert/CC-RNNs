@@ -50,7 +50,7 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 4000
 state_vars = ["x", "y", "z"]
-lag = 3
+lag = 1
 n_bins = 500
 
 # lorenz equation parameters
@@ -58,16 +58,17 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-noise_lvl = 0.5
+input_idx = np.asarray([0, 2])
 
 # reservoir parameters
 N = 200
-n_in = len(state_vars)
-k = 3
+n_in = len(input_idx)
+n_out = len(state_vars)
+k = len(state_vars)
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
-density = 0.1
+density = 0.2
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -84,10 +85,10 @@ init_steps = 1000
 backprop_steps = 5000
 loading_steps = 100000
 test_steps = 10000
-lr = 0.01
+lr = 0.001
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 5e-4
+alpha = 1e-2
 
 # generate inputs and targets
 #############################
@@ -101,7 +102,7 @@ for step in range(steps):
 y_col = np.asarray(y_col)
 
 # get inputs and targets
-inputs = torch.tensor(y_col[:-lag], device=device, dtype=dtype)
+inputs = torch.tensor(y_col[:-lag, input_idx], device=device, dtype=dtype)
 targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
 
 # train low-rank RNN to predict next time step of Lorenz attractor
@@ -132,7 +133,7 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+        y = rnn.forward(inputs[step])
 
         # calculate loss
         loss += loss_func(y, rnn.W @ rnn.W_z @ y)
@@ -160,7 +161,7 @@ W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 y_col = []
 with torch.no_grad():
     for step in range(loading_steps):
-        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+        y = rnn.forward(inputs[step])
         y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
@@ -173,7 +174,7 @@ with torch.no_grad():
     predictions = []
     y = W_r @ rnn.y
     for step in range(test_steps):
-        y = W_r @ rnn.forward(y)
+        y = W_r @ rnn.forward(y[input_idx])
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
 
@@ -181,7 +182,7 @@ predictions = np.asarray(predictions)
 wd = 0.0
 target_dist = []
 prediction_dist = []
-for i in range(n_in):
+for i in range(n_out):
     wd_tmp, x_hist, y_hist, x_edges, y_edges = wasserstein(predictions, targets.cpu().detach().numpy(), n_bins=n_bins)
     wd += wd_tmp
     prediction_dist.append((x_edges, x_hist))
@@ -191,12 +192,12 @@ for i in range(n_in):
 ##########
 
 # dynamics
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
+fig, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
 for i, ax in enumerate(axes):
     ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
     ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
     ax.set_ylabel(state_vars[i])
-    if i == n_in-1:
+    if i == n_out-1:
         ax.set_xlabel("steps")
         ax.legend()
 plt.tight_layout()
@@ -211,13 +212,13 @@ fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
 plt.tight_layout()
 
 # distributions
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
+fig, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
 for i, ax in enumerate(axes):
     ax.bar(target_dist[i][0][:-1], target_dist[i][1], color="royalblue", label="target")
     ax.bar(prediction_dist[i][0][1:], prediction_dist[i][1], color="darkorange", label="prediction")
     ax.set_ylabel("p")
     ax.set_xlabel(state_vars[i])
-    if i == n_in-1:
+    if i == n_out-1:
         ax.legend()
 fig.suptitle(f"WD = {wd}")
 plt.tight_layout()

@@ -44,7 +44,7 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-input_idx = np.asarray([2])
+input_idx = np.asarray([0, 2])
 
 # reservoir parameters
 N = 200
