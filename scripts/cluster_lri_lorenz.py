@@ -4,6 +4,7 @@ from src import LowRankRNN
 import torch
 import numpy as np
 from src.functions import init_weights
+from scipy.stats import wasserstein_distance
 import pickle
 
 
@@ -30,34 +31,49 @@ def lorenz(x: float, y: float, z: float, s: float = 10.0, r: float = 28.0, b: fl
     return np.asarray([x_dot, y_dot, z_dot])
 
 
+def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
+
+    # get histograms of arrays
+    x_hist, x_edges = np.histogram(x, bins=n_bins, density=True)
+    y_hist, y_edges = np.histogram(y, bins=n_bins, density=True)
+    x_hist /= np.sum(x_hist)
+    y_hist /= np.sum(y_hist)
+
+    # calculate KLD
+    wd = wasserstein_distance(u_values=x_edges[:-1], v_values=y_edges[:-1], u_weights=x_hist, v_weights=y_hist)
+    return wd, x_hist, y_hist, x_edges, y_edges
+
+
 # parameter definition
 ######################
 
 # batch condition
-lag = int(sys.argv[-2])
+N = int(sys.argv[-2])
 rep = int(sys.argv[-1])
 
 # general
 dtype = torch.float64
 device = "cpu"
+plot_steps = 4000
 state_vars = ["x", "y", "z"]
+lag = 1
+n_bins = 500
 
 # lorenz equation parameters
 s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-init_steps = 1000
-noise_lvl = 0.5
+input_idx = np.asarray([0, 2])
 
 # reservoir parameters
-N = 200
-n_in = len(state_vars)
-k = 3
+n_in = len(input_idx)
+n_out = len(state_vars)
+k = len(state_vars)
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
-density = 0.1
+density = 0.2
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -70,13 +86,14 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
 steps = 500000
+init_steps = 1000
 backprop_steps = 5000
 loading_steps = 100000
-test_steps = 20000
-lr = 0.01
+test_steps = 10000
+lr = 0.001
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 5e-4
+alpha = 1e-2
 
 # generate inputs and targets
 #############################
@@ -90,7 +107,7 @@ for step in range(steps):
 y_col = np.asarray(y_col)
 
 # get inputs and targets
-inputs = torch.tensor(y_col[:-lag], device=device, dtype=dtype)
+inputs = torch.tensor(y_col[:-lag, input_idx], device=device, dtype=dtype)
 targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
 
 # train low-rank RNN to predict next time step of Lorenz attractor
@@ -121,13 +138,14 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+        y = rnn.forward(inputs[step])
 
         # calculate loss
         loss += loss_func(y, rnn.W @ rnn.W_z @ y)
 
         # make update
         if (step + 1) % backprop_steps == 0:
+
             optim.zero_grad()
             loss /= backprop_steps
             loss += alpha * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
@@ -136,8 +154,8 @@ with torch.enable_grad():
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
+            print(f"Training phase I loss: {current_loss}")
 
-# calculate average trained weights
 W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 
@@ -146,28 +164,39 @@ W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 
 # harvest states
 y_col = []
-for step in range(loading_steps):
-    y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
-    y_col.append(rnn.y)
+with torch.no_grad():
+    for step in range(loading_steps):
+        y = rnn.forward(inputs[step])
+        y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
 W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
-print(f"Readout training error: {epsilon}")
+print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 with torch.no_grad():
     predictions = []
     y = W_r @ rnn.y
     for step in range(test_steps):
-        y = W_r @ rnn.forward(y)
+        y = W_r @ rnn.forward(y[input_idx])
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
+
+# calculate wasserstein distance and get probability distributions
+wd = 0.0
+target_dist = []
+prediction_dist = []
+for i in range(n_out):
+    wd_tmp, x_hist, y_hist, x_edges, y_edges = wasserstein(predictions, targets.cpu().detach().numpy(), n_bins=n_bins)
+    wd += wd_tmp
+    prediction_dist.append((x_edges, x_hist))
+    target_dist.append((y_edges, y_hist))
 
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alpha": alpha},
            "condition": {"lag": lag, "repetition": rep},
-           "training_error": epsilon, "avg_weights": W_abs}
-pickle.dump(results, open(f"../results/lri_lorenz/lag{lag}_{rep}.pkl", "wb"))
+           "training_error": epsilon, "avg_weights": W_abs,
+           "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd}
+pickle.dump(results, open(f"../results/lri_lorenz/n{N}_{rep}.pkl", "wb"))
