@@ -64,6 +64,7 @@ trajectories = {model: [] for model in models}
 for lvl in noise:
 
     df_tmp = df.loc[np.round(df.loc[:, "noise"], decimals=1) == lvl, :]
+    print(df_tmp.shape)
 
     for model in models:
 
