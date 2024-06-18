@@ -48,7 +48,7 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 ######################
 
 # batch condition
-N = int(sys.argv[-2])
+noise_lvl = float(sys.argv[-2])
 rep = int(sys.argv[-1])
 
 # general
@@ -67,12 +67,14 @@ dt = 0.01
 input_idx = np.asarray([0, 2])
 
 # reservoir parameters
+N = 200
 n_in = len(input_idx)
 n_out = len(state_vars)
 k = len(state_vars)
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.01
+out_scale = 0.5
 density = 0.2
 
 # rnn matrices
@@ -83,6 +85,7 @@ W_z = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
+W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
 steps = 500000
@@ -90,7 +93,7 @@ init_steps = 1000
 backprop_steps = 5000
 loading_steps = 100000
 test_steps = 10000
-lr = 0.001
+lr = 0.008
 betas = (0.9, 0.999)
 tychinov = 1e-3
 alpha = 1e-2
@@ -138,7 +141,7 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = rnn.forward(inputs[step])
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # calculate loss
         loss += loss_func(y, rnn.W @ rnn.W_z @ y)
@@ -166,7 +169,7 @@ W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 y_col = []
 with torch.no_grad():
     for step in range(loading_steps):
-        y = rnn.forward(inputs[step])
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
         y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
@@ -199,4 +202,4 @@ results = {"targets": targets[loading_steps:loading_steps+test_steps], "predicti
            "condition": {"lag": lag, "repetition": rep},
            "training_error": epsilon, "avg_weights": W_abs,
            "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd}
-pickle.dump(results, open(f"../results/lri_lorenz/n{N}_{rep}.pkl", "wb"))
+pickle.dump(results, open(f"../results/lri_lorenz/noise{int(noise_lvl*10)}_{rep}.pkl", "wb"))

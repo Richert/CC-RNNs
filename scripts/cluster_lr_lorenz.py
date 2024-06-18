@@ -48,7 +48,7 @@ def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
 ######################
 
 # batch condition
-N = int(sys.argv[-2])
+noise_lvl = float(sys.argv[-2])
 rep = int(sys.argv[-1])
 
 # general
@@ -67,6 +67,7 @@ dt = 0.01
 input_idx = np.asarray([0, 2])
 
 # reservoir parameters
+N = 200
 n_in = len(input_idx)
 n_out = len(state_vars)
 k = len(state_vars)
@@ -95,7 +96,7 @@ test_steps = 10000
 lr = 0.008
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 5e-2
+alpha = 1e-2
 
 # generate inputs and targets
 #############################
@@ -140,7 +141,7 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = W_r @ rnn.forward(inputs[step])
+        y = W_r @ rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # calculate loss
         loss += loss_func(y, targets[step])
@@ -168,7 +169,7 @@ W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 y_col = []
 with torch.no_grad():
     for step in range(loading_steps):
-        y = rnn.forward(inputs[step])
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
         y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
@@ -198,7 +199,7 @@ for i in range(n_out):
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alpha": alpha},
-           "condition": {"lag": lag, "repetition": rep},
+           "condition": {"noise": noise_lvl, "repetition": rep},
            "training_error": epsilon, "avg_weights": W_abs,
            "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd}
-pickle.dump(results, open(f"../results/lr_lorenz/n{N}_{rep}.pkl", "wb"))
+pickle.dump(results, open(f"../results/lr_lorenz/noise{int(noise_lvl*10)}_{rep}.pkl", "wb"))
