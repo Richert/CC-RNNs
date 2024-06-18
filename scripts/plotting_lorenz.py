@@ -59,7 +59,7 @@ for file in files:
         n += 1
 
 # collect representative trajectories for target steps
-noise = [0.2, 0.4, 0.8]
+noise = [0.1, 0.4, 0.7]
 trajectories = {model: [] for model in models}
 for lvl in noise:
 
