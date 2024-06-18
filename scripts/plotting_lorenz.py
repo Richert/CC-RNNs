@@ -63,7 +63,7 @@ noise = [0.1, 0.5, 0.9]
 trajectories = {model: [] for model in models}
 for lvl in noise:
 
-    df_tmp = df.iloc[np.argmin(np.abs(df.loc[:, "noise"] - lvl)), :]
+    df_tmp = df.iloc[np.abs(df.loc[:, "noise"] - lvl) < eps, :]
 
     for model in models:
 
