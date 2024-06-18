@@ -157,7 +157,7 @@ with torch.enable_grad():
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
-            print(f"Training phase I loss: {current_loss}")
+            # print(f"Training phase I loss: {current_loss}")
 
 W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
@@ -175,7 +175,7 @@ y_col = torch.stack(y_col, dim=0)
 
 # train readout
 W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
+# print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 with torch.no_grad():
@@ -199,7 +199,7 @@ for i in range(n_out):
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alpha": alpha},
-           "condition": {"lag": lag, "repetition": rep},
+           "condition": {"noise": noise_lvl, "repetition": rep},
            "training_error": epsilon, "avg_weights": W_abs,
            "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd}
 pickle.dump(results, open(f"../results/lri_lorenz/noise{int(noise_lvl*10)}_{rep}.pkl", "wb"))
