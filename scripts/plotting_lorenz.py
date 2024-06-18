@@ -37,7 +37,7 @@ for file in files:
         data = pickle.load(open(f"../results/{model}_lorenz/{file}", "rb"))
         noise = data["condition"]["noise"]
         rep = data["condition"]["repetition"]
-        error = data["training_error"]
+        error = np.mean(data["training_error"].detach().cpu().numpy())
 
         # calculate dimensionality
         try:

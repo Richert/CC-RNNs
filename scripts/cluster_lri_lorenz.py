@@ -175,7 +175,8 @@ y_col = torch.stack(y_col, dim=0)
 
 # train readout
 W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-# print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
+epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
+# print(f"Readout training error: {epsilon}")
 
 # generate predictions
 with torch.no_grad():
