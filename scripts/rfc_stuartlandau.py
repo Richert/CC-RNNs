@@ -3,7 +3,6 @@ from src.functions import init_weights
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 
 
 # function definitions
@@ -41,8 +40,7 @@ lag = 1
 # SL equation parameters
 omega = 6.0
 dt = 0.01
-steps = 500000
-init_steps = 1000
+noise_lvl = 0.8
 
 # reservoir parameters
 N = 200
@@ -50,19 +48,17 @@ n_in = len(state_vars)
 k = 600
 sr = 0.99
 bias_scale = 0.01
-in_scale = 0.01
+in_scale = 0.1
 density = 0.1
 
 # training parameters
-backprop_steps = 2000
-test_steps = 2000
-scaling_steps = 4000
-loading_steps = int(0.5*steps)
-lr = 0.02
+steps = 500000
+test_steps = 10000
+init_steps = 1000
+loading_steps = 100000
 lam = 0.002
-alpha = 50.0
+alphas = (10.0, 1e-3)
 betas = (0.9, 0.999)
-tychinov = 1e-4
 
 # matrix initialization
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -93,7 +89,7 @@ targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
 
 # initialize RFC-RNN
 rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                                torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
+                                torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
 rnn.init_new_conceptor(init_value="random")
 
 # initial wash-out period
@@ -105,61 +101,39 @@ with torch.no_grad():
 # train the conceptor
 with torch.no_grad():
     for step in range(steps-lag):
-        x = rnn.forward_c_adapt(inputs[step])
+        x = rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
 # harvest states
 y_col = []
 for step in range(loading_steps):
-    rnn.forward_c(inputs[step])
+    rnn.forward_c(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
     y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
-# load input into RNN weights
-D, epsilon = rnn.load_input(y_col.T, inputs[1:loading_steps+1].T, tychinov)
-print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
-
 # train readout
-W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
+W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
+print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
-# finalize conceptors
-# with torch.no_grad():
-#     rnn.y, rnn.z = y0, z0
-#     for step in range(loading_steps):
-#         rnn.forward_c_a_adapt()
-c = rnn.C.cpu().detach().numpy()
+# retrieve network connectivity
+c = rnn.C.cpu().detach().numpy().squeeze()
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
 print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions
 with torch.no_grad():
     predictions = []
+    y = W_r @ rnn.y
     for step in range(test_steps):
-        y = rnn.forward_c_a()
-        y = W_r @ y
+        y = W_r @ rnn.forward_c(y)
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
-
-# scaling task
-with torch.no_grad():
-    scaling_results = []
-    c = rnn.C[:]
-    scaling = torch.linspace(0.001, 10.0, scaling_steps)
-    for step in range(scaling_steps):
-        rnn.C = c*scaling[step]
-        y = rnn.forward_c_a()
-        y = W_r @ y
-        scaling_results.append(y.cpu().detach().numpy())
-
-# save results
-results = {"targets": targets, "predictions": predictions, "frequency_scaling": scaling_results,
-           "config": {"N": N, "k": k, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "lam": lam,
-                      "alpha": alpha, "lag": lag}}
-pickle.dump(results, open("../results/rfc_stuartlandau.pkl", "wb"))
+targets = targets.cpu().detach().numpy()
 
 # plotting
 ##########
 
-# predictions
+# dynamics
 fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
 for i, ax in enumerate(axes):
     ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
@@ -170,12 +144,12 @@ for i, ax in enumerate(axes):
         ax.legend()
 plt.tight_layout()
 
-# frequency scaling
-fig, ax = plt.subplots(figsize=(12, 6))
-for i in range(n_in):
-    ax.plot(targets[:plot_steps, i], label=f"y_{i+1}")
-ax.set_xlabel("steps")
-ax.legend()
+# trained weights
+fig, ax = plt.subplots(figsize=(6, 6))
+im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
+plt.colorbar(im, ax=ax)
+ax.set_xlabel("neuron")
+ax.set_ylabel("neuron")
+fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
 plt.tight_layout()
-
 plt.show()

@@ -45,7 +45,7 @@ noise_lvl = 0.8
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 1
+k = 3
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
