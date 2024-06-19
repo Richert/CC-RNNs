@@ -3,7 +3,6 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
-import pickle
 from scipy.stats import wasserstein_distance
 
 
@@ -59,7 +58,8 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-input_idx = np.asarray([0, 2])
+input_idx = np.asarray([0, 1, 2])
+noise_lvl = 0.08
 
 # reservoir parameters
 N = 200
@@ -68,7 +68,7 @@ n_out = len(state_vars)
 k = 3
 sr = 0.99
 bias_scale = 0.01
-in_scale = 0.01
+in_scale = 0.1
 density = 0.2
 out_scale = 0.5
 
@@ -90,8 +90,7 @@ loading_steps = 100000
 test_steps = 10000
 lr = 0.008
 betas = (0.9, 0.999)
-tychinov = 1e-3
-alpha = 5e-2
+alphas = (1e-3, 1e-3)
 
 # generate inputs and targets
 #############################
@@ -107,6 +106,10 @@ y_col = np.asarray(y_col)
 # get inputs and targets
 inputs = torch.tensor(y_col[:-lag, input_idx], device=device, dtype=dtype)
 targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
+for i in range(n_in):
+    inputs[:, i] /= torch.max(inputs[:, i])
+for i in range(n_out):
+    targets[:, i] /= torch.max(targets[:, i])
 
 # train low-rank RNN to predict next time step of Lorenz attractor
 ##################################################################
@@ -136,7 +139,7 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = W_r @ rnn.forward(inputs[step])
+        y = W_r @ rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # calculate loss
         loss += loss_func(y, targets[step])
@@ -146,7 +149,7 @@ with torch.enable_grad():
 
             optim.zero_grad()
             loss /= backprop_steps
-            loss += alpha * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
             optim.step()
@@ -164,13 +167,13 @@ W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 y_col = []
 with torch.no_grad():
     for step in range(loading_steps):
-        y = rnn.forward(inputs[step])
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
         y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
-W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, tychinov)
-print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
+W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
+print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 with torch.no_grad():
@@ -180,13 +183,14 @@ with torch.no_grad():
         y = W_r @ rnn.forward(y[input_idx])
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
+targets = targets.cpu().detach().numpy()
 
 # calculate wasserstein distance and get probability distributions
 wd = 0.0
 target_dist = []
 prediction_dist = []
 for i in range(n_out):
-    wd_tmp, x_hist, y_hist, x_edges, y_edges = wasserstein(predictions, targets.cpu().detach().numpy(), n_bins=n_bins)
+    wd_tmp, x_hist, y_hist, x_edges, y_edges = wasserstein(predictions[:, i], targets[:, i], n_bins=n_bins)
     wd += wd_tmp
     prediction_dist.append((x_edges, x_hist))
     target_dist.append((y_edges, y_hist))
@@ -197,8 +201,8 @@ for i in range(n_out):
 # dynamics
 fig, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
 for i, ax in enumerate(axes):
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
+    ax.plot(targets[-plot_steps:, i], color="royalblue", label="target")
+    ax.plot(predictions[-plot_steps:, i], color="darkorange", label="prediction")
     ax.set_ylabel(state_vars[i])
     if i == n_out-1:
         ax.set_xlabel("steps")

@@ -64,7 +64,6 @@ trajectories = {model: [] for model in models}
 for lvl in noise:
 
     df_tmp = df.loc[np.round(df.loc[:, "noise"], decimals=1) == lvl, :]
-    print(df_tmp.shape)
 
     for model in models:
 
@@ -110,15 +109,15 @@ for i in range(len(ys)):
 
     ax = axes[i]
     sb.lineplot(x=x, y=ys[i], hue="model", data=df, color="0.8", ax=ax)
-    ax.set_xlabel("steps")
+    ax.set_xlabel("noise level")
     ax.set_ylabel(titles[i])
 
 subfigs[0].suptitle("Model performance")
 
 # trajectory plots
 titles = [f"noise = {n}" for n in noise] + ["Lorenz equations"]
-colors = ["darkgreen", "darkblue", "darkred"]
-model_titles = ["RFC", "LR-RNN", "cLR- RNN"]
+colors = ["darkgreen", "darkred"]
+model_titles = ["LR", "LRI"]
 lvars = [0, 2]
 axes = subfigs[1].subplots(ncols=len(titles), nrows=len(models))
 for i in range(len(models)):

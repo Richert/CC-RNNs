@@ -35,32 +35,32 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 2000
 state_vars = ["x", "y"]
-lag = 4
+lag = 1
 
 # SL equation parameters
 omega = 6.0
 dt = 0.01
-noise_lvl = 0.9
+noise_lvl = 0.8
 
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
 k = 1
-sr = 1.1
+sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
 out_scale = 0.5
 density = 0.2
 
 # training parameters
-steps = 400000
+steps = 500000
 init_steps = 1000
-backprop_steps = 1000
-test_steps = 2000
+backprop_steps = 5000
+test_steps = 10000
 loading_steps = 100000
-lr = 0.001
+lr = 0.008
 betas = (0.9, 0.999)
-alphas = (1e-3, 1e-3)
+alphas = (1e-2, 1e-3)
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -148,8 +148,8 @@ with torch.no_grad():
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
-W_r, epsilon2 = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
-print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
+W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
+print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 with torch.no_grad():
@@ -159,9 +159,7 @@ with torch.no_grad():
         y = W_r @ rnn.forward(y)
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
-
-# plotting
-##########
+targets = targets.cpu().detach().numpy()
 
 # plotting
 ##########

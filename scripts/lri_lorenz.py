@@ -58,10 +58,11 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-input_idx = np.asarray([0, 2])
+input_idx = np.asarray([0, 1, 2])
+noise_lvl = 0.0
 
 # reservoir parameters
-N = 200
+N = 320
 n_in = len(input_idx)
 n_out = len(state_vars)
 k = len(state_vars)
@@ -85,10 +86,10 @@ init_steps = 1000
 backprop_steps = 5000
 loading_steps = 100000
 test_steps = 10000
-lr = 0.001
+lr = 0.008
 betas = (0.9, 0.999)
 tychinov = 1e-3
-alpha = 1e-2
+alpha = 1e-3
 
 # generate inputs and targets
 #############################
@@ -133,7 +134,7 @@ with torch.enable_grad():
     for step in range(steps-lag):
 
         # get RNN output
-        y = rnn.forward(inputs[step])
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # calculate loss
         loss += loss_func(y, rnn.W @ rnn.W_z @ y)
@@ -161,7 +162,7 @@ W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 y_col = []
 with torch.no_grad():
     for step in range(loading_steps):
-        y = rnn.forward(inputs[step])
+        y = rnn.forward(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
         y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
@@ -177,13 +178,14 @@ with torch.no_grad():
         y = W_r @ rnn.forward(y[input_idx])
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
+targets = targets.cpu().detach().numpy()
 
 # calculate wasserstein distance and get probability distributions
 wd = 0.0
 target_dist = []
 prediction_dist = []
 for i in range(n_out):
-    wd_tmp, x_hist, y_hist, x_edges, y_edges = wasserstein(predictions, targets.cpu().detach().numpy(), n_bins=n_bins)
+    wd_tmp, x_hist, y_hist, x_edges, y_edges = wasserstein(predictions[:, i], targets[:, i], n_bins=n_bins)
     wd += wd_tmp
     prediction_dist.append((x_edges, x_hist))
     target_dist.append((y_edges, y_hist))

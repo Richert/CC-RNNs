@@ -3,7 +3,6 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
-import pickle
 
 
 # function definitions
@@ -32,19 +31,17 @@ def two_choice(trials: int, evidence: int, noise: float) -> tuple:
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 4000
-lag = 10
-n_bins = 500
+plot_steps = 100
 
 # input parameters
 n_in = 2
-n_train1 = 2000
+n_train1 = 5000
 n_train2 = 1000
-n_test = 50
+n_test = 100
 evidence_dur = 20
 delay_dur = 4
 response_dur = 1
-noise_lvl = 0.1
+noise_lvl = 0.2
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
@@ -69,11 +66,10 @@ W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=d
 
 # training parameters
 init_steps = 200
-batch_size = 10
+batch_size = 20
 lr = 0.008
 betas = (0.9, 0.999)
-tychinov = 1e-4
-alpha = 1e-3
+alphas = (1e-3, 1e-3)
 
 # generate inputs and targets
 #############################
@@ -131,7 +127,7 @@ with torch.enable_grad():
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
             loss /= batch_size*response_dur
-            loss += alpha * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
             optim.step()
@@ -173,20 +169,20 @@ with torch.no_grad():
 # train readout
 y_col = torch.stack(y_col, dim=0)
 target_col = torch.stack(target_col, dim=0)
-W_r, epsilon = rnn.train_readout(y_col.T, target_col.T, tychinov)
+W_r, epsilon = rnn.train_readout(y_col.T, target_col.T, alphas[1])
 print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 predictions, targets = [], []
 with torch.no_grad():
-    for trial in range(n_train2):
+    for trial in range(n_test):
 
         # initial wash-out period
         for step in range(init_steps):
             rnn.forward(avg_input)
 
         # evidence integration period
-        trial_inp = x_train2[trial]
+        trial_inp = x_test[trial]
         for step in range(evidence_dur):
             rnn.forward(trial_inp[step])
 
@@ -195,7 +191,7 @@ with torch.no_grad():
             rnn.forward(avg_input)
 
         # response period
-        trial_target = y_train2[trial].cpu().detach().numpy()
+        trial_target = y_test[trial].cpu().detach().numpy()
         for step in range(response_dur):
             y = W_r @ rnn.forward(avg_input)
             predictions.append(y.cpu().detach().numpy())
