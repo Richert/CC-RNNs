@@ -41,7 +41,7 @@ n_test = 100
 evidence_dur = 20
 delay_dur = 4
 response_dur = 1
-noise_lvl = 0.1
+noise_lvl = 4.0
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
