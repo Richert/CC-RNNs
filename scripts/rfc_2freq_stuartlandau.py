@@ -2,7 +2,6 @@ from src import RandomFeatureConceptorRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 from src.functions import init_weights
 
 
@@ -38,20 +37,19 @@ plot_steps = 2000
 state_vars = ["x", "y"]
 
 # SL equation parameters
-omegas = [4.0, 8.0]
+omegas = [2.0, 8.0]
 dt = 0.01
-steps = 500000
-init_steps = 1000
 lag = 1
+noise_lvl = 0.1
 
 # rnn parameters
-N = 100
+N = 200
 n_in = len(state_vars)
-k = 500
+k = 600
 sr = 1.05
 bias_scale = 0.01
-in_scale = 1.0
-density = 0.05
+in_scale = 0.1
+density = 0.2
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -63,18 +61,19 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
-test_steps = 2000
-loading_steps = int(0.6 * steps)
-lam = 0.01
-alpha = 2.0
-tychinov = 1e-4
+steps = 500000
+init_steps = 1000
+test_steps = 10000
+loading_steps = 100000
+lam = 0.002
+alphas = (15.0, 1e-3)
 
 # train LR-RNN weights
 ######################
 
 # initialize RFC
 rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                                torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
+                                torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
 
 target_col, input_col, init_states = {}, {}, {}
 with torch.no_grad():
@@ -103,16 +102,11 @@ with torch.no_grad():
 
         # train the conceptor
         for step in range(steps-1):
-            rnn.forward_c_adapt(inputs[step])
+            rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
 
         # store final state
         rnn.store_conceptor(omega)
         init_states[omega] = rnn.y[:]
-
-# finalize conceptors
-# cs = [rnn.conceptors[omega][:] for omega in omegas]
-# for i in range(len(omegas)):
-#     rnn.conceptors[omegas[i]] = rnn.combine_conceptors(cs[i], 1 - cs[1-i], "and")
 
 # load input into RNN weights and train readout
 ###############################################
@@ -131,19 +125,19 @@ with torch.no_grad():
         y_col = []
         for step in range(loading_steps):
             y_col.append(rnn.y)
-            rnn.forward_c(inputs[step])
+            rnn.forward_c(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
         state_col[omega] = torch.stack(y_col, dim=0)
 
     # load input into RNN weights
     inputs = torch.cat([input_col[omega] for omega in omegas], dim=0)
     states = torch.cat([state_col[omega] for omega in omegas], dim=0)
-    D, epsilon = rnn.load_input(states.T, inputs.T, tychinov)
+    D, epsilon = rnn.load_input(states.T, inputs.T, alphas[1])
     print(f"Input loading error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
     # train readout
     states = torch.cat([state_col[omega][1:] for omega in omegas], dim=0)
     targets = torch.cat([target_col[omega][:-1] for omega in omegas], dim=0)
-    W_r, epsilon2 = rnn.train_readout(states.T, targets.T, tychinov)
+    W_r, epsilon2 = rnn.train_readout(states.T, targets.T, alphas[1])
     print(f"Readout training error: {float(torch.mean(epsilon2).cpu().detach().numpy())}")
 
 # generate predictions
@@ -157,11 +151,6 @@ for omega in omegas:
     target = target_col[omega]
 
     # finalize conceptors
-    # with torch.no_grad():
-    #     rnn.y = init_states[omega]
-    #     for step in range(loading_steps):
-    #         rnn.forward_c_a_adapt()
-    # rnn.store_conceptor(omega)
     c = rnn.conceptors[omega].detach().cpu().numpy()
     print(f"Conceptor for omega = {omega}: {np.sum(c)}")
 
@@ -202,19 +191,19 @@ interp_col = np.asarray(interp_col)
 ##########
 
 # prediction figure
-fig, axes = plt.subplots(ncols=n_in, nrows=len(omegas), figsize=(12, 6))
-for i in range(len(omegas)):
-    for j in range(n_in):
+fig, axes = plt.subplots(nrows=n_in, ncols=len(omegas), figsize=(12, 6))
+for j in range(len(omegas)):
+    for i in range(n_in):
 
         ax = axes[i, j]
-        ax.plot(target_col[omegas[i]][:plot_steps, j], color="royalblue", label="target")
-        ax.plot(prediction_col[omegas[i]][:plot_steps, j], color="darkorange", label="prediction")
-        ax.set_ylabel(state_vars[j])
+        ax.plot(target_col[omegas[j]][:plot_steps, i], color="royalblue", label="target")
+        ax.plot(prediction_col[omegas[j]][:plot_steps, i], color="darkorange", label="prediction")
+        ax.set_ylabel(state_vars[i])
         if i == k-1:
             ax.set_xlabel("steps")
             ax.legend()
         if i == 0:
-            ax.set_title(f"Reconstruction of f = {omegas[i]}")
+            ax.set_title(f"Reconstruction of f = {omegas[j]}")
 fig.suptitle("Model Predictions")
 plt.tight_layout()
 plt.show()
