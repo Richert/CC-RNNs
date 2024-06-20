@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../')
-from src import LowRankRNN
+from src import RandomFeatureConceptorRNN
 import torch
 import pickle
 import numpy as np
@@ -40,8 +40,8 @@ device = "cpu"
 
 # input parameters
 n_in = 2
-n_train1 = 20000
-n_train2 = 2000
+n_train1 = 10000
+n_train2 = 1000
 n_test = 100
 evidence_dur = 20
 delay_dur = 4
@@ -51,12 +51,12 @@ avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 # reservoir parameters
 N = 200
 n_out = n_in
-k = 3
+k = 10
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
-density = 0.2
 out_scale = 0.5
+density = 0.2
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -66,14 +66,15 @@ W_z = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
-W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
+W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
 init_steps = 200
 batch_size = 20
+lam = 0.004
 lr = 0.004
 betas = (0.9, 0.999)
-alphas = (1e-3, 1e-3)
+alphas = (15.0, 1e-3, 1e-3)
 
 # generate inputs and targets
 #############################
@@ -90,10 +91,12 @@ x_test, y_test = two_choice(n_test, evidence=evidence_dur, noise=noise_lvl)
 # train low-rank RNN to predict next time step of Lorenz attractor
 ##################################################################
 
-# initialize LR-RNN
-rnn = LowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias, torch.tensor(W_z, device=device, dtype=dtype))
+# initialize RFC-RNN
+rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
+                                torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
 rnn.free_param("W")
 rnn.free_param("W_z")
+rnn.init_new_conceptor(init_value="random")
 
 # set up loss function
 loss_func = torch.nn.CrossEntropyLoss()
@@ -102,7 +105,6 @@ loss_func = torch.nn.CrossEntropyLoss()
 optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
 
 # training
-current_loss = 0.0
 loss_hist = []
 with torch.enable_grad():
 
@@ -111,28 +113,28 @@ with torch.enable_grad():
 
         # initial wash-out period
         for step in range(init_steps):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # evidence integration period
         trial_inp = x_train[trial]
         for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
+            rnn.forward_c_adapt(trial_inp[step])
 
         # delay period
         for step in range(delay_dur):
-            rnn.forward(avg_input)
+            rnn.forward_c_adapt(avg_input)
 
         # response period
         trial_target = y_train[trial]
         for step in range(response_dur):
-            y = W_r @ rnn.forward(avg_input)
+            y = W_r @ rnn.forward_c(avg_input)
             loss += loss_func(y, trial_target)
 
         # make update
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
-            loss /= batch_size*response_dur
-            loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss /= batch_size * response_dur
+            loss += alphas[1] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
             loss_hist.append(current_loss)
@@ -140,8 +142,10 @@ with torch.enable_grad():
             loss = torch.zeros((1,))
             rnn.detach()
 
-W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
+# retrieve network connectivity
+c = rnn.C.cpu().detach().numpy().squeeze()
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################
@@ -153,21 +157,21 @@ with torch.no_grad():
 
         # initial wash-out period
         for step in range(init_steps):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # evidence integration period
         trial_inp = x_train2[trial]
         for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
+            rnn.forward_c(trial_inp[step])
 
         # delay period
         for step in range(delay_dur):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # response period
         trial_target = y_train2[trial]
         for step in range(response_dur):
-            y = rnn.forward(avg_input)
+            y = rnn.forward_c(avg_input)
             y_col.append(y)
             target_col.append(trial_target)
 
@@ -183,21 +187,21 @@ with torch.no_grad():
 
         # initial wash-out period
         for step in range(init_steps):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # evidence integration period
         trial_inp = x_test[trial]
         for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
+            rnn.forward_c(trial_inp[step])
 
         # delay period
         for step in range(delay_dur):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # response period
         trial_target = y_test[trial].cpu().detach().numpy()
         for step in range(response_dur):
-            y = W_r @ rnn.forward(avg_input)
+            y = W_r @ rnn.forward_c(avg_input)
             predictions.append(y.cpu().detach().numpy())
             targets.append(trial_target)
 
@@ -212,4 +216,4 @@ results = {"targets": targets, "predictions": predictions,
            "condition": {"repetition": rep, "noise": noise_lvl},
            "training_error": epsilon, "avg_weights": W_abs, "loss_hist": loss_hist,
            "classification_performance": performance}
-pickle.dump(results, open(f"../results/lr/delayedchoice_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))
+pickle.dump(results, open(f"../results/clr/delayedchoice_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

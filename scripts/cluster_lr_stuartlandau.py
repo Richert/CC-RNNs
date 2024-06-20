@@ -115,6 +115,7 @@ optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
 
 # training
 current_loss = 0.0
+loss_hist = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
@@ -134,9 +135,13 @@ with torch.enable_grad():
             loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
+            loss_hist.append(current_loss)
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
+
+W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################
@@ -174,6 +179,6 @@ wd = wasserstein_distance(u_values=f0, v_values=f1, u_weights=p0, v_weights=p1)
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
-           "condition": {"lag": lag, "repetition": rep, "noise": noise_lvl},
-           "training_error": epsilon, "W": (rnn.W @ rnn.W_z).cpu().detach().numpy(), "wd": wd}
+           "condition": {"repetition": rep, "noise": noise_lvl},
+           "training_error": epsilon, "avg_weights": W_abs, "wd": wd, "loss_hist": loss_hist}
 pickle.dump(results, open(f"../results/lr/stuartlandau_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

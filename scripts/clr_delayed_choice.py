@@ -1,8 +1,6 @@
-import sys
-sys.path.append('../')
-from src import LowRankRNN
+from src import RandomFeatureConceptorRNN
 import torch
-import pickle
+import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
 
@@ -30,33 +28,31 @@ def two_choice(trials: int, evidence: int, noise: float) -> tuple:
 # parameter definition
 ######################
 
-# batch condition
-noise_lvl = float(sys.argv[-2])
-rep = int(sys.argv[-1])
-
 # general
 dtype = torch.float64
 device = "cpu"
+plot_steps = 100
 
 # input parameters
 n_in = 2
-n_train1 = 20000
-n_train2 = 2000
+n_train1 = 10000
+n_train2 = 1000
 n_test = 100
 evidence_dur = 20
 delay_dur = 4
 response_dur = 1
+noise_lvl = 0.1
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
 n_out = n_in
-k = 3
+k = 10
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
-density = 0.2
 out_scale = 0.5
+density = 0.2
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -66,14 +62,15 @@ W_z = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
-W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
+W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # training parameters
 init_steps = 200
 batch_size = 20
+lam = 0.004
 lr = 0.004
 betas = (0.9, 0.999)
-alphas = (1e-3, 1e-3)
+alphas = (12.0, 1e-3, 1e-3)
 
 # generate inputs and targets
 #############################
@@ -90,10 +87,12 @@ x_test, y_test = two_choice(n_test, evidence=evidence_dur, noise=noise_lvl)
 # train low-rank RNN to predict next time step of Lorenz attractor
 ##################################################################
 
-# initialize LR-RNN
-rnn = LowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias, torch.tensor(W_z, device=device, dtype=dtype))
+# initialize RFC-RNN
+rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
+                                torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
 rnn.free_param("W")
 rnn.free_param("W_z")
+rnn.init_new_conceptor(init_value="random")
 
 # set up loss function
 loss_func = torch.nn.CrossEntropyLoss()
@@ -102,8 +101,6 @@ loss_func = torch.nn.CrossEntropyLoss()
 optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
 
 # training
-current_loss = 0.0
-loss_hist = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
@@ -111,37 +108,40 @@ with torch.enable_grad():
 
         # initial wash-out period
         for step in range(init_steps):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # evidence integration period
         trial_inp = x_train[trial]
         for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
+            rnn.forward_c_adapt(trial_inp[step])
 
         # delay period
         for step in range(delay_dur):
-            rnn.forward(avg_input)
+            rnn.forward_c_adapt(avg_input)
 
         # response period
         trial_target = y_train[trial]
         for step in range(response_dur):
-            y = W_r @ rnn.forward(avg_input)
+            y = W_r @ rnn.forward_c(avg_input)
             loss += loss_func(y, trial_target)
 
         # make update
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
-            loss /= batch_size*response_dur
-            loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss /= batch_size * response_dur
+            loss += alphas[1] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
-            loss_hist.append(current_loss)
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
+            print(f"Training phase I loss: {current_loss}")
 
-W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
+# retrieve network connectivity
+c = rnn.C.cpu().detach().numpy().squeeze()
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
+print(f"Conceptor: {np.sum(c)}")
 
 # train final readout and generate predictions
 ##############################################
@@ -153,21 +153,21 @@ with torch.no_grad():
 
         # initial wash-out period
         for step in range(init_steps):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # evidence integration period
         trial_inp = x_train2[trial]
         for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
+            rnn.forward_c(trial_inp[step])
 
         # delay period
         for step in range(delay_dur):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # response period
         trial_target = y_train2[trial]
         for step in range(response_dur):
-            y = rnn.forward(avg_input)
+            y = rnn.forward_c(avg_input)
             y_col.append(y)
             target_col.append(trial_target)
 
@@ -175,6 +175,7 @@ with torch.no_grad():
 y_col = torch.stack(y_col, dim=0)
 target_col = torch.stack(target_col, dim=0)
 W_r, epsilon = rnn.train_readout(y_col.T, target_col.T, alphas[1])
+print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 predictions, targets = [], []
@@ -183,21 +184,21 @@ with torch.no_grad():
 
         # initial wash-out period
         for step in range(init_steps):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # evidence integration period
         trial_inp = x_test[trial]
         for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
+            rnn.forward_c(trial_inp[step])
 
         # delay period
         for step in range(delay_dur):
-            rnn.forward(avg_input)
+            rnn.forward_c(avg_input)
 
         # response period
         trial_target = y_test[trial].cpu().detach().numpy()
         for step in range(response_dur):
-            y = W_r @ rnn.forward(avg_input)
+            y = W_r @ rnn.forward_c(avg_input)
             predictions.append(y.cpu().detach().numpy())
             targets.append(trial_target)
 
@@ -206,10 +207,28 @@ predictions = np.asarray(predictions)
 targets = np.asarray(targets)
 performance = np.mean(np.argmax(predictions, axis=1) == np.argmax(targets, axis=1))
 
-# save results
-results = {"targets": targets, "predictions": predictions,
-           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
-           "condition": {"repetition": rep, "noise": noise_lvl},
-           "training_error": epsilon, "avg_weights": W_abs, "loss_hist": loss_hist,
-           "classification_performance": performance}
-pickle.dump(results, open(f"../results/lr/delayedchoice_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))
+# plotting
+##########
+
+# dynamics
+fig, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
+for i, ax in enumerate(axes):
+    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
+    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
+    ax.set_ylabel(f"Target class {i+1}")
+    if i == n_out-1:
+        ax.set_xlabel("steps")
+        ax.legend()
+fig.suptitle(f"Classification performance: {np.round(performance, decimals=2)}")
+plt.tight_layout()
+
+# trained weights
+fig, ax = plt.subplots(figsize=(6, 6))
+im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
+plt.colorbar(im, ax=ax)
+ax.set_xlabel("neuron")
+ax.set_ylabel("neuron")
+fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
+
+plt.tight_layout()
+plt.show()

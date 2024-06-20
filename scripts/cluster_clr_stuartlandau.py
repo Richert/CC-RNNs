@@ -1,8 +1,10 @@
+import sys
+sys.path.append('../')
 from src import RandomFeatureConceptorRNN
-from src.functions import init_weights
 import torch
-import matplotlib.pyplot as plt
+import pickle
 import numpy as np
+from src.functions import init_weights
 from scipy.signal import welch
 from scipy.stats import wasserstein_distance
 
@@ -32,6 +34,10 @@ def stuart_landau(x: float, y: float, omega: float = 10.0) -> np.ndarray:
 # parameter definition
 ######################
 
+# batch condition
+noise_lvl = float(sys.argv[-2])
+rep = int(sys.argv[-1])
+
 # general
 dtype = torch.float64
 device = "cpu"
@@ -42,25 +48,28 @@ lag = 1
 # SL equation parameters
 omega = 6.0
 dt = 0.01
-noise_lvl = 0.8
 
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 600
+n_out = n_in
+k = 10
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
-density = 0.1
+out_scale = 0.5
+density = 0.2
 
 # training parameters
 steps = 500000
-test_steps = 10000
 init_steps = 1000
+backprop_steps = 5000
 loading_steps = 100000
+test_steps = 10000
+lr = 0.008
 lam = 0.002
-alphas = (10.0, 1e-3)
 betas = (0.9, 0.999)
+alphas = (12.0, 1e-3, 1e-3)
 
 # matrix initialization
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -70,6 +79,7 @@ W_z = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
+W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
 
 # generate inputs and targets
 #############################
@@ -92,6 +102,8 @@ targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
 # initialize RFC-RNN
 rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
                                 torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
+rnn.free_param("W")
+rnn.free_param("W_z")
 rnn.init_new_conceptor(init_value="random")
 
 # initial wash-out period
@@ -100,10 +112,44 @@ with torch.no_grad():
     for step in range(init_steps):
         rnn.forward_c(avg_input)
 
-# train the conceptor
-with torch.no_grad():
+# set up loss function
+loss_func = torch.nn.MSELoss()
+
+# set up optimizer
+optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
+
+# train the RNN weights and the conceptor simultaneously
+current_loss = 0.0
+loss_hist = []
+with torch.enable_grad():
+
+    loss = torch.zeros((1,))
     for step in range(steps-lag):
-        x = rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+
+        # get RNN readout
+        y = W_r @ rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+
+        # calculate loss
+        loss += loss_func(y, targets[step])
+
+        # make update
+        if (step + 1) % backprop_steps == 0:
+            optim.zero_grad()
+            W_z_tmp = torch.abs(rnn.W_z)
+            for j in range(k):
+                W_z_tmp[j, :] *= rnn.C[j]
+            loss /= backprop_steps
+            loss += alphas[1] * (torch.sum(torch.abs(rnn.W) @ W_z_tmp))
+            loss.backward()
+            current_loss = loss.item()
+            loss_hist.append(current_loss)
+            optim.step()
+            loss = torch.zeros((1,))
+            rnn.detach()
+
+# store conceptor
+rnn.store_conceptor("lorenz")
+rnn.detach()
 
 # harvest states
 y_col = []
@@ -113,14 +159,12 @@ for step in range(loading_steps):
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
-W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
-print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
+W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[2])
 
-# retrieve network connectivity
+# retrieve trained network connectivity
 c = rnn.C.cpu().detach().numpy().squeeze()
 W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
-print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions
 with torch.no_grad():
@@ -140,26 +184,9 @@ p0 /= np.sum(p0)
 p1 /= np.sum(p1)
 wd = wasserstein_distance(u_values=f0, v_values=f1, u_weights=p0, v_weights=p1)
 
-# plotting
-##########
-
-# dynamics
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
-for i, ax in enumerate(axes):
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(state_vars[i])
-    if i == n_in-1:
-        ax.set_xlabel("steps")
-        ax.legend()
-plt.tight_layout()
-
-# trained weights
-fig, ax = plt.subplots(figsize=(6, 6))
-im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
-plt.colorbar(im, ax=ax)
-ax.set_xlabel("neuron")
-ax.set_ylabel("neuron")
-fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
-plt.tight_layout()
-plt.show()
+# save results
+results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
+           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
+           "condition": {"repetition": rep, "noise": noise_lvl},
+           "training_error": epsilon, "avg_weights": W_abs, "wd": wd, "loss_hist": loss_hist}
+pickle.dump(results, open(f"../results/clr/stuartlandau_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

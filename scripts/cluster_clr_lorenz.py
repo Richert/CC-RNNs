@@ -141,6 +141,7 @@ optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
 
 # train the RNN weights and the conceptor simultaneously
 current_loss = 0.0
+loss_hist = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
@@ -162,6 +163,7 @@ with torch.enable_grad():
             loss /= backprop_steps
             loss.backward()
             current_loss = loss.item()
+            loss_hist.append(current_loss)
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
@@ -212,5 +214,5 @@ results = {"targets": targets[loading_steps:loading_steps+test_steps], "predicti
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"noise": noise_lvl, "repetition": rep},
            "training_error": epsilon, "avg_weights": W_abs, "k_star": k_star,
-           "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd}
+           "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd, "loss_hist": loss_hist}
 pickle.dump(results, open(f"../results/clr/lorenz_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

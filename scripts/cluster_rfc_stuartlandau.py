@@ -1,10 +1,12 @@
+import sys
+sys.path.append('../')
 from src import RandomFeatureConceptorRNN
 from src.functions import init_weights
 import torch
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import welch
 from scipy.stats import wasserstein_distance
+import pickle
 
 
 # function definitions
@@ -32,22 +34,24 @@ def stuart_landau(x: float, y: float, omega: float = 10.0) -> np.ndarray:
 # parameter definition
 ######################
 
+# batch condition
+k = int(sys.argv[-3])
+noise_lvl = float(sys.argv[-2])
+rep = int(sys.argv[-1])
+
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 2000
 state_vars = ["x", "y"]
 lag = 1
 
 # SL equation parameters
 omega = 6.0
 dt = 0.01
-noise_lvl = 0.8
 
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 600
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
@@ -114,13 +118,11 @@ y_col = torch.stack(y_col, dim=0)
 
 # train readout
 W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
-print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # retrieve network connectivity
 c = rnn.C.cpu().detach().numpy().squeeze()
 W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
-print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions
 with torch.no_grad():
@@ -140,26 +142,9 @@ p0 /= np.sum(p0)
 p1 /= np.sum(p1)
 wd = wasserstein_distance(u_values=f0, v_values=f1, u_weights=p0, v_weights=p1)
 
-# plotting
-##########
-
-# dynamics
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
-for i, ax in enumerate(axes):
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(state_vars[i])
-    if i == n_in-1:
-        ax.set_xlabel("steps")
-        ax.legend()
-plt.tight_layout()
-
-# trained weights
-fig, ax = plt.subplots(figsize=(6, 6))
-im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
-plt.colorbar(im, ax=ax)
-ax.set_xlabel("neuron")
-ax.set_ylabel("neuron")
-fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
-plt.tight_layout()
-plt.show()
+# save results
+results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
+           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
+           "condition": {"repetition": rep, "noise": noise_lvl},
+           "training_error": epsilon, "avg_weights": W_abs, "wd": wd}
+pickle.dump(results, open(f"../results/rfc_k{int(k)}/stuartlandau_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

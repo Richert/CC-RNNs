@@ -137,6 +137,7 @@ optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
 
 # training
 current_loss = 0.0
+loss_hist = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
@@ -156,6 +157,7 @@ with torch.enable_grad():
             loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
+            loss_hist.append(current_loss)
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
@@ -202,6 +204,6 @@ for i in range(n_out):
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"noise": noise_lvl, "repetition": rep},
-           "training_error": epsilon, "avg_weights": W_abs,
+           "training_error": epsilon, "avg_weights": W_abs, "loss_hist": loss_hist,
            "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd}
 pickle.dump(results, open(f"../results/lr/lorenz_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))
