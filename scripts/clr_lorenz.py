@@ -59,7 +59,7 @@ r = 28.0
 b = 8/3
 dt = 0.01
 input_idx = np.asarray([0, 1, 2])
-noise_lvl = 0.08
+noise_lvl = 0.02
 
 # reservoir parameters
 N = 200
@@ -91,7 +91,7 @@ test_steps = 10000
 lr = 0.008
 lam = 0.002
 betas = (0.9, 0.999)
-alphas = (4.0, 1e-3, 1e-3)
+alphas = (12.0, 1e-3, 1e-3)
 
 # generate inputs and targets
 #############################

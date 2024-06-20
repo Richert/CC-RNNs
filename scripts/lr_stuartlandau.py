@@ -3,6 +3,7 @@ from src.functions import init_weights
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.signal import welch
 
 
 # function definitions
@@ -60,7 +61,7 @@ test_steps = 10000
 loading_steps = 100000
 lr = 0.008
 betas = (0.9, 0.999)
-alphas = (1e-2, 1e-3)
+alphas = (1e-3, 1e-3)
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -161,6 +162,17 @@ with torch.no_grad():
 predictions = np.asarray(predictions)
 targets = targets.cpu().detach().numpy()
 
+# calculate prediction error
+cutoff = 100
+max_freq = 12.0
+f0, p0 = welch(targets[cutoff:, 0], fs=10/dt, nperseg=2048)
+f1, p1 = welch(predictions[cutoff:, 0], fs=10/dt, nperseg=2048)
+p0 /= np.max(p0)
+p1 /= np.max(p1)
+prediction_error = np.mean((p0[f0 < max_freq] - p1[f0 < max_freq])**2)
+max_error = np.mean((p0[f0 < max_freq] - np.zeros_like(p0)[f0 < max_freq])**2)
+prediction_error /= max_error
+
 # plotting
 ##########
 
@@ -183,4 +195,14 @@ ax.set_xlabel("neuron")
 ax.set_ylabel("neuron")
 fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
 plt.tight_layout()
+
+# frequency spectrum difference
+fig, ax = plt.subplots(figsize=(12, 3))
+ax.plot(f0, p0, label="target")
+ax.plot(f1, p1, label="prediction")
+ax.set_xlabel("f (Hz)")
+ax.set_ylabel("PSD")
+ax.set_title(f"Prediction error: {prediction_error}")
+plt.tight_layout()
+
 plt.show()

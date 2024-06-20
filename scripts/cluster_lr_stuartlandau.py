@@ -33,15 +33,14 @@ def stuart_landau(x: float, y: float, omega: float = 10.0) -> np.ndarray:
 ######################
 
 # batch condition
-noise_lvl = float(sys.argv[-3])
-lag = int(sys.argv[-2])
+noise_lvl = float(sys.argv[-2])
 rep = int(sys.argv[-1])
 
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 2000
 state_vars = ["x", "y"]
+lag = 1
 
 # SL equation parameters
 omega = 6.0
@@ -50,20 +49,20 @@ dt = 0.01
 # reservoir parameters
 N = 200
 n_in = len(state_vars)
-k = 1
-sr = 1.1
+k = 3
+sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
 out_scale = 0.5
 density = 0.2
 
 # training parameters
-steps = 400000
+steps = 500000
 init_steps = 1000
-backprop_steps = 1000
-test_steps = 2000
+backprop_steps = 5000
+test_steps = 10000
 loading_steps = 100000
-lr = 0.001
+lr = 0.008
 betas = (0.9, 0.999)
 alphas = (1e-3, 1e-3)
 
@@ -150,7 +149,6 @@ y_col = torch.stack(y_col, dim=0)
 
 # train readout
 W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
-print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # generate predictions
 with torch.no_grad():
@@ -160,10 +158,14 @@ with torch.no_grad():
         y = W_r @ rnn.forward(y)
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
+targets = targets.cpu().detach().numpy()
+
+# calculate prediction error
+
 
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"lag": lag, "repetition": rep, "noise": noise_lvl},
            "training_error": epsilon, "W": (rnn.W @ rnn.W_z).cpu().detach().numpy()}
-pickle.dump(results, open(f"../results/lr_lorenz/lag{lag}_n{int(noise_lvl*10)}_{rep}.pkl", "wb"))
+pickle.dump(results, open(f"../results/lr/stuartlandau_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

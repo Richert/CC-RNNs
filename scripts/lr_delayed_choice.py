@@ -35,19 +35,19 @@ plot_steps = 100
 
 # input parameters
 n_in = 2
-n_train1 = 5000
-n_train2 = 1000
+n_train1 = 20000
+n_train2 = 2000
 n_test = 100
 evidence_dur = 20
 delay_dur = 4
 response_dur = 1
-noise_lvl = 0.2
+noise_lvl = 2.0
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
 n_out = n_in
-k = 1
+k = 3
 sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
@@ -67,7 +67,7 @@ W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=d
 # training parameters
 init_steps = 200
 batch_size = 20
-lr = 0.008
+lr = 0.004
 betas = (0.9, 0.999)
 alphas = (1e-3, 1e-3)
 
