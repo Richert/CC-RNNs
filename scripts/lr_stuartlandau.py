@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import welch
+from scipy.stats import wasserstein_distance
 
 
 # function definitions
@@ -163,15 +164,12 @@ predictions = np.asarray(predictions)
 targets = targets.cpu().detach().numpy()
 
 # calculate prediction error
-cutoff = 100
-max_freq = 12.0
+cutoff = 1
 f0, p0 = welch(targets[cutoff:, 0], fs=10/dt, nperseg=2048)
 f1, p1 = welch(predictions[cutoff:, 0], fs=10/dt, nperseg=2048)
-p0 /= np.max(p0)
-p1 /= np.max(p1)
-prediction_error = np.mean((p0[f0 < max_freq] - p1[f0 < max_freq])**2)
-max_error = np.mean((p0[f0 < max_freq] - np.zeros_like(p0)[f0 < max_freq])**2)
-prediction_error /= max_error
+p0 /= np.sum(p0)
+p1 /= np.sum(p1)
+wd = wasserstein_distance(u_values=f0, v_values=f1, u_weights=p0, v_weights=p1)
 
 # plotting
 ##########
@@ -202,7 +200,8 @@ ax.plot(f0, p0, label="target")
 ax.plot(f1, p1, label="prediction")
 ax.set_xlabel("f (Hz)")
 ax.set_ylabel("PSD")
-ax.set_title(f"Prediction error: {prediction_error}")
+ax.set_title(f"Wasserstein distance: {wd}")
+ax.legend()
 plt.tight_layout()
 
 plt.show()

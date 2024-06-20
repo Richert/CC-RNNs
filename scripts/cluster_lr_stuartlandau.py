@@ -5,6 +5,8 @@ from src.functions import init_weights
 import torch
 import numpy as np
 import pickle
+from scipy.signal import welch
+from scipy.stats import wasserstein_distance
 
 
 # function definitions
@@ -161,11 +163,17 @@ predictions = np.asarray(predictions)
 targets = targets.cpu().detach().numpy()
 
 # calculate prediction error
+cutoff = 1
+f0, p0 = welch(targets[cutoff:, 0], fs=10/dt, nperseg=2048)
+f1, p1 = welch(predictions[cutoff:, 0], fs=10/dt, nperseg=2048)
+p0 /= np.sum(p0)
+p1 /= np.sum(p1)
+wd = wasserstein_distance(u_values=f0, v_values=f1, u_weights=p0, v_weights=p1)
 
 
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"lag": lag, "repetition": rep, "noise": noise_lvl},
-           "training_error": epsilon, "W": (rnn.W @ rnn.W_z).cpu().detach().numpy()}
+           "training_error": epsilon, "W": (rnn.W @ rnn.W_z).cpu().detach().numpy(), "wd": wd}
 pickle.dump(results, open(f"../results/lr/stuartlandau_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

@@ -54,7 +54,6 @@ rep = int(sys.argv[-1])
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 4000
 state_vars = ["x", "y", "z"]
 lag = 1
 n_bins = 500
@@ -201,7 +200,7 @@ for i in range(n_out):
 
 # save results
 results = {"targets": targets[loading_steps:loading_steps+test_steps], "predictions": predictions,
-           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alpha": alpha},
+           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"noise": noise_lvl, "repetition": rep},
            "training_error": epsilon, "avg_weights": W_abs,
            "prediction_dist": prediction_dist, "target_dist": target_dist, "wd": wd}

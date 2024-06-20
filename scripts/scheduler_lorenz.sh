@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set condition
-noise=( 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 )
+noise=( 0.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 )
 n=20
 batch_size=8
 range_end=$(($n-1))
@@ -22,7 +22,14 @@ for lvl in "${noise[@]}"; do
     (
     echo "Starting job #$(($IDX+1)) of ${n} jobs for noise level = ${lvl}."
     python cluster_lr_lorenz.py $lvl $IDX
-    python cluster_lri_lorenz.py $lvl $IDX
+    python cluster_clr_lorenz.py $lvl $IDX
+    python cluster_rfc_lorenz.py 10 $lvl $IDX
+    python cluster_rfc_lorenz.py 20 $lvl $IDX
+    python cluster_rfc_lorenz.py 40 $lvl $IDX
+    python cluster_rfc_lorenz.py 80 $lvl $IDX
+    python cluster_rfc_lorenz.py 160 $lvl $IDX
+    python cluster_rfc_lorenz.py 320 $lvl $IDX
+    python cluster_rfc_lorenz.py 640 $lvl $IDX
     sleep 1
     ) &
 
