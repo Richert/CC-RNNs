@@ -21,6 +21,7 @@ for file in files:
         # extract data
         data = pickle.load(open(f"../results/{model}/{file}", "rb"))
         noise = data["condition"]["noise"]
+        print(noise)
         rep = data["condition"]["repetition"]
         error = np.mean(data["training_error"].detach().cpu().numpy())
         wd = data["wd"]
