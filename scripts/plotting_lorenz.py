@@ -9,19 +9,19 @@ import pandas as pd
 # data collection and analysis
 ##############################
 
-files = [f for f in os.listdir("../results/lr") if f[0] == "lorenz"]
+files = [f for f in os.listdir("../results/lr") if f[:6] == "lorenz"]
 models = ["lr", "clr", "rfc_k10", "rfc_k20", "rfc_k40", "rfc_k80", "rfc_k160", "rfc_k320", "rfc_k640"]
 df = pd.DataFrame(columns=["model", "noise", "rep", "wd", "k_star", "dim", "train_error"],
                   index=np.arange(0, len(files)))
 eps = 1e-10
 n = 0
+
 for file in files:
     for model in models:
 
         # extract data
         data = pickle.load(open(f"../results/{model}/{file}", "rb"))
         noise = data["condition"]["noise"]
-        print(noise)
         rep = data["condition"]["repetition"]
         error = np.mean(data["training_error"].detach().cpu().numpy())
         wd = data["wd"]
