@@ -95,8 +95,6 @@ subfigs[0].suptitle("Model performance")
 
 # trajectory plots
 titles = [f"noise = {n}" for n in noise] + ["Lorenz equations"]
-colors = ["darkgreen", "darkred"]
-model_titles = ["LR", "LRI"]
 lvars = [0, 2]
 axes = subfigs[1].subplots(ncols=len(titles), nrows=len(models))
 for i in range(len(models)):
@@ -105,15 +103,13 @@ for i in range(len(models)):
         ax = axes[i, j]
         if j < len(titles) - 1:
             data = trajectories[models[i]][j]
-            c = colors[i]
         else:
             data = targets
-            c = "black"
 
-        ax.plot(data[plot_start:plot_stop, lvars[0]], data[plot_start:plot_stop, lvars[1]], color=c)
+        ax.plot(data[plot_start:plot_stop, lvars[0]], data[plot_start:plot_stop, lvars[1]], )
         ax.set_xlabel(fr"$u_{lvars[0] + 1}$")
         ax.set_ylabel(fr"$u_{lvars[1] + 1}$")
-        ax.set_title(f"{model_titles[i]}: {titles[j]}")
+        ax.set_title(f"{models[i]}: {titles[j]}")
 
 subfigs[1].suptitle("Lorenz attractor reconstructions")
 
