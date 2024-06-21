@@ -23,7 +23,7 @@ for file in files:
         data = pickle.load(open(f"../results/{model}/{file}", "rb"))
         noise = data["condition"]["noise"]
         rep = data["condition"]["repetition"]
-        error = np.mean(data["training_error"].detach().cpu().numpy())
+        error = data["training_error"]
         wd = data["wd"]
 
         # get dimensionality
