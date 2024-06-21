@@ -76,7 +76,7 @@ plot_start = 2000
 plot_stop = 7000
 
 # figure layout
-fig = plt.figure(figsize=(12, 8))
+fig = plt.figure(figsize=(12, 12))
 subfigs = fig.subfigures(nrows=2, height_ratios=[0.3, 0.7])
 
 # line plots
