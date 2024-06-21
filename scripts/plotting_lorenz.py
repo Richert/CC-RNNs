@@ -2,64 +2,42 @@ import pickle
 import matplotlib.pyplot as plt
 import seaborn as sb
 import numpy as np
-from scipy.stats import wasserstein_distance
 import os
 import pandas as pd
-
-
-def wasserstein(x: np.ndarray, y: np.ndarray, n_bins: int = 100) -> tuple:
-
-    # get histograms of arrays
-    x_hist, x_edges = np.histogram(x, bins=n_bins, density=True)
-    y_hist, y_edges = np.histogram(y, bins=n_bins, density=True)
-    x_hist /= np.sum(x_hist)
-    y_hist /= np.sum(y_hist)
-
-    # calculate KLD
-    wd = wasserstein_distance(u_values=x_edges[:-1], v_values=y_edges[:-1], u_weights=x_hist, v_weights=y_hist)
-    return wd, x_hist, y_hist, x_edges, y_edges
 
 
 # data collection and analysis
 ##############################
 
-files = [f for f in os.listdir("../results/lr_lorenz") if f[0] == "n"]
-models = ["lr", "lri"]
+files = [f for f in os.listdir("../results/lr") if f[0] == "lorenz"]
+models = ["lr", "clr", "rfc_k10", "rfc_k20", "rfc_k40", "rfc_k80", "rfc_k160", "rfc_k320", "rfc_k640"]
 df = pd.DataFrame(columns=["model", "noise", "rep", "wd", "k_star", "dim", "train_error"],
                   index=np.arange(0, len(files)))
-n_bins = 500
 eps = 1e-10
 n = 0
 for file in files:
     for model in models:
 
-        # load data
-        data = pickle.load(open(f"../results/{model}_lorenz/{file}", "rb"))
+        # extract data
+        data = pickle.load(open(f"../results/{model}/{file}", "rb"))
         noise = data["condition"]["noise"]
         rep = data["condition"]["repetition"]
         error = np.mean(data["training_error"].detach().cpu().numpy())
+        wd = data["wd"]
 
-        # calculate dimensionality
+        # get dimensionality
         try:
-            k_star = np.sum(data["c"])
+            k_star = data["k_star"]
             dim = np.sum(data["c"] > eps)
         except KeyError:
             k_star = data["config"]["k"]
             dim = k_star
 
-        # calculate wasserstein distance
-        wd = 0.0
-        for i in range(data["targets"].shape[1]):
-            targets = data["targets"][:, i]
-            predictions = data["predictions"][:, i]
-            wd_tmp, *_ = wasserstein(predictions, targets, n_bins=n_bins)
-            wd += wd_tmp
-
         df.loc[n, :] = (model, noise, rep, wd, k_star, dim, error)
         n += 1
 
 # collect representative trajectories for target steps
-noise = [0.1, 0.4, 0.7]
+noise = [0.0, 0.04, 0.1]
 trajectories = {model: [] for model in models}
 for lvl in noise:
 
@@ -74,11 +52,11 @@ for lvl in noise:
         rep = df_tmp2.loc[df_tmp2.index[idx], "rep"]
 
         # load data
-        data = pickle.load(open(f"../results/{model}_lorenz/noise{int(lvl*10)}_{int(rep)}.pkl", "rb"))
+        data = pickle.load(open(f"../results/{model}/lorenz_noise{int(lvl*100)}_{int(rep)}.pkl", "rb"))
         trajectories[model].append(data["predictions"])
 
 # get target trajectory
-targets = pickle.load(open(f"../results/lr_lorenz/{files[0]}", "rb"))["targets"]
+targets = pickle.load(open(f"../results/lr/{files[0]}", "rb"))["targets"]
 
 # plotting
 ##########
@@ -108,7 +86,7 @@ axes = subfigs[0].subplots(ncols=len(ys))
 for i in range(len(ys)):
 
     ax = axes[i]
-    sb.lineplot(x=x, y=ys[i], hue="model", data=df, color="0.8", ax=ax)
+    sb.lineplot(x=x, y=ys[i], hue="model", data=df, color="0.8", err_style="bars", errorbar="sd", ax=ax)
     ax.set_xlabel("noise level")
     ax.set_ylabel(titles[i])
 
