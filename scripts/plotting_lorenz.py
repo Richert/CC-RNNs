@@ -41,7 +41,7 @@ noise = [0.0, 0.04, 0.1]
 trajectories = {model: [] for model in models}
 for lvl in noise:
 
-    df_tmp = df.loc[np.round(df.loc[:, "noise"], decimals=1) == lvl, :]
+    df_tmp = df.loc[np.round(df.loc[:, "noise"], decimals=2) == lvl, :]
 
     for model in models:
 
