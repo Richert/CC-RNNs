@@ -10,9 +10,10 @@ import pandas as pd
 #################
 
 files = [f for f in os.listdir("../results/lr") if f[:7] == "delayed"]
-df = pd.DataFrame(columns=["noise", "delay", "rep", "train_error", "test_performance"],
+df = pd.DataFrame(columns=["noise", "delay", "rep", "train_error", "test_performance", "train_success"],
                   index=np.arange(0, len(files)))
 eps = 1e-10
+thresh = 0.9
 n = 0
 
 for file in files:
@@ -25,14 +26,16 @@ for file in files:
     performance = data["classification_performance"]
     delay = int(file.split("_")[1][1:])
 
-    df.loc[n, :] = (noise, delay, rep, error, performance)
+    df.loc[n, :] = (noise, delay, rep, error, performance, 1.0 if performance > thresh else 0.0)
     n += 1
 
 # bring data into 2D matrix format
 train_error = df.pivot_table(index="noise", columns="delay", values="train_error", aggfunc="mean")
 test_perf = df.pivot_table(index="noise", columns="delay", values="test_performance", aggfunc="mean")
+train_success = df.pivot_table(index="noise", columns="delay", values="train_success", aggfunc="mean")
 train_error = train_error[train_error.columns].astype(float)
 test_perf = test_perf[test_perf.columns].astype(float)
+train_success = train_success[train_success.columns].astype(float)
 
 # plotting
 ##########
@@ -56,17 +59,17 @@ grid = fig.add_gridspec(ncols=2)
 
 # training error
 ax = fig.add_subplot(grid[0])
-sb.heatmap(train_error, ax=ax)
+sb.heatmap(train_success, ax=ax)
 ax.set_xlabel("delay period duration")
 ax.set_ylabel("noise level")
-ax.set_title("MSE (training data)")
+ax.set_title("Fraction of successful model fits")
 
 # test performance
 ax = fig.add_subplot(grid[1])
 sb.heatmap(test_perf, ax=ax)
 ax.set_xlabel("delay period duration")
 ax.set_ylabel("noise level")
-ax.set_title("Classification performance (test data)")
+ax.set_title("Mean classification performance")
 
 # padding
 fig.set_constrained_layout_pads(w_pad=0.05, h_pad=0.05, hspace=0.02, wspace=0.02)
