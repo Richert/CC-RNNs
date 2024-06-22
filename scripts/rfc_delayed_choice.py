@@ -35,19 +35,19 @@ plot_steps = 100
 
 # input parameters
 n_in = 2
-n_train1 = 10000
-n_train2 = 1000
+n_train1 = 20000
+n_train2 = 2000
 n_test = 100
 evidence_dur = 20
-delay_dur = 4
+delay_dur = 20
 response_dur = 1
-noise_lvl = 2.0
+noise_lvl = 0.1
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
 n_out = n_in
-k = 600
+k = 50
 sr = 1.2
 bias_scale = 0.01
 in_scale = 0.1
@@ -65,7 +65,7 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 # training parameters
 init_steps = 200
 batch_size = 20
-lam = 0.008
+lam = 0.002
 alphas = (15.0, 1e-3)
 
 # generate inputs and targets
@@ -89,23 +89,23 @@ rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_i
 rnn.init_new_conceptor(init_value="random")
 
 # training
-with torch.no_grad():
-
-    loss = torch.zeros((1,))
-    for trial in range(n_train1):
-
-        # initial wash-out period
-        for step in range(init_steps):
-            rnn.forward_c(avg_input)
-
-        # evidence integration period
-        trial_inp = x_train[trial]
-        for step in range(evidence_dur):
-            rnn.forward_c_adapt(trial_inp[step])
-
-        # delay period
-        for step in range(delay_dur):
-            rnn.forward_c_adapt(avg_input)
+# with torch.no_grad():
+#
+#     loss = torch.zeros((1,))
+#     for trial in range(n_train1):
+#
+#         # initial wash-out period
+#         for step in range(init_steps):
+#             rnn.forward_c(avg_input)
+#
+#         # evidence integration period
+#         trial_inp = x_train[trial]
+#         for step in range(evidence_dur):
+#             rnn.forward_c_adapt(trial_inp[step])
+#
+#         # delay period
+#         for step in range(delay_dur):
+#             rnn.forward_c_adapt(avg_input)
 
 # retrieve network connectivity
 c = rnn.C.cpu().detach().numpy().squeeze()

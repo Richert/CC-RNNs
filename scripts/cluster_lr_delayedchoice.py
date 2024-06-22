@@ -31,6 +31,7 @@ def two_choice(trials: int, evidence: int, noise: float) -> tuple:
 ######################
 
 # batch condition
+delay_dur = int(sys.argv[-3])
 noise_lvl = float(sys.argv[-2])
 rep = int(sys.argv[-1])
 
@@ -40,23 +41,22 @@ device = "cpu"
 
 # input parameters
 n_in = 2
-n_train1 = 20000
-n_train2 = 2000
+n_train = 50000
 n_test = 100
 evidence_dur = 20
-delay_dur = 4
-response_dur = 1
+response_dur = 2
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
 n_out = n_in
-k = 3
-sr = 0.99
+k = 2
+sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
 density = 0.2
 out_scale = 0.5
+init_noise = 0.003
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -69,49 +69,49 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-init_steps = 200
+init_steps = 1000
 batch_size = 20
-lr = 0.004
+lr = 0.001
 betas = (0.9, 0.999)
-alphas = (1e-3, 1e-3)
+alphas = (1e-5, 1e-3)
 
 # generate inputs and targets
 #############################
 
 # get training data
-x_train, y_train = two_choice(n_train1, evidence=evidence_dur, noise=noise_lvl)
-
-# get readout training data
-x_train2, y_train2 = two_choice(n_train2, evidence=evidence_dur, noise=noise_lvl)
+x_train, y_train = two_choice(n_train, evidence=evidence_dur, noise=noise_lvl)
 
 # get test data
 x_test, y_test = two_choice(n_test, evidence=evidence_dur, noise=noise_lvl)
 
-# train low-rank RNN to predict next time step of Lorenz attractor
-##################################################################
+# training
+##########
 
 # initialize LR-RNN
 rnn = LowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias, torch.tensor(W_z, device=device, dtype=dtype))
 rnn.free_param("W")
 rnn.free_param("W_z")
+f = torch.nn.Softmax(dim=0)
 
 # set up loss function
 loss_func = torch.nn.CrossEntropyLoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.parameters()), lr=lr, betas=betas)
+optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+
+# initial wash-out period
+for step in range(init_steps):
+    rnn.forward(avg_input)
+y0 = rnn.y[:]
 
 # training
 current_loss = 0.0
-loss_hist = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
-    for trial in range(n_train1):
+    for trial in range(n_train):
 
-        # initial wash-out period
-        for step in range(init_steps):
-            rnn.forward(avg_input)
+        rnn.y = y0 + init_noise * torch.randn(N)
 
         # evidence integration period
         trial_inp = x_train[trial]
@@ -125,7 +125,7 @@ with torch.enable_grad():
         # response period
         trial_target = y_train[trial]
         for step in range(response_dur):
-            y = W_r @ rnn.forward(avg_input)
+            y = f(W_r @ rnn.forward(avg_input))
             loss += loss_func(y, trial_target)
 
         # make update
@@ -135,46 +135,16 @@ with torch.enable_grad():
             loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
             loss.backward()
             current_loss = loss.item()
-            loss_hist.append(current_loss)
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
+            print(f"Training phase I loss: {current_loss}")
 
 W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
 
-# train final readout and generate predictions
-##############################################
-
-# harvest states
-y_col, target_col = [], []
-with torch.no_grad():
-    for trial in range(n_train2):
-
-        # initial wash-out period
-        for step in range(init_steps):
-            rnn.forward(avg_input)
-
-        # evidence integration period
-        trial_inp = x_train2[trial]
-        for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
-
-        # delay period
-        for step in range(delay_dur):
-            rnn.forward(avg_input)
-
-        # response period
-        trial_target = y_train2[trial]
-        for step in range(response_dur):
-            y = rnn.forward(avg_input)
-            y_col.append(y)
-            target_col.append(trial_target)
-
-# train readout
-y_col = torch.stack(y_col, dim=0)
-target_col = torch.stack(target_col, dim=0)
-W_r, epsilon = rnn.train_readout(y_col.T, target_col.T, alphas[1])
+# testing
+#########
 
 # generate predictions
 predictions, targets = [], []
@@ -197,7 +167,7 @@ with torch.no_grad():
         # response period
         trial_target = y_test[trial].cpu().detach().numpy()
         for step in range(response_dur):
-            y = W_r @ rnn.forward(avg_input)
+            y = f(W_r @ rnn.forward(avg_input))
             predictions.append(y.cpu().detach().numpy())
             targets.append(trial_target)
 
@@ -210,6 +180,6 @@ performance = np.mean(np.argmax(predictions, axis=1) == np.argmax(targets, axis=
 results = {"targets": targets, "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"repetition": rep, "noise": noise_lvl},
-           "training_error": epsilon, "avg_weights": W_abs, "loss_hist": loss_hist,
+           "training_error": current_loss, "avg_weights": W_abs,
            "classification_performance": performance}
 pickle.dump(results, open(f"../results/lr/delayedchoice_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))

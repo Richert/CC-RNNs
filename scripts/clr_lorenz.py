@@ -58,11 +58,11 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-input_idx = np.asarray([0, 1, 2])
-noise_lvl = 0.02
+input_idx = np.asarray([0, 2])
+noise_lvl = 0.0
 
 # reservoir parameters
-N = 200
+N = 100
 n_in = len(input_idx)
 n_out = len(state_vars)
 k = 10
@@ -80,10 +80,10 @@ W_z = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
 W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
-W_r = torch.tensor(out_scale * np.random.randn(n_in, N), device=device, dtype=dtype)
+W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-steps = 500000
+steps = 1000000
 init_steps = 1000
 backprop_steps = 5000
 loading_steps = 100000
@@ -91,7 +91,7 @@ test_steps = 10000
 lr = 0.008
 lam = 0.002
 betas = (0.9, 0.999)
-alphas = (12.0, 1e-3, 1e-3)
+alphas = (15.0, 1e-3, 1e-3)
 
 # generate inputs and targets
 #############################
@@ -188,7 +188,7 @@ with torch.no_grad():
     predictions = []
     y = W_r @ rnn.y
     for step in range(test_steps):
-        y = W_r @ rnn.forward_c(y)
+        y = W_r @ rnn.forward_c(y[input_idx])
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
 targets = targets.cpu().detach().numpy()

@@ -3,30 +3,34 @@ from src.functions import init_weights
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import welch
-from scipy.stats import wasserstein_distance
 
 
 # function definitions
 ######################
 
-def stuart_landau(x: float, y: float, omega: float = 10.0) -> np.ndarray:
-    """
-    Parameters
-    ----------
-    x, y: float
-        State variables.
-    omega : float
-       Parameters defining the Stuart-Landau attractor.
+def get_inp(f1: float, f2: float, trial_dur: int, steps: int, noise: float, dt: float) -> tuple:
 
-    Returns
-    -------
-    xy_dot : np.ndarray
-       Vectorfield of the Lorenz equations.
-    """
-    x_dot = omega*y + y*(1-y**2-x**2)
-    y_dot = -omega*x + y*(1-y**2-x**2)
-    return np.asarray([x_dot, y_dot])
+    # create sines
+    time = np.linspace(0.0, steps*dt, steps)
+    s1 = np.sin(2.0*np.pi*f1*time)
+    s2 = np.sin(2.0*np.pi*f2*time)
+
+    # create switching signal and targets
+    switch = np.zeros_like(s1)
+    step = 0
+    targets = np.zeros((steps, 1))
+    while step < steps:
+        if np.random.randn() > 0:
+            switch[step:step+trial_dur] = 1.0
+            targets[step:step+trial_dur, 0] = s1[step:step+trial_dur]
+        else:
+            targets[step:step+trial_dur, 0] = s2[step:step+trial_dur]
+        step += trial_dur
+
+    # add noise to input signals
+    inputs = np.asarray([s1, s2, switch]).T + noise * np.random.randn(steps, 3)
+
+    return torch.tensor(inputs, device=device, dtype=dtype), torch.tensor(targets, device=device, dtype=dtype)
 
 
 # parameter definition
@@ -36,31 +40,30 @@ def stuart_landau(x: float, y: float, omega: float = 10.0) -> np.ndarray:
 dtype = torch.float64
 device = "cpu"
 plot_steps = 2000
-state_vars = ["x", "y"]
-lag = 1
 
-# SL equation parameters
-omega = 6.0
+# input parameters
+n_in = 3
+f1 = 0.5
+f2 = 3.0
 dt = 0.01
-noise_lvl = 0.8
+trial_dur = 300
+noise = 0.1
 
 # reservoir parameters
 N = 100
-n_in = len(state_vars)
-k = 250
+k = 50
 sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
-density = 0.1
+density = 0.2
 
 # training parameters
-steps = 500000
-test_steps = 10000
-init_steps = 1000
+train_steps = 600000
 loading_steps = 100000
+test_steps = 18000
+init_steps = 1000
 lam = 0.002
-alphas = (10.0, 1e-3)
-betas = (0.9, 0.999)
+alphas = (12.0, 1e-3)
 
 # matrix initialization
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -74,17 +77,14 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 # generate inputs and targets
 #############################
 
-# simulation
-y = np.asarray([0.1, 0.9])
-y_col = []
-for step in range(steps):
-    y = y + dt * stuart_landau(y[0], y[1], omega=omega)
-    y_col.append(y)
-y_col = np.asarray(y_col)
+# get training data
+x_train, y_train = get_inp(f1, f2, trial_dur, train_steps, noise, dt)
 
-# get inputs and targets
-inputs = torch.tensor(y_col[:-lag], device=device, dtype=dtype)
-targets = torch.tensor(y_col[lag:], device=device, dtype=dtype)
+# get loading data
+x_load, y_load = get_inp(f1, f2, trial_dur, loading_steps, noise, dt)
+
+# get test data
+x_test, y_test = get_inp(f1, f2, trial_dur, test_steps, noise, dt)
 
 # train RFC-RNN to predict next time step of Lorenz attractor
 #############################################################
@@ -95,25 +95,25 @@ rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_i
 rnn.init_new_conceptor(init_value="random")
 
 # initial wash-out period
-avg_input = torch.mean(inputs, dim=0)
+avg_input = torch.mean(x_train, dim=0)
 with torch.no_grad():
     for step in range(init_steps):
         rnn.forward_c(avg_input)
 
 # train the conceptor
 with torch.no_grad():
-    for step in range(steps-lag):
-        x = rnn.forward_c_adapt(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+    for step in range(train_steps):
+        x = rnn.forward_c_adapt(x_train[step])
 
 # harvest states
 y_col = []
 for step in range(loading_steps):
-    rnn.forward_c(inputs[step] + noise_lvl*torch.randn((n_in,), device=device, dtype=dtype))
+    rnn.forward_c(x_load[step])
     y_col.append(rnn.y)
 y_col = torch.stack(y_col, dim=0)
 
 # train readout
-W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
+W_r, epsilon = rnn.train_readout(y_col.T, y_load.T, alphas[1])
 print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # retrieve network connectivity
@@ -125,33 +125,20 @@ print(f"Conceptor: {np.sum(c)}")
 # generate predictions
 with torch.no_grad():
     predictions = []
-    y = W_r @ rnn.y
     for step in range(test_steps):
-        y = W_r @ rnn.forward_c(y)
+        y = W_r @ rnn.forward_c(x_test[step])
         predictions.append(y.cpu().detach().numpy())
 predictions = np.asarray(predictions)
-targets = targets.cpu().detach().numpy()
-
-# calculate prediction error
-cutoff = 1
-f0, p0 = welch(targets[cutoff:, 0], fs=10/dt, nperseg=2048)
-f1, p1 = welch(predictions[cutoff:, 0], fs=10/dt, nperseg=2048)
-p0 /= np.sum(p0)
-p1 /= np.sum(p1)
-wd = wasserstein_distance(u_values=f0, v_values=f1, u_weights=p0, v_weights=p1)
+targets = y_test.cpu().detach().numpy()
 
 # plotting
 ##########
 
 # dynamics
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 6))
-for i, ax in enumerate(axes):
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(state_vars[i])
-    if i == n_in-1:
-        ax.set_xlabel("steps")
-        ax.legend()
+_, ax = plt.subplots(figsize=(12, 6))
+ax.plot(targets[:plot_steps], color="royalblue", label="target")
+ax.plot(predictions[:plot_steps], color="darkorange", label="prediction")
+ax.set_xlabel("steps")
 plt.tight_layout()
 
 # trained weights

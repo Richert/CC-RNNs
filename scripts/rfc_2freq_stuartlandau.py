@@ -66,7 +66,7 @@ init_steps = 1000
 test_steps = 10000
 loading_steps = 100000
 lam = 0.002
-alphas = (15.0, 1e-3)
+alphas = (20.0, 1e-3)
 
 # train LR-RNN weights
 ######################
@@ -173,7 +173,7 @@ for omega in omegas:
 # linear interpolation between two frequencies
 c1 = rnn.conceptors[omegas[0]]
 c2 = rnn.conceptors[omegas[1]]
-interpolation_steps = 4000
+interpolation_steps = 8000
 constant_steps = int(interpolation_steps/4)
 ramp_steps = interpolation_steps - constant_steps
 gamma = torch.zeros((interpolation_steps,), dtype=dtype, device=device)

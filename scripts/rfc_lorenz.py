@@ -58,15 +58,15 @@ s = 10.0
 r = 28.0
 b = 8/3
 dt = 0.01
-input_idx = np.asarray([0, 1, 2])
-noise_lvl = 0.02
+input_idx = np.asarray([0, 2])
+noise_lvl = 0.0
 
 # reservoir parameters
-N = 200
+N = 100
 n_in = len(input_idx)
 n_out = len(state_vars)
-k = 600
-sr = 0.99
+k = 250
+sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
 density = 0.2
@@ -81,13 +81,13 @@ W *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 
 # training parameters
-steps = 500000
+steps = 1000000
 init_steps = 1000
 test_steps = 10000
 loading_steps = 100000
 lam = 0.002
 betas = (0.9, 0.999)
-alphas = (15.0, 1e-3)
+alphas = (20.0, 1e-3)
 
 # generate inputs and targets
 #############################
@@ -170,12 +170,13 @@ for i in range(n_out):
 # dynamics
 fig, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
 for i, ax in enumerate(axes):
-    ax.plot(targets[-plot_steps:, i], color="royalblue", label="target")
-    ax.plot(predictions[-plot_steps:, i], color="darkorange", label="prediction")
+    ax.plot(targets[:, i], color="royalblue", label="target")
+    ax.plot(predictions[:, i], color="darkorange", label="prediction")
     ax.set_ylabel(state_vars[i])
     if i == n_out-1:
         ax.set_xlabel("steps")
         ax.legend()
+    ax.set_xlim([test_steps-plot_steps, test_steps])
 plt.tight_layout()
 
 # trained weights

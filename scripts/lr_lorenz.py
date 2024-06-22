@@ -59,14 +59,14 @@ r = 28.0
 b = 8/3
 dt = 0.01
 input_idx = np.asarray([0, 1, 2])
-noise_lvl = 0.08
+noise_lvl = 0.04
 
 # reservoir parameters
-N = 200
+N = 100
 n_in = len(input_idx)
 n_out = len(state_vars)
-k = 3
-sr = 0.99
+k = 5
+sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
 density = 0.2
@@ -83,7 +83,7 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-steps = 500000
+steps = 1000000
 init_steps = 1000
 backprop_steps = 5000
 loading_steps = 100000
