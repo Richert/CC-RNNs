@@ -182,4 +182,4 @@ results = {"targets": targets, "predictions": predictions,
            "condition": {"repetition": rep, "noise": noise_lvl},
            "training_error": current_loss, "avg_weights": W_abs,
            "classification_performance": performance}
-pickle.dump(results, open(f"../results/lr/delayedchoice_noise{int(noise_lvl*100)}_{rep}.pkl", "wb"))
+pickle.dump(results, open(f"../results/lr/delayedchoice_d{int(delay_dur)}_n{int(noise_lvl*10)}_{rep}.pkl", "wb"))
