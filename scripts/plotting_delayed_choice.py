@@ -31,7 +31,8 @@ for file in files:
 # bring data into 2D matrix format
 train_error = df.pivot_table(index="noise", columns="delay", values="train_error", aggfunc="mean")
 test_perf = df.pivot_table(index="noise", columns="delay", values="test_performance", aggfunc="mean")
-print(train_error)
+train_error = train_error[train_error.columns].astype(float)
+test_perf = test_perf[test_perf.columns].astype(float)
 
 # plotting
 ##########
