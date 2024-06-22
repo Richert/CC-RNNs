@@ -138,7 +138,6 @@ with torch.enable_grad():
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
-            print(f"Training phase I loss: {current_loss}")
 
 W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
