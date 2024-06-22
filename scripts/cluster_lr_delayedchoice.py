@@ -178,7 +178,7 @@ performance = np.mean(np.argmax(predictions, axis=1) == np.argmax(targets, axis=
 # save results
 results = {"targets": targets, "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
-           "condition": {"repetition": rep, "noise": noise_lvl},
+           "condition": {"repetition": rep, "noise": noise_lvl, "delay": delay_dur},
            "training_error": current_loss, "avg_weights": W_abs,
            "classification_performance": performance}
 pickle.dump(results, open(f"../results/lr/delayedchoice_d{int(delay_dur)}_n{int(noise_lvl*10)}_{rep}.pkl", "wb"))
