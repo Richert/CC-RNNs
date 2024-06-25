@@ -3,7 +3,7 @@
 # set condition
 delay=( 5 10 15 20 25 30 )
 noise=( 0.0 0.1 0.2 0.4 0.8 1.6 )
-n=20
+n=50
 batch_size=8
 range_end=$(($n-1))
 

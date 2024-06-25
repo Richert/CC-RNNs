@@ -45,7 +45,7 @@ noise_lvl = 0.1
 # rnn parameters
 N = 200
 n_in = len(state_vars)
-k = 600
+k = 800
 sr = 1.05
 bias_scale = 0.01
 in_scale = 0.1
@@ -66,7 +66,7 @@ init_steps = 1000
 test_steps = 10000
 loading_steps = 100000
 lam = 0.002
-alphas = (20.0, 1e-3)
+alphas = (30.0, 1e-3)
 
 # train LR-RNN weights
 ######################
