@@ -32,11 +32,9 @@ def get_inp(f1: float, f2: float, trial_dur: int, trials: int, noise: float, dt:
     return torch.tensor(inputs, device=device, dtype=dtype), torch.tensor(targets, device=device, dtype=dtype)
 
 
-def fft_loss(x: torch.Tensor, y: torch.Tensor, alpha: float = 1.0) -> torch.Tensor:
-    x_fft = torch.fft.rfft(x)
-    y_fft = torch.fft.rfft(y)
-    mse_real = torch.mean((torch.real(x_fft) - torch.real(y_fft))**2)
-    return mse_real + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
+def cc_loss(x: torch.Tensor, y: torch.Tensor, alpha: float = 1.0, padding: int = 1) -> torch.Tensor:
+    cc = torch.abs(torch.nn.functional.conv1d(x[None, None, :], y[None, None, :], padding=padding))
+    return -torch.max(cc) + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
 
 
 # parameter definition
@@ -48,17 +46,18 @@ device = "cpu"
 plot_steps = 1000
 
 # input parameters
-f1 = 4.0
-f2 = 8.0
+f1 = 5.0
+f2 = 10.0
 dt = 0.01
 n_in = 1
-trial_dur = 400
+trial_dur = 100
+padding = int(0.2*trial_dur)
 noise_lvl = 0.01
 
 # reservoir parameters
 N = 200
 n_out = 1
-k = 3
+k = 4
 sr = 1.05
 bias_scale = 0.01
 in_scale = 0.1
@@ -83,7 +82,7 @@ init_steps = 1000
 batch_size = 20
 lr = 0.0001
 betas = (0.9, 0.999)
-alphas = (50.0, 1e-4)
+alphas = (30.0, 1e-4)
 
 # generate inputs and targets
 #############################
@@ -103,7 +102,7 @@ rnn.free_param("W")
 rnn.free_param("W_z")
 
 # set up loss function
-loss_func = fft_loss
+loss_func = cc_loss
 
 # set up optimizer
 optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
@@ -137,7 +136,7 @@ with torch.enable_grad():
             outputs.append(W_r @ rnn.forward(trial_inp[step]))
         outputs = torch.stack(outputs, dim=0)
         for i in range(n_out):
-            loss += loss_func(outputs[:, i], trial_targ[:, i], alpha=alphas[0])
+            loss += loss_func(outputs[:, i], trial_targ[:, i], alpha=alphas[0], padding=padding)
 
         # make update
         if (trial + 1) % batch_size == 0:
