@@ -8,7 +8,8 @@ from src.functions import init_weights
 # function definitions
 ######################
 
-def get_inp(f1: float, f2: float, trial_dur: int, trials: int, noise: float, dt: float) -> tuple:
+def get_inp(f1: float, f2: float, trial_dur: int, trials: int, noise: float, dt: float, single_output: bool = True
+            ) -> tuple:
 
     # create sines
     time = np.linspace(0.0, trial_dur*dt, trial_dur)
@@ -17,11 +18,11 @@ def get_inp(f1: float, f2: float, trial_dur: int, trials: int, noise: float, dt:
 
     # create switching signal and targets
     inputs = np.zeros((trials, trial_dur, 1))
-    targets = np.zeros((trials, trial_dur, 2))
+    targets = np.zeros((trials, trial_dur, 1 if single_output else 2))
     for trial in range(trials):
         if np.random.randn() > 0:
             inputs[trial, :, 0] = 1.0
-            targets[trial, :, 1] = s1
+            targets[trial, :, 0 if single_output else 1] = s1
         else:
             targets[trial, :, 0] = s2
 
@@ -35,8 +36,7 @@ def fft_loss(x: torch.Tensor, y: torch.Tensor, alpha: float = 1.0) -> torch.Tens
     x_fft = torch.fft.rfft(x)
     y_fft = torch.fft.rfft(y)
     mse_real = torch.mean((torch.real(x_fft) - torch.real(y_fft))**2)
-    mse_imag = torch.mean((torch.imag(x_fft) - torch.imag(y_fft)) ** 2)
-    return mse_real + mse_imag + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
+    return mse_real + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
 
 
 # parameter definition
@@ -48,23 +48,23 @@ device = "cpu"
 plot_steps = 1000
 
 # input parameters
-f1 = 8.0
-f2 = 12.0
+f1 = 4.0
+f2 = 8.0
 dt = 0.01
 n_in = 1
-trial_dur = 200
+trial_dur = 400
 noise_lvl = 0.01
-avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
-n_out = 2
+n_out = 1
 k = 3
-sr = 0.99
+sr = 1.05
 bias_scale = 0.01
 in_scale = 0.1
 density = 0.2
 out_scale = 0.1
+init_noise = 0.05
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -77,13 +77,13 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 100000
+n_train = 20000
 n_test = 1000
 init_steps = 1000
-batch_size = 10
+batch_size = 20
 lr = 0.0001
 betas = (0.9, 0.999)
-alphas = (1e-2, 1e-5)
+alphas = (50.0, 1e-4)
 
 # generate inputs and targets
 #############################
@@ -109,13 +109,21 @@ loss_func = fft_loss
 optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
 
 # initial wash-out period
+y_col = []
 for step in range(init_steps):
-    rnn.forward(avg_input)
-y0 = rnn.y[:]
+    y_col.append(rnn.forward(init_noise*torch.randn(n_in, dtype=dtype, device=device)).cpu().detach().numpy())
+fig, ax = plt.subplots(figsize=(12, 3))
+im = ax.imshow(np.asarray(y_col).T, aspect="auto", interpolation="none", cmap="viridis", vmin=-1.0, vmax=1.0)
+plt.colorbar(im, ax=ax, shrink=0.6)
+ax.set_xlabel("steps")
+ax.set_ylabel("neurons")
+plt.tight_layout()
+plt.show()
 
 # training
 current_loss = 100.0
 min_loss = 1e-3
+loss_hist = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
@@ -141,6 +149,7 @@ with torch.enable_grad():
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
+            loss_hist.append(current_loss)
             print(f"MSE loss after {trial+1} training trials: {current_loss}")
 
         if current_loss < min_loss:
@@ -167,23 +176,24 @@ with torch.no_grad():
             targets.append(trial_targ[step])
 
 # calculate performance on test data
-predictions = np.asarray(predictions).squeeze()
-targets = np.asarray(targets).squeeze()
-performance = np.mean((predictions - targets)**2)
+predictions = np.asarray(predictions)
+targets = np.asarray(targets)
+performance = np.mean((predictions.squeeze() - targets.squeeze())**2)
 
 # plotting
 ##########
 
 # dynamics
-_, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
-for i, ax in enumerate(axes):
+_, axes = plt.subplots(nrows=n_out, figsize=(12, 3*n_out), sharex=True)
+for i in range(n_out):
+    ax = axes[i] if n_out > 1 else axes
     ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
     ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
     ax.set_ylabel(f"y_{i+1}")
-    if i == 1:
+    if i == n_out-1:
         ax.set_xlabel("steps")
         ax.legend()
-    else:
+    if i == 0:
         ax.set_title(f"Test error: {np.round(performance, decimals=2)}")
 plt.tight_layout()
 
@@ -195,5 +205,10 @@ ax.set_xlabel("neuron")
 ax.set_ylabel("neuron")
 fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
 
+# loss history
+fig, ax = plt.subplots(figsize=(10, 3))
+ax.plot(loss_hist)
+ax.set_xlabel("Epoch")
+ax.set_ylabel("Loss")
 plt.tight_layout()
 plt.show()
