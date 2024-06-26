@@ -134,7 +134,7 @@ with torch.enable_grad():
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
             loss /= batch_size * response_dur
-            loss += alphas[1] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += alphas[1] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.L))
             loss.backward()
             current_loss = loss.item()
             loss_hist.append(current_loss)
@@ -144,8 +144,8 @@ with torch.enable_grad():
 
 # retrieve network connectivity
 c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################

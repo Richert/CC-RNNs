@@ -132,15 +132,15 @@ with torch.enable_grad():
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
             loss /= batch_size*response_dur
-            loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+            loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.L))
             loss.backward()
             current_loss = loss.item()
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
 
-W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.W_z)).cpu().detach().numpy())
+W = (rnn.W @ rnn.L).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.L)).cpu().detach().numpy())
 
 # testing
 #########

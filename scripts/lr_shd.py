@@ -158,7 +158,7 @@ for epoch in range(n_epochs):
             loss += loss_func(y, y_t[0])
 
     optim.zero_grad()
-    loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.W_z))
+    loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.L))
     loss += alphas[1] * torch.sum(torch.abs(W_r))
     loss.backward()
     epoch_loss.append(loss.item())
@@ -167,7 +167,7 @@ for epoch in range(n_epochs):
     print(f"Loss after epoch {epoch + 1}: {epoch_loss[-1]}")
 
 # get trained weights
-W = (rnn.W @ rnn.W_z).cpu().detach().numpy()
+W = (rnn.W @ rnn.L).cpu().detach().numpy()
 lambdas = np.abs(np.linalg.eigvals(W))
 sr_trained = np.max(lambdas)
 

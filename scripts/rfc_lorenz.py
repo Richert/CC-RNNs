@@ -140,8 +140,8 @@ print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy(
 
 # extract trained recurrent weights
 c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions

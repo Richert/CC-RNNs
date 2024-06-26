@@ -156,7 +156,7 @@ with torch.enable_grad():
         # make update
         if (step + 1) % backprop_steps == 0:
             optim.zero_grad()
-            W_r_tmp = torch.abs(rnn.W_z)
+            W_r_tmp = torch.abs(rnn.L)
             for j in range(k):
                 W_r_tmp[j, :] *= rnn.C[j]
             loss += alphas[1]*torch.sum(torch.abs(rnn.W) @ W_r_tmp)
@@ -186,8 +186,8 @@ epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
 # inspect conceptor
 c = rnn.C.cpu().detach().numpy()
 k_star = np.sum(c)
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 
 # generate predictions
 with torch.no_grad():

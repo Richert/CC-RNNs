@@ -85,33 +85,34 @@ class RNN(torch.nn.Module):
 
 class LowRankRNN(RNN):
 
-    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, W_z: torch.Tensor):
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, L: torch.Tensor, R: torch.Tensor):
 
         super().__init__(W, W_in, bias)
-        self.W_z = W_z
-        self.rank = W_z.shape[0]
+        self.L = L
+        self.R = R
+        self.rank = L.shape[1]
         self.z = torch.zeros((self.rank,), device=self.device, dtype=self.dtype)
 
     @classmethod
     def random_init(cls, N: int, n_in: int, rank: int = 1, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
                     rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
 
-        rnn = super().random_init(N, n_in, sr, density, bias_var, rf_var, device, dtype)
-        W = init_weights(N, rank, density)
-        W_z = init_weights(rank, N, density)
-        sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
-        W *= np.sqrt(sr) / np.sqrt(sr_comb)
-        W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
-        return cls(W, rnn.W_in, rnn.bias, W_z)
+        rnn = super().random_init(N, n_in, sr*0.5, density, bias_var, rf_var, device, dtype)
+        L = init_weights(N, rank, density)
+        R = init_weights(rank, N, density)
+        sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
+        L *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
+        R *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
+        return cls(rnn.W, rnn.W_in, rnn.bias, L, R)
 
     def forward(self, x):
-        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
-        self.z = self.W_z @ self.y
+        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.W_in @ x + self.bias)
+        self.z = self.R @ self.y
         return self.y
 
     def forward_a(self):
-        self.y = torch.tanh(self.W @ self.z + self.D @ self.y + self.bias)
-        self.z = self.W_z @ self.y
+        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.D @ self.y + self.bias)
+        self.z = self.R @ self.y
         return self.y
 
     def detach(self):
@@ -181,9 +182,9 @@ class AutoConceptorRNN(ConceptorRNN):
 
 class RandomFeatureConceptorRNN(LowRankRNN):
 
-    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, W_z: torch.Tensor,
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, L: torch.Tensor, R: torch.Tensor,
                  lam: float, alpha: float):
-        super().__init__(W, W_in, bias, W_z)
+        super().__init__(W, W_in, bias, L, R)
         self.alpha_sq = alpha ** (-2)
         self.lam = lam
         self.C = torch.zeros_like(self.z)
@@ -194,28 +195,28 @@ class RandomFeatureConceptorRNN(LowRankRNN):
                     density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
                     dtype: torch.dtype = torch.float64):
         lr = super().random_init(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
-        return cls(lr.W, lr.W_in, lr.bias, lr.W_z, lam, alpha)
+        return cls(lr.W, lr.W_in, lr.bias, lr.L, lr.R, lam, alpha)
 
     def forward_c(self, x):
-        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
-        self.z = self.C * (self.W_z @ self.y)
+        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.W_in @ x + self.bias)
+        self.z = self.C * (self.R @ self.y)
         return self.y
 
     def forward_c_a(self):
-        self.y = torch.tanh(self.W @ self.z + self.D @ self.y + self.bias)
-        self.z = self.C * (self.W_z @ self.y)
+        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.D @ self.y + self.bias)
+        self.z = self.C * (self.R @ self.y)
         return self.y
 
     def forward_c_adapt(self, x):
-        self.y = torch.tanh(self.W @ self.z + self.W_in @ x + self.bias)
-        z = self.C * (self.W_z @ self.y)
+        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.W_in @ x + self.bias)
+        z = self.C * (self.R @ self.y)
         self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
         self.z = z
         return self.y
 
     def forward_c_a_adapt(self):
-        self.y = torch.tanh(self.W @ self.z + self.D @ self.y + self.bias)
-        z = self.C * (self.W_z @ self.y)
+        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.D @ self.y + self.bias)
+        z = self.C * (self.R @ self.y)
         self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
         self.z = z
         return self.y

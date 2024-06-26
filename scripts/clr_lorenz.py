@@ -150,7 +150,7 @@ with torch.enable_grad():
         # make update
         if (step + 1) % backprop_steps == 0:
             optim.zero_grad()
-            W_z_tmp = torch.abs(rnn.W_z)
+            W_z_tmp = torch.abs(rnn.L)
             for j in range(k):
                 W_z_tmp[j, :] *= rnn.C[j]
             loss /= backprop_steps
@@ -179,8 +179,8 @@ print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy(
 
 # retrieve trained network connectivity
 c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions

@@ -135,7 +135,7 @@ for i, omega in enumerate(omegas):
             # make update
             if (step + 1) % backprop_steps == 0:
                 optim.zero_grad()
-                W_r_tmp = torch.abs(rnn.W_z)
+                W_r_tmp = torch.abs(rnn.L)
                 for j in range(k):
                     W_r_tmp[j, :] *= rnn.C[j]
                 loss += epsilon*torch.sum(torch.abs(rnn.W) @ W_r_tmp)

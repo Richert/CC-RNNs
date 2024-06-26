@@ -146,8 +146,8 @@ epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
 # inspect conceptor
 c = rnn.C.cpu().detach().numpy()
 k_star = np.sum(c)
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.W_z)).cpu().detach().numpy())
+W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 
 # generate predictions
 with torch.no_grad():
