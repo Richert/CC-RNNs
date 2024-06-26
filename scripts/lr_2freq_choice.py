@@ -8,13 +8,12 @@ from src.functions import init_weights
 # function definitions
 ######################
 
-def get_inp(f1: float, f2: float, trial_dur: int, trials: int, noise: float, dt: float, single_output: bool = True
+def get_inp(f: float, trial_dur: int, trials: int, noise: float, dt: float, single_output: bool = True
             ) -> tuple:
 
     # create sines
     time = np.linspace(0.0, trial_dur*dt, trial_dur)
-    s1 = np.sin(2.0*np.pi*f1*time)
-    s2 = np.sin(2.0*np.pi*f2*time)
+    s = np.sin(2.0*np.pi*freq*time)
 
     # create switching signal and targets
     inputs = np.zeros((trials, trial_dur, 1))
@@ -22,9 +21,7 @@ def get_inp(f1: float, f2: float, trial_dur: int, trials: int, noise: float, dt:
     for trial in range(trials):
         if np.random.randn() > 0:
             inputs[trial, :, 0] = 1.0
-            targets[trial, :, 0 if single_output else 1] = s1
-        else:
-            targets[trial, :, 0] = s2
+            targets[trial, :, 0 if single_output else 1] = s
 
     # add noise to input signals
     inputs += noise * np.random.randn(trials, trial_dur, 1)
@@ -33,8 +30,11 @@ def get_inp(f1: float, f2: float, trial_dur: int, trials: int, noise: float, dt:
 
 
 def cc_loss(x: torch.Tensor, y: torch.Tensor, alpha: float = 1.0, padding: int = 1) -> torch.Tensor:
-    cc = torch.abs(torch.nn.functional.conv1d(x[None, None, :], y[None, None, :], padding=padding))
-    return -torch.max(cc) + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
+    if torch.max(y) > 0.5:
+        cc = torch.abs(torch.nn.functional.conv1d(x[None, None, :], y[None, None, :], padding=padding))
+        return -torch.max(cc) + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
+    else:
+        return alpha*torch.mean(x)
 
 
 # parameter definition
@@ -46,18 +46,17 @@ device = "cpu"
 plot_steps = 1000
 
 # input parameters
-f1 = 5.0
-f2 = 10.0
+freq = 10.0
 dt = 0.01
 n_in = 1
 trial_dur = 100
-padding = int(0.2*trial_dur)
+padding = int(0.4*trial_dur)
 noise_lvl = 0.01
 
 # reservoir parameters
 N = 200
 n_out = 1
-k = 4
+k = 5
 sr = 1.05
 bias_scale = 0.01
 in_scale = 0.1
@@ -76,22 +75,22 @@ W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 20000
+n_train = 500000
 n_test = 1000
 init_steps = 1000
 batch_size = 20
-lr = 0.0001
+lr = 0.0005
 betas = (0.9, 0.999)
-alphas = (30.0, 1e-4)
+alphas = (5.0, 1e-4)
 
 # generate inputs and targets
 #############################
 
 # get training data
-x_train, y_train = get_inp(f1, f2, trial_dur, n_train, noise_lvl, dt)
+x_train, y_train = get_inp(freq, trial_dur, n_train, noise_lvl, dt)
 
 # get test data
-x_test, y_test = get_inp(f1, f2, trial_dur, n_test, noise_lvl, dt)
+x_test, y_test = get_inp(freq, trial_dur, n_test, noise_lvl, dt)
 
 # training
 ##########
@@ -121,7 +120,7 @@ plt.show()
 
 # training
 current_loss = 100.0
-min_loss = 1e-3
+min_loss = -50.0
 loss_hist = []
 with torch.enable_grad():
 
