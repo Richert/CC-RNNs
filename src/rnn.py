@@ -1,4 +1,4 @@
-from typing import Iterator, overload
+from typing import Iterator, Iterable
 from .functions import *
 from torch.nn import Parameter
 import torch
@@ -14,7 +14,7 @@ class RNN(torch.nn.Module):
         self.dtype = W.dtype
         self.W = W
         self.W_in = W_in
-        self.D = None
+        self.D = 0.0
         self.bias = bias
         self.y = torch.zeros((self.N,), device=self.device, dtype=self.dtype)
         self._free_params = {}
@@ -35,6 +35,30 @@ class RNN(torch.nn.Module):
     def forward_a(self):
         self.y = torch.tanh((self.W + self.D) @ self.y + self.bias)
         return self.y
+
+    def get_vf(self, L: torch.Tensor, R: torch.Tensor, grid_points: int, lower_bounds: Iterable, upper_bounds: Iterable,
+               *args, **kwargs) -> tuple:
+
+        # get coordinates at which to evaluate the vectorfield
+        eval_points = [np.linspace(lb, ub, grid_points) for lb, ub in zip(lower_bounds, upper_bounds)]
+        coordinates = np.asarray([c.flatten(order="C") for c in np.meshgrid(*tuple(eval_points), **kwargs)])
+        coordinates = torch.tensor(coordinates, device=self.y.device, dtype=self.y.dtype).T
+
+        # calculate coordinate inversion matrix
+        R2 = R.T @ R
+        R_inv = torch.linalg.lstsq(R2, R.T).solution
+
+        # evaluate the vectorfield
+        vf = torch.zeros_like(coordinates)
+        with torch.no_grad():
+            for idx in range(coordinates.shape[0]):
+                z = coordinates[idx, :]
+                y = R_inv @ z
+                self.set_state(y, coordinates[idx, :])
+                y_new = self.forward_a()
+                vf[idx, :] = R @ (y_new - y)
+
+        return coordinates, vf
 
     def free_param(self, key: str):
         try:
@@ -76,6 +100,9 @@ class RNN(torch.nn.Module):
     def detach(self):
         self.y = self.y.detach()
 
+    def set_state(self, y: torch.Tensor, *args):
+        self.y = y
+
     @staticmethod
     def train_readout(y, target, tychinov_alpha: float = 1e-4) -> tuple:
         assert target.shape[-1] == y.shape[-1]  # time steps
@@ -111,9 +138,17 @@ class LowRankRNN(RNN):
         return self.y
 
     def forward_a(self):
-        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.D @ self.y + self.bias)
+        self.y = torch.tanh((self.W + self.D) @ self.y + self.L @ self.z + self.bias)
         self.z = self.R @ self.y
         return self.y
+
+    def get_vf(self, grid_points: int, lower_bounds: Iterable, upper_bounds: Iterable, *args, **kwargs) -> tuple:
+        return super().get_vf(self.L, self.R, grid_points, lower_bounds, upper_bounds, *args, **kwargs)
+
+    def set_state(self, y: torch.Tensor, *args):
+        super().set_state(y)
+        if len(args) > 0:
+            self.z = args[0]
 
     def detach(self):
         super().detach()
@@ -203,7 +238,7 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         return self.y
 
     def forward_c_a(self):
-        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.D @ self.y + self.bias)
+        self.y = torch.tanh((self.W + self.D) @ self.y + self.L @ self.z + self.bias)
         self.z = self.C * (self.R @ self.y)
         return self.y
 
@@ -215,7 +250,7 @@ class RandomFeatureConceptorRNN(LowRankRNN):
         return self.y
 
     def forward_c_a_adapt(self):
-        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.D @ self.y + self.bias)
+        self.y = torch.tanh((self.W + self.D) @ self.y + self.L @ self.z + self.bias)
         z = self.C * (self.R @ self.y)
         self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
         self.z = z

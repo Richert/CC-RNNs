@@ -52,7 +52,7 @@ inp_noise = 0.1
 # reservoir parameters
 N = 200
 n_out = 1
-k = 2
+k = 3
 sr = 1.05
 bias_scale = 0.01
 in_scale = 0.2
@@ -61,18 +61,19 @@ out_scale = 0.1
 init_noise = 0.05
 
 # rnn matrices
-W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype)
-bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
-W = torch.tensor(0.5*sr*init_weights(N, N, density), device=device, dtype=dtype)
+lbd = 0.99
+W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype, requires_grad=False)
+bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype, requires_grad=False)
+W = torch.tensor((1-lbd)*sr*init_weights(N, N, density), device=device, dtype=dtype, requires_grad=False)
 L = init_weights(N, k, density)
 R = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
-L *= np.sqrt(sr) / np.sqrt(sr_comb)
-R *= np.sqrt(sr) / np.sqrt(sr_comb)
+L *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
+R *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 50000
+n_train = 500
 n_test = 1000
 init_steps = 100
 batch_size = 3
@@ -109,6 +110,7 @@ optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
 current_loss = 100.0
 min_loss = -50.0
 loss_hist = []
+z_col = []
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
@@ -124,6 +126,7 @@ with torch.enable_grad():
         for step in range(trial_dur):
             y = W_r @ rnn.forward(trial_inp[step])
             loss += loss_func(y, trial_targ[step])
+            z_col.append(rnn.z.detach().cpu().numpy())
 
         # make update
         if (trial + 1) % batch_size == 0:
@@ -165,6 +168,7 @@ with torch.no_grad():
             y = W_r @ rnn.forward(trial_inp[step])
             trial_predictions.append(y)
             targets.append(trial_targ[step])
+            z_col.append(rnn.z.detach().cpu().numpy())
         trial_predictions = torch.stack(trial_predictions, dim=0)
         predictions.extend(trial_predictions.cpu().detach().numpy().tolist())
         for i in range(n_out):
@@ -173,7 +177,14 @@ with torch.no_grad():
 # calculate performance on test data
 predictions = np.asarray(predictions)
 targets = np.asarray(targets)
-performance = test_loss  / n_test
+z_col = np.asarray(z_col)
+performance = test_loss / n_test
+
+# calculate vector field
+grid_points = 20
+lb = np.min(z_col, axis=0)
+ub = np.max(z_col, axis=0)
+coords, vf = rnn.get_vf(grid_points, lower_bounds=lb, upper_bounds=ub)
 
 # plotting
 ##########
@@ -201,9 +212,29 @@ ax.set_ylabel("neuron")
 fig.suptitle(f"Summed LR connectivity: {np.round(W_abs, decimals=1)}")
 
 # loss history
-fig, ax = plt.subplots(figsize=(10, 3))
+_, ax = plt.subplots(figsize=(10, 3))
 ax.plot(loss_hist)
 ax.set_xlabel("Epoch")
 ax.set_ylabel("Loss")
+plt.tight_layout()
+
+# vector field
+_, ax = plt.subplots(figsize=(8, 8))
+ax.quiver(coords[:, 0], coords[:, 1], vf[:, 0], vf[:, 1])
+ax.set_xlabel("z_1")
+ax.set_ylabel("z_2")
+ax.set_title("Vectorfield 1")
+plt.tight_layout()
+_, ax = plt.subplots(figsize=(8, 8))
+ax.quiver(coords[:, 1], coords[:, 2], vf[:, 1], vf[:, 2])
+ax.set_xlabel("z_2")
+ax.set_ylabel("z_3")
+ax.set_title("Vectorfield 2")
+plt.tight_layout()
+_, ax = plt.subplots(figsize=(8, 8))
+ax.quiver(coords[:, 0], coords[:, 2], vf[:, 0], vf[:, 2])
+ax.set_xlabel("z_1")
+ax.set_ylabel("z_3")
+ax.set_title("Vectorfield 3")
 plt.tight_layout()
 plt.show()
