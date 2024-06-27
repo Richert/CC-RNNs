@@ -61,7 +61,7 @@ out_scale = 0.1
 init_noise = 0.05
 
 # rnn matrices
-lbd = 0.99
+lbd = 0.9
 W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype, requires_grad=False)
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype, requires_grad=False)
 W = torch.tensor((1-lbd)*sr*init_weights(N, N, density), device=device, dtype=dtype, requires_grad=False)
@@ -73,7 +73,7 @@ R *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 500
+n_train = 50000
 n_test = 1000
 init_steps = 100
 batch_size = 3
