@@ -52,7 +52,7 @@ inp_noise = 0.1
 # reservoir parameters
 N = 200
 n_out = 1
-k = 3
+k = 2
 sr = 1.05
 bias_scale = 0.01
 in_scale = 0.2
@@ -219,22 +219,11 @@ ax.set_ylabel("Loss")
 plt.tight_layout()
 
 # vector field
-_, ax = plt.subplots(figsize=(8, 8))
+fig, ax = plt.subplots(figsize=(8, 8))
 ax.quiver(coords[:, 0], coords[:, 1], vf[:, 0], vf[:, 1])
 ax.set_xlabel("z_1")
 ax.set_ylabel("z_2")
-ax.set_title("Vectorfield 1")
+ax.set_title("Vectorfield")
 plt.tight_layout()
-_, ax = plt.subplots(figsize=(8, 8))
-ax.quiver(coords[:, 1], coords[:, 2], vf[:, 1], vf[:, 2])
-ax.set_xlabel("z_2")
-ax.set_ylabel("z_3")
-ax.set_title("Vectorfield 2")
-plt.tight_layout()
-_, ax = plt.subplots(figsize=(8, 8))
-ax.quiver(coords[:, 0], coords[:, 2], vf[:, 0], vf[:, 2])
-ax.set_xlabel("z_1")
-ax.set_ylabel("z_3")
-ax.set_title("Vectorfield 3")
-plt.tight_layout()
+
 plt.show()
