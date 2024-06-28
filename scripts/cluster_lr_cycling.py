@@ -1,8 +1,10 @@
+import sys
+sys.path.append('../')
 from src import LowRankRNN
 import torch
-import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
+import pickle
 
 
 # function definitions
@@ -37,6 +39,11 @@ def cc_loss(x: torch.Tensor, y: torch.Tensor, alpha: float = 1.0, padding: int =
 # parameter definition
 ######################
 
+# batch condition
+inp_noise = int(sys.argv[-3])
+init_noise = float(sys.argv[-2])
+rep = int(sys.argv[-1])
+
 # general
 dtype = torch.float64
 device = "cpu"
@@ -51,7 +58,6 @@ min_cycling_dur = 50
 inp_dur = 5
 inp_damping = 1.0
 padding = int(0.2*trial_dur)
-inp_noise = 0.1
 
 # reservoir parameters
 N = 200
@@ -62,10 +68,9 @@ bias_scale = 0.01
 in_scale = 0.2
 density = 0.2
 out_scale = 0.1
-init_noise = 0.2
 
 # rnn matrices
-lbd = 1.0
+lbd = 0.5
 W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype, requires_grad=False)
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype, requires_grad=False)
 W = torch.tensor((1-lbd)*sr*init_weights(N, N, density), device=device, dtype=dtype, requires_grad=False)
@@ -77,7 +82,7 @@ R *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 2000
+n_train = 10000
 n_test = 1000
 init_steps = 1000
 batch_size = 3
@@ -168,7 +173,6 @@ z_col = np.asarray(z_col)
 predictions, targets = [], []
 test_loss = 0.0
 z_test = []
-inp_test = []
 with torch.no_grad():
     for trial in range(n_test):
 
@@ -182,18 +186,12 @@ with torch.no_grad():
         trial_targ = y_test[trial]
         trial_predictions = []
         trial_z = []
-        trial_inp_dur = []
         for step in range(trial_dur):
             y = W_r @ rnn.forward(trial_inp[step])
             trial_predictions.append(y)
             targets.append(trial_targ[step])
             trial_z.append(rnn.z.detach().cpu().numpy())
-            if torch.sum(torch.abs(trial_inp[step])) > 0.5:
-                trial_inp_dur.append(1.0)
-            else:
-                trial_inp_dur.append(0.0)
         z_test.append(np.asarray(trial_z))
-        inp_test.append(np.asarray(trial_inp_dur))
         trial_predictions = torch.stack(trial_predictions, dim=0)
         predictions.extend(trial_predictions.cpu().detach().numpy().tolist())
         for i in range(n_out):
@@ -202,63 +200,21 @@ with torch.no_grad():
 # calculate performance on test data
 predictions = np.asarray(predictions)
 targets = np.asarray(targets)
+
 performance = test_loss / n_test
 
 # calculate vector field
 grid_points = 20
-margin = 0.0
+margin = 0.2
 lb = np.min(z_col, axis=0)
 ub = np.max(z_col, axis=0)
 width = ub - lb
 coords, vf = rnn.get_vf(grid_points, lower_bounds=lb - margin*width, upper_bounds=ub + margin*width)
 
-# plotting
-##########
-
-# dynamics
-_, axes = plt.subplots(nrows=n_out, figsize=(12, 3*n_out), sharex=True)
-for i in range(n_out):
-    ax = axes[i] if n_out > 1 else axes
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(f"y_{i+1}")
-    if i == n_out-1:
-        ax.set_xlabel("steps")
-        ax.legend()
-    if i == 0:
-        ax.set_title(f"Test error: {np.round(performance, decimals=2)}")
-plt.tight_layout()
-
-# trained weights
-fig, ax = plt.subplots(figsize=(6, 6))
-im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
-plt.colorbar(im, ax=ax)
-ax.set_xlabel("neuron")
-ax.set_ylabel("neuron")
-fig.suptitle(f"Summed LR connectivity: {np.round(W_abs, decimals=1)}")
-
-# loss history
-_, ax = plt.subplots(figsize=(10, 3))
-ax.plot(loss_hist)
-ax.set_xlabel("Epoch")
-ax.set_ylabel("Loss")
-plt.tight_layout()
-
-# vector field
-plot_trials = 5
-fig, ax = plt.subplots(figsize=(8, 8))
-ax.quiver(coords[:, 0], coords[:, 1], vf[:, 0], vf[:, 1])
-for _ in range(plot_trials):
-    idx = np.random.randint(0, n_test)
-    trial_z = z_test[idx]
-    trial_inp = inp_test[idx]
-    l = ax.plot(trial_z[trial_inp < 0.5, 0], trial_z[trial_inp < 0.5, 1], linestyle="dotted")
-    ax.plot(trial_z[trial_inp > 0.5, 0], trial_z[trial_inp > 0.5, 1], linestyle="solid", c=l[0].get_color())
-    ax.scatter(trial_z[0, 0], trial_z[0, 1], marker="o", s=50.0, c=l[0].get_color())
-    ax.scatter(trial_z[-1, 0], trial_z[-1, 1], marker="x", s=50.0, c=l[0].get_color())
-ax.set_xlabel("z_1")
-ax.set_ylabel("z_2")
-ax.set_title("Vectorfield")
-plt.tight_layout()
-
-plt.show()
+# save results
+results = {"targets": targets, "predictions": predictions,
+           "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
+           "condition": {"repetition": rep, "inp_noise": inp_noise, "init_noise": init_noise},
+           "training_error": current_loss, "avg_weights": W_abs,
+           "classification_performance": performance}
+pickle.dump(results, open(f"../results/lr/cycling_inp{int(inp_noise*10.0)}_init{int(init_noise*10)}_{rep}.pkl", "wb"))

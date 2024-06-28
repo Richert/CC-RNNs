@@ -45,8 +45,7 @@ class RNN(torch.nn.Module):
         coordinates = torch.tensor(coordinates, device=self.y.device, dtype=self.y.dtype).T
 
         # calculate coordinate inversion matrix
-        R2 = R.T @ R
-        R_inv = torch.linalg.lstsq(R2, R.T).solution
+        R_inv = torch.linalg.lstsq(R, torch.eye(R.shape[0], dtype=R.dtype, device=R.device)).solution
 
         # evaluate the vectorfield
         vf = torch.zeros_like(coordinates)
@@ -54,7 +53,7 @@ class RNN(torch.nn.Module):
             for idx in range(coordinates.shape[0]):
                 z = coordinates[idx, :]
                 y = R_inv @ z
-                self.set_state(y, coordinates[idx, :])
+                self.set_state(y, z)
                 y_new = self.forward_a()
                 vf[idx, :] = R @ (y_new - y)
 
