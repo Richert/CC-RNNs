@@ -17,14 +17,11 @@ def get_inp(freq: float, trial_dur: int, min_cycling_dur: int, inp_dur: int, inp
     for trial in range(trials):
         start = np.random.randint(low=0, high=int(0.5*(trial_dur-min_cycling_dur)))
         stop = np.random.randint(low=start+min_cycling_dur, high=trial_dur-inp_dur)
-        inputs[trial, start:start+inp_dur, 0] = 1.0
-        inputs[trial, stop:stop+inp_dur, 1] = -1.0
+        inputs[trial, start:start+inp_dur, 0] = 1.0 + noise * np.random.randn(inp_dur)
+        inputs[trial, stop:stop+inp_dur, 1] = -1.0 + noise * np.random.randn(inp_dur)
         sine = np.sin(2.0*np.pi*freq*np.linspace(0.0, (stop-start)*dt, stop-start))
         damping = (np.ones((stop-start,))*inp_damping)**np.arange(1, stop-start+1)
         targets[trial, start:stop, 0] = sine * damping
-
-    # add noise to input signals
-    inputs += noise * np.random.randn(trials, trial_dur, 1)
 
     return torch.tensor(inputs, device=device, dtype=dtype), torch.tensor(targets, device=device, dtype=dtype)
 
@@ -46,9 +43,9 @@ plot_steps = 1000
 freq = 5.0
 dt = 0.01
 n_in = 2
-trial_dur = 200
+trial_dur = 500
 min_cycling_dur = 50
-inp_dur = 5
+inp_dur = 3
 inp_damping = 1.0
 padding = int(0.2*trial_dur)
 inp_noise = 0.1
@@ -59,10 +56,10 @@ n_out = 1
 k = 2
 sr = 1.05
 bias_scale = 0.01
-in_scale = 0.2
+in_scale = 0.1
 density = 0.2
 out_scale = 0.1
-init_noise = 0.2
+init_noise = 0.5
 
 # rnn matrices
 lbd = 1.0
@@ -77,10 +74,10 @@ R *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 2000
+n_train = 50000
 n_test = 1000
 init_steps = 1000
-batch_size = 3
+batch_size = 1
 lr = 0.0005
 betas = (0.9, 0.999)
 alphas = (1.0, 1e-4)
@@ -120,7 +117,7 @@ z0 = rnn.z.detach()
 
 # training
 current_loss = 100.0
-min_loss = 0.08
+min_loss = 0.009
 loss_hist = []
 z_col = []
 with torch.enable_grad():
@@ -188,7 +185,7 @@ with torch.no_grad():
             trial_predictions.append(y)
             targets.append(trial_targ[step])
             trial_z.append(rnn.z.detach().cpu().numpy())
-            if torch.sum(torch.abs(trial_inp[step])) > 0.5:
+            if trial_inp[step, 0] > 0.9 or trial_inp[step, 1] < -0.9:
                 trial_inp_dur.append(1.0)
             else:
                 trial_inp_dur.append(0.0)

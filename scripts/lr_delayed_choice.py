@@ -115,7 +115,7 @@ y0 = rnn.y.detach()
 current_loss = 100.0
 z_col = []
 loss_hist = []
-min_loss = 0.03
+min_loss = 0.009
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
