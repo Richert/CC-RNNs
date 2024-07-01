@@ -1,4 +1,4 @@
-from src import RandomFeatureConceptorRNN
+from src import ConceptorLowRankRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -91,8 +91,8 @@ for n in range(n_epochs):
 #############################################################
 
 # initialize RFC-RNN
-rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                                torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
+rnn = ConceptorLowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
+                          torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
 rnn.init_new_conceptor(init_value="random")
 readout = torch.nn.Linear(in_features=N, out_features=n_in, bias=False, device=device, dtype=dtype)
 

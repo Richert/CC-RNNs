@@ -3,32 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
-
-
-# function definitions
-######################
-
-def get_inp(freq: float, trial_dur: int, min_cycling_dur: int, inp_dur: int, inp_damping: float, trials: int,
-            noise: float, dt: float) -> tuple:
-
-    # create inputs and targets
-    inputs = np.zeros((trials, trial_dur, 2))
-    targets = np.zeros((trials, trial_dur, 1))
-    for trial in range(trials):
-        start = np.random.randint(low=0, high=int(0.5*(trial_dur-min_cycling_dur)))
-        stop = np.random.randint(low=start+min_cycling_dur, high=trial_dur-inp_dur)
-        inputs[trial, start:start+inp_dur, 0] = 1.0 + noise * np.random.randn(inp_dur)
-        inputs[trial, stop:stop+inp_dur, 1] = -1.0 + noise * np.random.randn(inp_dur)
-        sine = np.sin(2.0*np.pi*freq*np.linspace(0.0, (stop-start)*dt, stop-start))
-        damping = (np.ones((stop-start,))*inp_damping)**np.arange(1, stop-start+1)
-        targets[trial, start:stop, 0] = sine * damping
-
-    return torch.tensor(inputs, device=device, dtype=dtype), torch.tensor(targets, device=device, dtype=dtype)
-
-
-def cc_loss(x: torch.Tensor, y: torch.Tensor, alpha: float = 1.0, padding: int = 1) -> torch.Tensor:
-    cc = torch.abs(torch.nn.functional.conv1d(x[None, None, :], y[None, None, :], padding=padding))
-    return -torch.max(cc) + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
+from scripts.task_functions import cycling
 
 
 # parameter definition
@@ -43,9 +18,9 @@ plot_steps = 1000
 freq = 5.0
 dt = 0.01
 n_in = 2
-trial_dur = 500
+trial_dur = 200
 min_cycling_dur = 50
-inp_dur = 3
+stop_dur = 5
 inp_damping = 1.0
 padding = int(0.2*trial_dur)
 inp_noise = 0.1
@@ -54,12 +29,12 @@ inp_noise = 0.1
 N = 200
 n_out = 1
 k = 2
-sr = 1.05
+sr = 0.99
 bias_scale = 0.01
 in_scale = 0.1
 density = 0.2
 out_scale = 0.1
-init_noise = 0.5
+init_noise = 0.1
 
 # rnn matrices
 lbd = 1.0
@@ -74,22 +49,24 @@ R *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 50000
+n_train = 10000
 n_test = 1000
 init_steps = 1000
-batch_size = 1
-lr = 0.0005
+batch_size = 20
+lr = 0.005
 betas = (0.9, 0.999)
-alphas = (1.0, 1e-4)
+alphas = (1.0, 1e-5)
 
 # generate inputs and targets
 #############################
 
 # get training data
-x_train, y_train = get_inp(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_train, inp_noise, dt)
+x_train, y_train = cycling(freq, trial_dur, min_cycling_dur, stop_dur, inp_damping, n_train, inp_noise, dt,
+                           device=device, dtype=dtype)
 
 # get test data
-x_test, y_test = get_inp(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_test, inp_noise, dt)
+x_test, y_test = cycling(freq, trial_dur, min_cycling_dur, stop_dur, inp_damping, n_test, inp_noise, dt,
+                         device=device, dtype=dtype)
 
 # training
 ##########
@@ -117,7 +94,7 @@ z0 = rnn.z.detach()
 
 # training
 current_loss = 100.0
-min_loss = 0.009
+min_loss = 0.01
 loss_hist = []
 z_col = []
 with torch.enable_grad():
@@ -163,7 +140,6 @@ z_col = np.asarray(z_col)
 
 # generate predictions
 predictions, targets = [], []
-test_loss = 0.0
 z_test = []
 inp_test = []
 with torch.no_grad():
@@ -193,13 +169,10 @@ with torch.no_grad():
         inp_test.append(np.asarray(trial_inp_dur))
         trial_predictions = torch.stack(trial_predictions, dim=0)
         predictions.extend(trial_predictions.cpu().detach().numpy().tolist())
-        for i in range(n_out):
-            test_loss += cc_loss(trial_predictions[:, 0], trial_targ[:, 0], alpha=alphas[0], padding=padding)
 
 # calculate performance on test data
 predictions = np.asarray(predictions)
 targets = np.asarray(targets)
-performance = test_loss / n_test
 
 # calculate vector field
 grid_points = 20
@@ -222,8 +195,6 @@ for i in range(n_out):
     if i == n_out-1:
         ax.set_xlabel("steps")
         ax.legend()
-    if i == 0:
-        ax.set_title(f"Test error: {np.round(performance, decimals=2)}")
 plt.tight_layout()
 
 # trained weights

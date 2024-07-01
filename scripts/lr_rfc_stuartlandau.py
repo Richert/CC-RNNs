@@ -1,4 +1,4 @@
-from src import RandomFeatureConceptorRNN
+from src import ConceptorLowRankRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -78,8 +78,8 @@ epsilon = 1e-4
 ######################
 
 # initialize RFC
-rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                                torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
+rnn = ConceptorLowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
+                          torch.tensor(W_z, device=device, dtype=dtype), lam, alpha)
 rnn.free_param("W")
 rnn.free_param("W_z")
 

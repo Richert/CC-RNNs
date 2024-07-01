@@ -1,40 +1,11 @@
 import sys
 sys.path.append('../')
-from src import LowRankRNN
+from src import LowRankOnlyRNN
 import torch
 import numpy as np
 from src.functions import init_weights
+from scripts.task_functions import cycling
 import pickle
-
-
-# function definitions
-######################
-
-def get_inp(freq: float, trial_dur: int, min_cycling_dur: int, inp_dur: int, inp_damping: float, trials: int,
-            noise: float, dt: float) -> tuple:
-
-    # create inputs and targets
-    inputs = np.zeros((trials, trial_dur, 2))
-    targets = np.zeros((trials, trial_dur, 1))
-    for trial in range(trials):
-        start = np.random.randint(low=0, high=int(0.5*(trial_dur-min_cycling_dur)))
-        stop = np.random.randint(low=start+min_cycling_dur, high=trial_dur-inp_dur)
-        inputs[trial, start:start+inp_dur, 0] = 1.0
-        inputs[trial, stop:stop+inp_dur, 1] = -1.0
-        sine = np.sin(2.0*np.pi*freq*np.linspace(0.0, (stop-start)*dt, stop-start))
-        damping = (np.ones((stop-start,))*inp_damping)**np.arange(1, stop-start+1)
-        targets[trial, start:stop, 0] = sine * damping
-
-    # add noise to input signals
-    inputs += noise * np.random.randn(trials, trial_dur, 1)
-
-    return torch.tensor(inputs, device=device, dtype=dtype), torch.tensor(targets, device=device, dtype=dtype)
-
-
-def cc_loss(x: torch.Tensor, y: torch.Tensor, alpha: float = 1.0, padding: int = 1) -> torch.Tensor:
-    cc = torch.abs(torch.nn.functional.conv1d(x[None, None, :], y[None, None, :], padding=padding))
-    return -torch.max(cc) + alpha*(torch.abs(torch.max(x) - 1.0) + torch.abs(torch.min(x) + 1.0))
-
 
 # parameter definition
 ######################
@@ -53,7 +24,7 @@ plot_steps = 1000
 freq = 5.0
 dt = 0.01
 n_in = 2
-trial_dur = 200
+trial_dur = 400
 min_cycling_dur = 50
 inp_dur = 5
 inp_damping = 1.0
@@ -63,48 +34,48 @@ padding = int(0.2*trial_dur)
 N = 200
 n_out = 1
 k = 2
-sr = 1.05
+sr = 0.99
 bias_scale = 0.01
-in_scale = 0.2
+in_scale = 0.1
 density = 0.2
 out_scale = 0.1
 
 # rnn matrices
-lbd = 0.5
 W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype, requires_grad=False)
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype, requires_grad=False)
-W = torch.tensor((1-lbd)*sr*init_weights(N, N, density), device=device, dtype=dtype, requires_grad=False)
 L = init_weights(N, k, density)
 R = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
-L *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
-R *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
+L *= np.sqrt(sr) / np.sqrt(sr_comb)
+R *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 10000
+n_train = 100000
 n_test = 1000
 init_steps = 1000
-batch_size = 3
+batch_size = 20
 lr = 0.0005
 betas = (0.9, 0.999)
-alphas = (1.0, 1e-4)
+alphas = (1e-5,)
 
 # generate inputs and targets
 #############################
 
 # get training data
-x_train, y_train = get_inp(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_train, inp_noise, dt)
+x_train, y_train = cycling(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_train, inp_noise, dt,
+                           device=device, dtype=dtype)
 
 # get test data
-x_test, y_test = get_inp(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_test, inp_noise, dt)
+x_test, y_test = cycling(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_test, inp_noise, dt,
+                         device=device, dtype=dtype)
 
 # training
 ##########
 
 # initialize LR-RNN
-rnn = LowRankRNN(W, W_in, bias, torch.tensor(L, device=device, dtype=dtype),
-                 torch.tensor(R, device=device, dtype=dtype))
+rnn = LowRankOnlyRNN(W_in, bias, torch.tensor(L, device=device, dtype=dtype),
+                     torch.tensor(R, device=device, dtype=dtype))
 rnn.free_param("W_in")
 rnn.free_param("L")
 rnn.free_param("R")
@@ -125,7 +96,7 @@ z0 = rnn.z.detach()
 
 # training
 current_loss = 100.0
-min_loss = 0.08
+min_loss = 1e-3
 loss_hist = []
 z_col = []
 with torch.enable_grad():
@@ -150,14 +121,13 @@ with torch.enable_grad():
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
             loss /= batch_size*trial_dur
-            loss += alphas[1] * torch.sum(torch.abs(rnn.L) @ torch.abs(rnn.R))
+            loss += alphas[0] * torch.sum(torch.abs(rnn.L) @ torch.abs(rnn.R))
             loss.backward()
             current_loss = loss.item()
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
             loss_hist.append(current_loss)
-            print(f"MSE loss after {trial+1} training trials: {current_loss}")
 
         if current_loss < min_loss:
             break
@@ -171,7 +141,7 @@ z_col = np.asarray(z_col)
 
 # generate predictions
 predictions, targets = [], []
-test_loss = 0.0
+test_loss = torch.zeros((1,))
 z_test = []
 with torch.no_grad():
     for trial in range(n_test):
@@ -188,24 +158,23 @@ with torch.no_grad():
         trial_z = []
         for step in range(trial_dur):
             y = W_r @ rnn.forward(trial_inp[step])
+            test_loss += loss_func(y, trial_targ[step])
             trial_predictions.append(y)
             targets.append(trial_targ[step])
             trial_z.append(rnn.z.detach().cpu().numpy())
         z_test.append(np.asarray(trial_z))
         trial_predictions = torch.stack(trial_predictions, dim=0)
         predictions.extend(trial_predictions.cpu().detach().numpy().tolist())
-        for i in range(n_out):
-            test_loss += cc_loss(trial_predictions[:, 0], trial_targ[:, 0], alpha=alphas[0], padding=padding)
 
 # calculate performance on test data
 predictions = np.asarray(predictions)
 targets = np.asarray(targets)
 
-performance = test_loss / n_test
+test_loss = test_loss.item() / (n_test * trial_dur)
 
 # calculate vector field
 grid_points = 20
-margin = 0.2
+margin = 0.0
 lb = np.min(z_col, axis=0)
 ub = np.max(z_col, axis=0)
 width = ub - lb
@@ -215,6 +184,6 @@ coords, vf = rnn.get_vf(grid_points, lower_bounds=lb - margin*width, upper_bound
 results = {"targets": targets, "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"repetition": rep, "inp_noise": inp_noise, "init_noise": init_noise},
-           "training_error": current_loss, "avg_weights": W_abs,
-           "classification_performance": performance}
+           "training_error": current_loss, "W": rnn.W.detach().cpu().numpy(), "L": rnn.L.detach().cpu().numpy(),
+           "R": rnn.R.detach().cpu().numpy(), "test_loss": test_loss, "vf": vf, "vf_coords": coords, "vf_sols": z_test}
 pickle.dump(results, open(f"../results/lr/cycling_inp{int(inp_noise*10.0)}_init{int(init_noise*10)}_{rep}.pkl", "wb"))

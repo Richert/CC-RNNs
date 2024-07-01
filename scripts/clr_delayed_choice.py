@@ -1,4 +1,4 @@
-from src import RandomFeatureConceptorRNN
+from src import ConceptorLowRankRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -88,8 +88,8 @@ x_test, y_test = two_choice(n_test, evidence=evidence_dur, noise=noise_lvl)
 ##################################################################
 
 # initialize RFC-RNN
-rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                                torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
+rnn = ConceptorLowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
+                          torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
 rnn.free_param("W")
 rnn.free_param("W_z")
 rnn.init_new_conceptor(init_value="random")

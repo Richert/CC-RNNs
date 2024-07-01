@@ -3,35 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
-
-
-# function definitions
-######################
-
-def two_choice(trials: int, evidence: int, noise: float) -> tuple:
-
-    # allocate arrays
-    inputs = torch.randn(trials, evidence, 2, device=device, dtype=dtype) * noise
-    targets = torch.zeros((trials, 2), device=device, dtype=dtype)
-
-    # create inputs and targets
-    for trial in range(trials):
-
-        # choose random input channel
-        channel = np.random.randint(low=0, high=2)
-        inputs[trial, :, channel] += 1.0
-        targets[trial, channel] = 1.0
-
-    return inputs, targets
-
-
-def init_state(x: torch.Tensor, noise: float, boundaries: tuple):
-    x = x + noise * torch.randn(x.shape, device=device, dtype=dtype)
-    if boundaries:
-        x[x < boundaries[0]] = boundaries[0]
-        x[x > boundaries[1]] = boundaries[1]
-    return x
-
+from scripts.task_functions import init_state, delayed_choice
 
 # parameter definition
 ######################
@@ -39,26 +11,27 @@ def init_state(x: torch.Tensor, noise: float, boundaries: tuple):
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 100
+plot_steps = 500
 
 # input parameters
-n_in = 2
+n_in = 3
 evidence_dur = 20
-delay_dur = 20
-response_dur = 3
+delay_min = 10
+delay_max = 20
+response_dur = 10
 noise_lvl = 0.1
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
-n_out = n_in
+n_out = 1
 k = 2
 sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
 density = 0.2
-out_scale = 0.5
-init_noise = 0.8
+out_scale = 0.2
+init_noise = 0.05
 
 # rnn matrices
 lbd = 1.0
@@ -73,11 +46,11 @@ R *= np.sqrt(lbd*sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 50000
+n_train = 20000
 n_test = 100
 init_steps = 1000
 batch_size = 20
-lr = 0.0005
+lr = 0.001
 betas = (0.9, 0.999)
 alphas = (1e-5, 1e-3)
 
@@ -85,10 +58,12 @@ alphas = (1e-5, 1e-3)
 #############################
 
 # get training data
-x_train, y_train = two_choice(n_train, evidence=evidence_dur, noise=noise_lvl)
+x_train, y_train = delayed_choice(n_train, evidence=evidence_dur, delay_min=delay_min, delay_max=delay_max,
+                                  response=response_dur, noise=noise_lvl)
 
 # get test data
-x_test, y_test = two_choice(n_test, evidence=evidence_dur, noise=noise_lvl)
+x_test, y_test = delayed_choice(n_test, evidence=evidence_dur, delay_min=delay_min, delay_max=delay_max,
+                                response=response_dur, noise=noise_lvl)
 
 # training
 ##########
@@ -101,7 +76,7 @@ rnn.free_param("L")
 rnn.free_param("R")
 
 # set up loss function
-loss_func = torch.nn.CrossEntropyLoss()
+loss_func = torch.nn.MSELoss()
 
 # set up optimizer
 optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
@@ -115,32 +90,22 @@ y0 = rnn.y.detach()
 current_loss = 100.0
 z_col = []
 loss_hist = []
-min_loss = 0.009
+min_loss = 1e-3
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
     for trial in range(n_train):
 
         # set random initial condition
-        y_init = init_state(y0, noise=init_noise, boundaries=(-1.0, 1.0))
+        y_init = init_state(y0, noise=init_noise, boundaries=(-1.0, 1.0), device=device, dtype=dtype)
         rnn.set_state(y_init, rnn.R @ y_init)
 
-        # evidence integration period
-        trial_inp = x_train[trial]
-        for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
-            z_col.append(rnn.z.cpu().detach().numpy())
-
-        # delay period
-        for step in range(delay_dur):
-            rnn.forward_a()
-            z_col.append(rnn.z.cpu().detach().numpy())
-
-        # response period
-        trial_target = y_train[trial]
-        for step in range(response_dur):
-            y = W_r @ rnn.forward_a()
-            loss += loss_func(y, trial_target)
+        # trial
+        trial_inp = torch.tensor(x_train[trial], device=device, dtype=dtype)
+        trial_out = torch.tensor(y_train[trial], device=device, dtype=dtype)
+        for step in range(trial_inp.shape[0]):
+            y = W_r @ rnn.forward(trial_inp[step])
+            loss += loss_func(y, trial_out[step])
             z_col.append(rnn.z.cpu().detach().numpy())
 
         # make update
@@ -167,8 +132,8 @@ z_col = np.asarray(z_col)
 #########
 
 # generate predictions
-predictions, targets = [], []
-z_test = []
+predictions, targets, z_test = [], [], []
+test_loss = torch.zeros((1,))
 with torch.no_grad():
     for trial in range(n_test):
 
@@ -178,23 +143,14 @@ with torch.no_grad():
         y_init = init_state(y0, noise=init_noise, boundaries=(-1.0, 1.0))
         rnn.set_state(y_init, rnn.R @ y_init)
 
-        # evidence integration period
-        trial_inp = x_test[trial]
-        for step in range(evidence_dur):
-            rnn.forward(trial_inp[step])
-            z_trial.append(rnn.z.cpu().detach().numpy())
-
-        # delay period
-        for step in range(delay_dur):
-            rnn.forward_a()
-            z_trial.append(rnn.z.cpu().detach().numpy())
-
-        # response period
-        trial_target = y_test[trial].cpu().detach().numpy()
-        for step in range(response_dur):
-            y = W_r @ rnn.forward_a()
+        # trial
+        trial_inp = torch.tensor(x_train[trial], device=device, dtype=dtype)
+        trial_out = torch.tensor(y_train[trial], device=device, dtype=dtype)
+        for step in range(trial_inp.shape[0]):
+            y = W_r @ rnn.forward(trial_inp[step])
+            test_loss += loss_func(y, trial_out[step])
             predictions.append(y.cpu().detach().numpy())
-            targets.append(trial_target)
+            targets.append(trial_out[step].cpu().detach().numpy())
             z_trial.append(rnn.z.cpu().detach().numpy())
 
         z_test.append(np.asarray(z_trial))
@@ -202,7 +158,7 @@ with torch.no_grad():
 # calculate performance on test data
 predictions = np.asarray(predictions)
 targets = np.asarray(targets)
-performance = np.mean(np.argmax(predictions, axis=1) == np.argmax(targets, axis=1))
+test_loss = test_loss.item()
 
 # calculate vector field
 grid_points = 20
@@ -212,20 +168,17 @@ ub = np.max(z_col, axis=0)
 width = ub - lb
 coords, vf = rnn.get_vf(grid_points, lower_bounds=lb - margin*width, upper_bounds=ub + margin*width)
 
-
 # plotting
 ##########
 
 # dynamics
-fig, axes = plt.subplots(nrows=n_out, figsize=(12, 6))
-for i, ax in enumerate(axes):
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(f"Target class {i+1}")
-    if i == n_out-1:
-        ax.set_xlabel("steps")
-        ax.legend()
-fig.suptitle(f"Classification performance: {np.round(performance, decimals=2)}")
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(targets[:plot_steps, 0], color="royalblue", label="target")
+ax.plot(predictions[:plot_steps, 0], color="darkorange", label="prediction")
+ax.set_ylabel(f"Prediction on test data")
+ax.set_xlabel("steps")
+ax.legend()
+fig.suptitle(f"Test loss: {np.round(test_loss, decimals=2)}")
 plt.tight_layout()
 
 # trained weights

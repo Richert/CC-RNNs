@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../')
-from src import RandomFeatureConceptorRNN
+from src import ConceptorLowRankRNN
 import torch
 import numpy as np
 from src.functions import init_weights
@@ -117,8 +117,8 @@ for i in range(n_out):
 #############################################################
 
 # initialize RFC-RNN
-rnn = RandomFeatureConceptorRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                                torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
+rnn = ConceptorLowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
+                          torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
 rnn.init_new_conceptor(init_value="random")
 
 # initial wash-out period
