@@ -20,7 +20,7 @@ dt = 0.01
 n_in = 2
 trial_dur = 200
 min_cycling_dur = 50
-stop_dur = 5
+inp_dur = 5
 inp_damping = 1.0
 padding = int(0.2*trial_dur)
 inp_noise = 0.1
@@ -29,12 +29,12 @@ inp_noise = 0.1
 N = 200
 n_out = 1
 k = 2
-sr = 0.99
+sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
 density = 0.2
 out_scale = 0.1
-init_noise = 0.1
+init_noise = 0.05
 
 # rnn matrices
 lbd = 1.0
@@ -53,7 +53,7 @@ n_train = 10000
 n_test = 1000
 init_steps = 1000
 batch_size = 20
-lr = 0.005
+lr = 0.001
 betas = (0.9, 0.999)
 alphas = (1.0, 1e-5)
 
@@ -61,11 +61,11 @@ alphas = (1.0, 1e-5)
 #############################
 
 # get training data
-x_train, y_train = cycling(freq, trial_dur, min_cycling_dur, stop_dur, inp_damping, n_train, inp_noise, dt,
+x_train, y_train = cycling(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_train, inp_noise, dt,
                            device=device, dtype=dtype)
 
 # get test data
-x_test, y_test = cycling(freq, trial_dur, min_cycling_dur, stop_dur, inp_damping, n_test, inp_noise, dt,
+x_test, y_test = cycling(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_test, inp_noise, dt,
                          device=device, dtype=dtype)
 
 # training

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 
-def cycling(freq: float, trial_dur: int, min_cycling_dur: int, stop_dur: int, inp_damping: float, trials: int,
+def cycling(freq: float, trial_dur: int, min_cycling_dur: int, inp_dur: int, inp_damping: float, trials: int,
             noise: float, dt: float, device: str = "cpu", dtype: torch.dtype = torch.float64) -> tuple:
 
     # create inputs and targets
@@ -10,12 +10,12 @@ def cycling(freq: float, trial_dur: int, min_cycling_dur: int, stop_dur: int, in
     targets = np.zeros((trials, trial_dur, 1))
     for trial in range(trials):
         start = np.random.randint(low=0, high=int(0.5*(trial_dur-min_cycling_dur)))
-        stop = np.random.randint(low=start+min_cycling_dur, high=trial_dur - stop_dur)
-        inputs[trial, start:stop, 0] += 1.0
-        inputs[trial, stop:stop+stop_dur, 1] += 1.0
+        stop = np.random.randint(low=start+min_cycling_dur, high=trial_dur - inp_dur)
+        inputs[trial, start:start+inp_dur, 0] += 1.0
+        inputs[trial, stop:stop+inp_dur, 1] += 1.0
         sine = np.sin(2.0*np.pi*freq*np.linspace(0.0, (stop-start)*dt, stop-start))
         damping = (np.ones((stop-start,))*inp_damping)**np.arange(1, stop-start+1)
-        targets[trial, start:stop, 0] = sine * damping
+        targets[trial, start:stop, 0] = 2.0 * sine * damping
 
     return torch.tensor(inputs, device=device, dtype=dtype), torch.tensor(targets, device=device, dtype=dtype)
 
