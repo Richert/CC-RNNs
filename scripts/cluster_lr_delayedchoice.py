@@ -187,6 +187,7 @@ results = {"targets": targets, "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"repetition": rep, "noise": noise_lvl, "delay": delay_dur},
            "training_error": current_loss, "classification_performance": performance,
-           "W": rnn.W.detach().cpu().numpy(), "L": rnn.L.detach().cpu().numpy(), "R": rnn.R.detach().cpu().numpy(),
-           "vf": vf, "vf_coords": coords, "vf_sols": z_test}
+           "L": rnn.L.detach().cpu().numpy(), "R": rnn.R.detach().cpu().numpy(),
+           "W_in": rnn.W_in.detach().cpu().numpy(), "bias": rnn.bias.detach().cpu().numpy(),
+           "W_r": W_r.detach().cpu().numpy(), "vf": vf, "vf_coords": coords, "vf_sols": z_test}
 pickle.dump(results, open(f"../results/lr/delayedchoice_d{int(delay_dur)}_n{int(noise_lvl*10)}_{rep}.pkl", "wb"))

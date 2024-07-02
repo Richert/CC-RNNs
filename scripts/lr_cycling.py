@@ -1,4 +1,4 @@
-from src import LowRankRNN
+from src import LowRankOnlyRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,45 +15,45 @@ device = "cpu"
 plot_steps = 1000
 
 # input parameters
-freq = 5.0
+amp = 5.0
+freq = 6.0
 dt = 0.01
 n_in = 2
-trial_dur = 200
-min_cycling_dur = 50
+trial_dur = 100
+min_cycling_dur = 25
 inp_dur = 5
 inp_damping = 1.0
 padding = int(0.2*trial_dur)
 inp_noise = 0.1
+avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
 n_out = 1
 k = 2
-sr = 1.1
+sr = 1.0
 bias_scale = 0.01
-in_scale = 0.1
+in_scale = 0.2
 density = 0.2
-out_scale = 0.1
-init_noise = 0.05
+out_scale = 0.2
+init_noise = 0.2
 
 # rnn matrices
-lbd = 1.0
-W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype, requires_grad=False)
-bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype, requires_grad=False)
-W = torch.tensor((1-lbd)*sr*init_weights(N, N, density), device=device, dtype=dtype, requires_grad=False)
+W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype)
+bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
 L = init_weights(N, k, density)
 R = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
-L *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
-R *= np.sqrt(sr*lbd) / np.sqrt(sr_comb)
+L *= np.sqrt(sr) / np.sqrt(sr_comb)
+R *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 10000
+n_train = 100000
 n_test = 1000
 init_steps = 1000
 batch_size = 20
-lr = 0.001
+lr = 0.0002
 betas = (0.9, 0.999)
 alphas = (1.0, 1e-5)
 
@@ -61,19 +61,19 @@ alphas = (1.0, 1e-5)
 #############################
 
 # get training data
-x_train, y_train = cycling(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_train, inp_noise, dt,
+x_train, y_train = cycling(amp, freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_train, inp_noise, dt,
                            device=device, dtype=dtype)
 
 # get test data
-x_test, y_test = cycling(freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_test, inp_noise, dt,
+x_test, y_test = cycling(amp, freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_test, inp_noise, dt,
                          device=device, dtype=dtype)
 
 # training
 ##########
 
 # initialize LR-RNN
-rnn = LowRankRNN(W, W_in, bias, torch.tensor(L, device=device, dtype=dtype),
-                 torch.tensor(R, device=device, dtype=dtype))
+rnn = LowRankOnlyRNN(W_in, bias, torch.tensor(L, device=device, dtype=dtype),
+                     torch.tensor(R, device=device, dtype=dtype))
 rnn.free_param("W_in")
 rnn.free_param("L")
 rnn.free_param("R")
@@ -88,7 +88,7 @@ optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
 
 # initial wash-out period
 for step in range(init_steps):
-    rnn.forward_a()
+    rnn.forward(avg_input)
 y0 = rnn.y.detach()
 z0 = rnn.z.detach()
 
@@ -131,7 +131,7 @@ with torch.enable_grad():
         if current_loss < min_loss:
             break
 
-W = (rnn.L @ rnn.R).cpu().detach().numpy() + rnn.W.cpu().detach().numpy()
+W = (rnn.L @ rnn.R).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(rnn.R)).cpu().detach().numpy())
 z_col = np.asarray(z_col)
 

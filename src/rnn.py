@@ -14,7 +14,7 @@ class RNN(torch.nn.Module):
         self.dtype = W.dtype
         self.W = W
         self.W_in = W_in
-        self.D = 0.0
+        self.D = torch.zeros_like(W)
         self.bias = bias
         self.y = torch.zeros((self.N,), device=self.device, dtype=self.dtype)
         self._free_params = {}
@@ -158,7 +158,7 @@ class LowRankOnlyRNN(LowRankRNN):
 
     def __init__(self, W_in: torch.Tensor, bias: torch.Tensor, L: torch.Tensor, R: torch.Tensor):
 
-        W = torch.empty((L.shape[0], L.shape[0]))
+        W = torch.empty((L.shape[0], L.shape[0]), dtype=W_in.dtype, device=W_in.device)
         super().__init__(W, W_in, bias, L, R)
         self.W = 0.0
 

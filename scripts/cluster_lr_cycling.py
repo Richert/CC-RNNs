@@ -184,6 +184,7 @@ coords, vf = rnn.get_vf(grid_points, lower_bounds=lb - margin*width, upper_bound
 results = {"targets": targets, "predictions": predictions,
            "config": {"N": N, "sr": sr, "bias": bias_scale, "in": in_scale, "p": density, "k": k, "alphas": alphas},
            "condition": {"repetition": rep, "inp_noise": inp_noise, "init_noise": init_noise},
-           "training_error": current_loss, "W": rnn.W.detach().cpu().numpy(), "L": rnn.L.detach().cpu().numpy(),
-           "R": rnn.R.detach().cpu().numpy(), "test_loss": test_loss, "vf": vf, "vf_coords": coords, "vf_sols": z_test}
+           "training_error": current_loss, "L": rnn.L.detach().cpu().numpy(), "R": rnn.R.detach().cpu().numpy(),
+           "W_in": rnn.W_in.detach().cpu().numpy(), "bias": rnn.bias.detach().cpu().numpy(),
+           "W_r": W_r.detach().cpu().numpy(), "vf": vf, "vf_coords": coords, "vf_sols": z_test}
 pickle.dump(results, open(f"../results/lr/cycling_inp{int(inp_noise*10.0)}_init{int(init_noise*10)}_{rep}.pkl", "wb"))
