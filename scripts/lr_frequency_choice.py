@@ -3,8 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
-from scripts.task_functions import cycling
-
+from scripts.task_functions import init_state, frequency_choice
 
 # parameter definition
 ######################
@@ -16,24 +15,24 @@ plot_steps = 1000
 
 # input parameters
 amp = 5.0
-freq = 6.0
-dt = 0.01
+f1 = 5.0
+f2 = 9.0
 n_in = 2
-trial_dur = 200
-min_cycling_dur = 30
-inp_dur = 5
-inp_damping = 1.0
-padding = int(0.2*trial_dur)
-inp_noise = 0.1
+evidence_dur = 50
+delay_min = 0
+delay_max = 1
+response_dur = 10
+noise_lvl = 0.01
+dt = 0.01
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
 n_out = 1
-k = 4
-sr = 1.0
+k = 2
+sr = 1.1
 bias_scale = 0.01
-in_scale = 0.2
+in_scale = 0.1
 density = 0.2
 out_scale = 0.2
 init_noise = 0.2
@@ -49,24 +48,24 @@ R *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 10000
-n_test = 1000
+n_train = 50000
+n_test = 100
 init_steps = 1000
-batch_size = 10
-lr = 0.0005
+batch_size = 20
+lr = 0.001
 betas = (0.9, 0.999)
-alphas = (1.0, 1e-5)
+alphas = (1e-5, 1e-3)
 
 # generate inputs and targets
 #############################
 
 # get training data
-x_train, y_train = cycling(amp, freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_train, inp_noise, dt,
-                           device=device, dtype=dtype)
+x_train, y_train = frequency_choice(amp=amp, f1=f1, f2=f2, trials=n_train, evidence=evidence_dur, delay_min=delay_min,
+                                    delay_max=delay_max, response=response_dur, dt=dt, noise=noise_lvl)
 
 # get test data
-x_test, y_test = cycling(amp, freq, trial_dur, min_cycling_dur, inp_dur, inp_damping, n_test, inp_noise, dt,
-                         device=device, dtype=dtype)
+x_test, y_test = frequency_choice(amp=amp, f1=f1, f2=f2, trials=n_test, evidence=evidence_dur, delay_min=delay_min,
+                                  delay_max=delay_max, response=response_dur, dt=dt, noise=noise_lvl)
 
 # training
 ##########
@@ -77,8 +76,6 @@ rnn = LowRankOnlyRNN(W_in, bias, torch.tensor(L, device=device, dtype=dtype),
 rnn.free_param("W_in")
 rnn.free_param("L")
 rnn.free_param("R")
-y0 = rnn.y.detach()
-z0 = rnn.z.detach()
 
 # set up loss function
 loss_func = torch.nn.MSELoss()
@@ -90,48 +87,46 @@ optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
 for step in range(init_steps):
     rnn.forward(avg_input)
 y0 = rnn.y.detach()
-z0 = rnn.z.detach()
 
 # training
 current_loss = 100.0
-min_loss = 0.01
-loss_hist = []
 z_col = []
+loss_hist = []
+min_loss = 1e-3
 with torch.enable_grad():
 
     loss = torch.zeros((1,))
     for trial in range(n_train):
 
-        # wash out
-        rnn.set_state(y0, z0)
-        for step in range(init_steps):
-            rnn.forward(init_noise * torch.randn(n_in, dtype=dtype, device=device)).cpu().detach().numpy()
+        # set random initial condition
+        y_init = init_state(y0, noise=init_noise, boundaries=(-1.0, 1.0), device=device, dtype=dtype)
+        rnn.set_state(y_init, rnn.R @ y_init)
 
         # trial
-        trial_inp = x_train[trial]
-        trial_targ = y_train[trial]
-        for step in range(trial_dur):
+        trial_inp = torch.tensor(x_train[trial], device=device, dtype=dtype)
+        trial_out = torch.tensor(y_train[trial], device=device, dtype=dtype)
+        for step in range(trial_inp.shape[0]):
             y = W_r @ rnn.forward(trial_inp[step])
-            loss += loss_func(y, trial_targ[step])
-            z_col.append(rnn.z.detach().cpu().numpy())
+            loss += loss_func(y, trial_out[step])
+            z_col.append(rnn.z.cpu().detach().numpy())
 
         # make update
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
-            loss /= batch_size*trial_dur
-            loss += alphas[1] * torch.sum(torch.abs(rnn.L) @ torch.abs(rnn.R))
+            loss /= batch_size*response_dur
+            loss += alphas[0] * torch.sum(torch.abs(rnn.L) @ torch.abs(rnn.R))
             loss.backward()
             current_loss = loss.item()
+            loss_hist.append(current_loss)
             optim.step()
             loss = torch.zeros((1,))
             rnn.detach()
-            loss_hist.append(current_loss)
-            print(f"MSE loss after {trial+1} training trials: {current_loss}")
+            print(f"Training loss after {trial+1} trials: {current_loss}")
 
         if current_loss < min_loss:
             break
 
-W = (rnn.L @ rnn.R).cpu().detach().numpy()
+W = (rnn.W + rnn.L @ rnn.R).cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(rnn.R)).cpu().detach().numpy())
 z_col = np.asarray(z_col)
 
@@ -139,40 +134,33 @@ z_col = np.asarray(z_col)
 #########
 
 # generate predictions
-predictions, targets = [], []
-z_test = []
-inp_test = []
+predictions, targets, z_test = [], [], []
+test_loss = torch.zeros((1,))
 with torch.no_grad():
     for trial in range(n_test):
 
-        # wash out
-        rnn.set_state(y0, z0)
-        for step in range(init_steps):
-            rnn.forward(init_noise * torch.randn(n_in, dtype=dtype, device=device)).cpu().detach().numpy()
+        z_trial = []
+
+        # set random initial condition
+        y_init = init_state(y0, noise=init_noise, boundaries=(-1.0, 1.0))
+        rnn.set_state(y_init, rnn.R @ y_init)
 
         # trial
-        trial_inp = x_test[trial]
-        trial_targ = y_test[trial]
-        trial_predictions = []
-        trial_z = []
-        trial_inp_dur = []
-        for step in range(trial_dur):
+        trial_inp = torch.tensor(x_train[trial], device=device, dtype=dtype)
+        trial_out = torch.tensor(y_train[trial], device=device, dtype=dtype)
+        for step in range(trial_inp.shape[0]):
             y = W_r @ rnn.forward(trial_inp[step])
-            trial_predictions.append(y)
-            targets.append(trial_targ[step])
-            trial_z.append(rnn.z.detach().cpu().numpy())
-            if trial_inp[step, 0] > 0.9 or trial_inp[step, 1] < -0.9:
-                trial_inp_dur.append(1.0)
-            else:
-                trial_inp_dur.append(0.0)
-        z_test.append(np.asarray(trial_z))
-        inp_test.append(np.asarray(trial_inp_dur))
-        trial_predictions = torch.stack(trial_predictions, dim=0)
-        predictions.extend(trial_predictions.cpu().detach().numpy().tolist())
+            test_loss += loss_func(y, trial_out[step])
+            predictions.append(y.cpu().detach().numpy())
+            targets.append(trial_out[step].cpu().detach().numpy())
+            z_trial.append(rnn.z.cpu().detach().numpy())
+
+        z_test.append(np.asarray(z_trial))
 
 # calculate performance on test data
 predictions = np.asarray(predictions)
 targets = np.asarray(targets)
+test_loss = test_loss.item() / n_test*(evidence_dur + 0.5*(delay_max + delay_min) + response_dur)
 
 # calculate vector field
 grid_points = 20
@@ -186,15 +174,13 @@ coords, vf = rnn.get_vf(grid_points, lower_bounds=lb - margin*width, upper_bound
 ##########
 
 # dynamics
-_, axes = plt.subplots(nrows=n_out, figsize=(12, 3*n_out), sharex=True)
-for i in range(n_out):
-    ax = axes[i] if n_out > 1 else axes
-    ax.plot(targets[:plot_steps, i], color="royalblue", label="target")
-    ax.plot(predictions[:plot_steps, i], color="darkorange", label="prediction")
-    ax.set_ylabel(f"y_{i+1}")
-    if i == n_out-1:
-        ax.set_xlabel("steps")
-        ax.legend()
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(targets[:plot_steps, 0], color="royalblue", label="target")
+ax.plot(predictions[:plot_steps, 0], color="darkorange", label="prediction")
+ax.set_ylabel(f"Prediction on test data")
+ax.set_xlabel("steps")
+ax.legend()
+fig.suptitle(f"Test loss: {np.round(test_loss, decimals=2)}")
 plt.tight_layout()
 
 # trained weights
@@ -203,7 +189,8 @@ im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
 plt.colorbar(im, ax=ax)
 ax.set_xlabel("neuron")
 ax.set_ylabel("neuron")
-fig.suptitle(f"Summed LR connectivity: {np.round(W_abs, decimals=1)}")
+fig.suptitle(f"Absolute weights: {np.round(W_abs, decimals=1)}")
+plt.tight_layout()
 
 # loss history
 _, ax = plt.subplots(figsize=(10, 3))
@@ -213,15 +200,14 @@ ax.set_ylabel("Loss")
 plt.tight_layout()
 
 # vector field
-plot_trials = 5
+plot_trials = 8
 fig, ax = plt.subplots(figsize=(8, 8))
 ax.quiver(coords[:, 0], coords[:, 1], vf[:, 0], vf[:, 1])
 for _ in range(plot_trials):
     idx = np.random.randint(0, n_test)
     trial_z = z_test[idx]
-    trial_inp = inp_test[idx]
-    l = ax.plot(trial_z[trial_inp < 0.5, 0], trial_z[trial_inp < 0.5, 1], linestyle="dotted")
-    ax.plot(trial_z[trial_inp > 0.5, 0], trial_z[trial_inp > 0.5, 1], linestyle="solid", c=l[0].get_color())
+    l = ax.plot(trial_z[:evidence_dur, 0], trial_z[:evidence_dur, 1], linestyle="solid")
+    ax.plot(trial_z[evidence_dur-1:, 0], trial_z[evidence_dur-1:, 1], linestyle="dotted", c=l[0].get_color())
     ax.scatter(trial_z[0, 0], trial_z[0, 1], marker="o", s=50.0, c=l[0].get_color())
     ax.scatter(trial_z[-1, 0], trial_z[-1, 1], marker="x", s=50.0, c=l[0].get_color())
 ax.set_xlabel("z_1")

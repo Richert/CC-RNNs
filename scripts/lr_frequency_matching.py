@@ -1,9 +1,10 @@
-from src import LowRankRNN
+from src import LowRankOnlyRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from src.functions import init_weights
-from scripts.task_functions import init_state, delayed_choice
+from scripts.task_functions import init_state, frequency_matching
+from itertools import combinations
 
 # parameter definition
 ######################
@@ -11,22 +12,23 @@ from scripts.task_functions import init_state, delayed_choice
 # general
 dtype = torch.float64
 device = "cpu"
-plot_steps = 500
+plot_steps = 1000
 
 # input parameters
-target = 5.0
-n_in = 3
-evidence_dur = 20
+freqs = np.asarray([4.0, 9.0])
+n_in = 2
+evidence_dur = 50
 delay_min = 10
 delay_max = 20
-response_dur = 10
+response_dur = 50
 noise_lvl = 0.1
+dt = 0.01
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
 # reservoir parameters
 N = 200
 n_out = 1
-k = 2
+k = 3
 sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
@@ -35,19 +37,17 @@ out_scale = 0.2
 init_noise = 0.2
 
 # rnn matrices
-lbd = 1.0
 W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype)
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
-W = torch.tensor((1-lbd)*sr*init_weights(N, N, density), device=device, dtype=dtype)
 L = init_weights(N, k, density)
 R = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
-L *= np.sqrt(lbd*sr) / np.sqrt(sr_comb)
-R *= np.sqrt(lbd*sr) / np.sqrt(sr_comb)
+L *= np.sqrt(sr) / np.sqrt(sr_comb)
+R *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 50000
+n_train = 100000
 n_test = 100
 init_steps = 1000
 batch_size = 20
@@ -59,19 +59,19 @@ alphas = (1e-5, 1e-3)
 #############################
 
 # get training data
-x_train, y_train = delayed_choice(target, n_train, evidence=evidence_dur, delay_min=delay_min, delay_max=delay_max,
-                                  response=response_dur, noise=noise_lvl)
+x_train, y_train = frequency_matching(frequencies=freqs, trials=n_train, evidence=evidence_dur, delay_min=delay_min,
+                                      delay_max=delay_max, response=response_dur, dt=dt, noise=noise_lvl)
 
 # get test data
-x_test, y_test = delayed_choice(target, n_test, evidence=evidence_dur, delay_min=delay_min, delay_max=delay_max,
-                                response=response_dur, noise=noise_lvl)
+x_test, y_test = frequency_matching(frequencies=freqs, trials=n_test, evidence=evidence_dur, delay_min=delay_min,
+                                    delay_max=delay_max, response=response_dur, dt=dt, noise=noise_lvl)
 
 # training
 ##########
 
 # initialize LR-RNN
-rnn = LowRankRNN(W, W_in, bias, torch.tensor(L, device=device, dtype=dtype),
-                 torch.tensor(R, device=device, dtype=dtype))
+rnn = LowRankOnlyRNN(W_in, bias, torch.tensor(L, device=device, dtype=dtype),
+                     torch.tensor(R, device=device, dtype=dtype))
 rnn.free_param("W_in")
 rnn.free_param("L")
 rnn.free_param("R")
@@ -200,18 +200,20 @@ plt.tight_layout()
 
 # vector field
 plot_trials = 8
-fig, ax = plt.subplots(figsize=(8, 8))
-ax.quiver(coords[:, 0], coords[:, 1], vf[:, 0], vf[:, 1])
-for _ in range(plot_trials):
-    idx = np.random.randint(0, n_test)
-    trial_z = z_test[idx]
-    l = ax.plot(trial_z[:evidence_dur, 0], trial_z[:evidence_dur, 1], linestyle="solid")
-    ax.plot(trial_z[evidence_dur-1:, 0], trial_z[evidence_dur-1:, 1], linestyle="dotted", c=l[0].get_color())
-    ax.scatter(trial_z[0, 0], trial_z[0, 1], marker="o", s=50.0, c=l[0].get_color())
-    ax.scatter(trial_z[-1, 0], trial_z[-1, 1], marker="x", s=50.0, c=l[0].get_color())
-ax.set_xlabel("z_1")
-ax.set_ylabel("z_2")
-ax.set_title("Vectorfield")
-plt.tight_layout()
+vf_indices = list(combinations(np.arange(k), 2))
+for vf_1, vf_2 in vf_indices:
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.quiver(coords[:, vf_1], coords[:, vf_2], vf[:, vf_1], vf[:, vf_2], minlength=2.0, headaxislength=5.0)
+    for _ in range(plot_trials):
+        idx = np.random.randint(0, n_test)
+        trial_z = z_test[idx]
+        l = ax.plot(trial_z[:evidence_dur, vf_1], trial_z[:evidence_dur, vf_2], linestyle="solid")
+        ax.plot(trial_z[evidence_dur-1:, vf_1], trial_z[evidence_dur-1:, vf_2], linestyle="dotted", c=l[0].get_color())
+        ax.scatter(trial_z[0, vf_1], trial_z[0, vf_2], marker="o", s=50.0, c=l[0].get_color())
+        ax.scatter(trial_z[-1, vf_1], trial_z[-1, vf_2], marker="x", s=50.0, c=l[0].get_color())
+    ax.set_xlabel(f"z_{vf_1+1}")
+    ax.set_ylabel(f"z_{vf_2+1}")
+    ax.set_title(f"Vectorfield in dimensions {vf_1+1} and {vf_2+1}")
+    plt.tight_layout()
 
 plt.show()
