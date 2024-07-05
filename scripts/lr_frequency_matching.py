@@ -15,7 +15,7 @@ device = "cpu"
 plot_steps = 1000
 
 # input parameters
-freqs = np.asarray([4.0, 9.0])
+freqs = np.asarray([3.0, 9.0])
 n_in = 2
 evidence_dur = 50
 delay_min = 10
@@ -47,7 +47,7 @@ R *= np.sqrt(sr) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
 
 # training parameters
-n_train = 100000
+n_train = 50000
 n_test = 100
 init_steps = 1000
 batch_size = 20
