@@ -1,4 +1,4 @@
-from src import LowRankOnlyRNN
+from src.ct_rnn import LowRankRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,14 +15,14 @@ plot_steps = 1000
 
 # input parameters
 amp = 5.0
-f1 = 5.0
-f2 = 9.0
+f1 = 0.8
+f2 = 1.9
 n_in = 2
-evidence_dur = 50
-delay_min = 0
-delay_max = 1
+evidence_dur = 100
+delay_min = 10
+delay_max = 20
 response_dur = 10
-noise_lvl = 0.01
+noise_lvl = 0.1
 dt = 0.01
 avg_input = torch.zeros(size=(n_in,), device=device, dtype=dtype)
 
@@ -33,24 +33,29 @@ k = 2
 sr = 1.1
 bias_scale = 0.01
 in_scale = 0.1
+tau_min = 0.5
+tau_max = 1.5
 density = 0.2
 out_scale = 0.2
 init_noise = 0.2
 
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype)
+W = torch.tensor(sr*0.5 * init_weights(N, N, density))
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
+taus = torch.tensor(tau_min + tau_max*np.random.rand(N), device=device, dtype=dtype)
 L = init_weights(N, k, density)
 R = init_weights(k, N, density)
 sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
-L *= np.sqrt(sr) / np.sqrt(sr_comb)
-R *= np.sqrt(sr) / np.sqrt(sr_comb)
+L *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
+R *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
+
 
 # training parameters
 n_train = 50000
 n_test = 100
-init_steps = 1000
+init_steps = 10000
 batch_size = 20
 lr = 0.001
 betas = (0.9, 0.999)
@@ -71,8 +76,8 @@ x_test, y_test = frequency_choice(amp=amp, f1=f1, f2=f2, trials=n_test, evidence
 ##########
 
 # initialize LR-RNN
-rnn = LowRankOnlyRNN(W_in, bias, torch.tensor(L, device=device, dtype=dtype),
-                     torch.tensor(R, device=device, dtype=dtype))
+rnn = LowRankRNN(W, W_in, bias, taus, torch.tensor(L, device=device, dtype=dtype),
+                 torch.tensor(R, device=device, dtype=dtype), dt=dt)
 rnn.free_param("W_in")
 rnn.free_param("L")
 rnn.free_param("R")

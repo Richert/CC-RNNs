@@ -105,7 +105,7 @@ def frequency_matching(frequencies: np.ndarray, trials: int, evidence: int, dela
         # choose random input channel
         idx = np.random.randint(low=0, high=n_freqs)
         f = frequencies[idx]
-        sine = np.sin(2.0 * np.pi * f * np.linspace(0.0, trial_dur * dt, trial_dur))
+        sine = np.sin(2.0 * np.pi * f * dt * np.arange(0, trial_dur))
         trial_inp[:evidence, 0] += sine[:evidence]
         trial_inp[evidence+delay:, -1] += 1.0
         trial_targ[evidence+delay:, 0] = sine[evidence+delay:]

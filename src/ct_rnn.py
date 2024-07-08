@@ -6,13 +6,14 @@ import torch
 
 class RNN(torch.nn.Module):
 
-    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, tau: torch.Tensor, bias: torch.Tensor, dt: float):
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, tau: torch.Tensor, dt: float):
 
         super().__init__()
         self.N = W.shape[0]
         self.device = W.device
         self.dtype = W.dtype
-        self.W = W - 1/tau * torch.eye(self.N, device=self.device, dtype=self.dtype)
+        self.W = W
+        self.tau = tau
         self.W_in = W_in
         self.D = torch.zeros_like(W)
         self.bias = bias
@@ -32,11 +33,11 @@ class RNN(torch.nn.Module):
         return cls(W, W_in, tau, bias, dt)
 
     def forward(self, x):
-        self.y = self.y + self.dt * torch.tanh(self.W @ self.y + self.W_in @ x + self.bias)
+        self.y = self.y + self.dt * ((self.bias-self.y)/self.tau + torch.tanh(self.W @ self.y + self.W_in @ x))
         return self.y
 
     def forward_a(self):
-        self.y = self.y + self.dt * torch.tanh((self.W + self.D) @ self.y + self.bias)
+        self.y = self.y + self.dt * ((self.bias-self.y)/self.tau + torch.tanh((self.W + self.D) @ self.y))
         return self.y
 
     def get_vf(self, L: torch.Tensor, R: torch.Tensor, grid_points: int, lower_bounds: Iterable, upper_bounds: Iterable,
@@ -141,12 +142,12 @@ class LowRankRNN(RNN):
         return cls(W, W_in, bias, tau, L, R, dt)
 
     def forward(self, x):
-        self.y = self.y + self.dt * torch.tanh(self.W @ self.y + self.L @ self.z + self.W_in @ x + self.bias)
+        self.y = self.y + self.dt * ((self.bias-self.y)/self.tau + torch.tanh(self.W @ self.y + self.W_in @ x))
         self.z = self.R @ self.y
         return self.y
 
     def forward_a(self):
-        self.y = self.y + self.dt * torch.tanh((self.W + self.D) @ self.y + self.L @ self.z + self.bias)
+        self.y = self.y + self.dt * ((self.bias-self.y)/self.tau + torch.tanh((self.W + self.D) @ self.y))
         self.z = self.R @ self.y
         return self.y
 
