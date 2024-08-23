@@ -1,4 +1,4 @@
-from src import ConceptorLowRankRNN
+from src.rnn import ConceptorLowRankRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,13 +52,14 @@ in_scale = 0.1
 density = 0.2
 
 # initialize rnn matrices
-W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
+W_in = torch.tensor(in_scale * np.random.rand(N, n_in), device=device, dtype=dtype)
+W = torch.tensor(sr*0.5 * init_weights(N, N, density))
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
-W = init_weights(N, k, density)
-W_z = init_weights(k, N, density)
-sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(W, W_z))))
-W *= np.sqrt(sr) / np.sqrt(sr_comb)
-W_z *= np.sqrt(sr) / np.sqrt(sr_comb)
+L = init_weights(N, k, density)
+R = init_weights(k, N, density)
+sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
+L *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
+R *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
 
 # training parameters
 steps = 500000
@@ -72,8 +73,9 @@ alphas = (30.0, 1e-3)
 ######################
 
 # initialize RFC
-rnn = ConceptorLowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                          torch.tensor(W_z, device=device, dtype=dtype), lam, alphas[0])
+rnn = ConceptorLowRankRNN(W, W_in, bias,
+                          torch.tensor(L, device=device, dtype=dtype), torch.tensor(R, device=device, dtype=dtype),
+                          lam, alphas[0])
 
 target_col, input_col, init_states = {}, {}, {}
 with torch.no_grad():
