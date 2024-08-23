@@ -1,4 +1,4 @@
-from src.rnn import LowRankOnlyRNN
+from src.rnn import RNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -79,7 +79,6 @@ max_dur = 2
 
 # reservoir parameters
 N = 200
-k = 100
 n_in = keys
 n_out = int(fingers*2)
 sr = 1.1
@@ -91,14 +90,8 @@ out_scale = 0.5
 # rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
 bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
+W = torch.tensor(sr * init_weights(N, N, density), device=device, dtype=dtype)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, N), device=device, dtype=dtype)
-L = init_weights(N, k, density)
-R = init_weights(k, N, density)
-sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
-L *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
-R *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
-L = torch.tensor(L, device=device, dtype=dtype)
-R = torch.tensor(R, device=device, dtype=dtype)
 
 # training parameters
 batch_size = 100
@@ -123,9 +116,8 @@ X_test, y_test = get_trials(input_patterns, target_patterns, test_trials, min_st
 ##################################################
 
 # initialize LR-RNN
-rnn = LowRankOnlyRNN(W_in, bias, L=L, R=R)
-rnn.free_param("L")
-rnn.free_param("R")
+rnn = RNN(W, W_in, bias)
+rnn.free_param("W")
 rnn.free_param("W_in")
 
 # initial wash-out period
@@ -162,8 +154,7 @@ with torch.enable_grad():
         if (trial + 1) % batch_size == 0:
             optim.zero_grad()
             loss /= batch_size
-            loss += alphas[0] * torch.sum(torch.abs(rnn.L))
-            loss += alphas[0] * torch.sum(torch.abs(rnn.R))
+            loss += alphas[0] * torch.sum(torch.abs(rnn.W))
             loss += alphas[0] * torch.sum(torch.abs(rnn.W_in))
             loss += alphas[0] * torch.sum(torch.abs(W_r))
             loss.backward()
@@ -173,9 +164,7 @@ with torch.enable_grad():
             rnn.detach()
             print(f"Training phase I loss: {current_loss}")
 
-L_tmp = rnn.L.cpu().detach().numpy()
-R_tmp = rnn.R.cpu().detach().numpy()
-W = L_tmp @ R_tmp
+W = rnn.W.cpu().detach().numpy()
 
 # generate predictions
 ######################
@@ -200,9 +189,9 @@ test_error = np.mean((predictions - targets)**2)
 # saving the learned network weights
 ####################################
 
-results = {"W": rnn.W, "W_in": rnn.W_in, "W_out": W_r, "bias": bias, "L": L, "R": R,
+results = {"W": rnn.W, "W_in": rnn.W_in, "W_out": W_r, "bias": bias,
            "inputs": input_patterns, "targets": target_patterns}
-pickle.dump(results, open("../data/lr_piano_weights.pkl", "wb"))
+pickle.dump(results, open("../data/piano_weights.pkl", "wb"))
 
 # plotting
 ##########

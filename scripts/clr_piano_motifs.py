@@ -2,7 +2,6 @@ from src.rnn import ConceptorRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-from itertools import combinations
 import pickle
 
 # function definitions
@@ -31,7 +30,7 @@ keys = 4
 fingers = 2
 noise_lvl = 0.1
 motifs = 3
-motif_length = 3
+motif_length = 4
 key_dur = 1
 
 # rnn matrices
@@ -47,10 +46,10 @@ n_in = keys
 n_out = int(fingers*2)
 
 # training parameters
-training_trials = 50000
+training_trials = 200000
 test_trials = 10
-loading_trials = 20000
-alphas = (20.0, 1e-4)
+loading_trials = 100000
+alphas = (10.0, 1e-4)
 init_steps = 1000
 
 # generate inputs and targets

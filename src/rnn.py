@@ -328,7 +328,7 @@ class ConceptorLowRankOnlyRNN(ConceptorLowRankRNN):
     def __init__(self, W_in: torch.Tensor, bias: torch.Tensor, L: torch.Tensor, R: torch.Tensor,
                  lam: float, alpha: float):
 
-        W = torch.empty((L.shape[0], L.shape[0]))
+        W = torch.empty((L.shape[0], L.shape[0]), dtype=L.dtype)
         super().__init__(W, W_in, bias, L, R, lam, alpha)
         self.W = 0.0
 
