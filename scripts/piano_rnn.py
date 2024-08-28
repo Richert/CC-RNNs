@@ -191,31 +191,31 @@ test_error = np.mean((predictions - targets)**2)
 
 results = {"W": rnn.W, "W_in": rnn.W_in, "W_out": W_r, "bias": bias,
            "inputs": input_patterns, "targets": target_patterns}
-pickle.dump(results, open("../data/piano_weights.pkl", "wb"))
+pickle.dump(results, open(f"~/PycharmProjects/CC-RNNs/data/piano/piano_crnn_{keys}keys_{fingers}fingers.pkl", "wb"))
 
 # plotting
 ##########
 
 # dynamics
-fig, axes = plt.subplots(nrows=2, figsize=(12, 8))
-ax = axes[0]
-ax.imshow(predictions[:plot_steps].T, interpolation="none", cmap="viridis", aspect="auto")
-ax.set_xlabel("steps")
-ax.set_ylabel("output channel")
-ax.set_title("Test Predictions")
-ax = axes[1]
-ax.imshow(targets[:plot_steps].T, interpolation="none", cmap="viridis", aspect="auto")
-ax.set_xlabel("steps")
-ax.set_ylabel("target channel")
-ax.set_title("Test Targets")
-plt.tight_layout()
-
-# trained weights
-fig, ax = plt.subplots(figsize=(6, 6))
-im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
-plt.colorbar(im, ax=ax)
-ax.set_xlabel("neuron")
-ax.set_ylabel("neuron")
-fig.suptitle(f"Trained Recurrent Weights")
-plt.tight_layout()
-plt.show()
+# fig, axes = plt.subplots(nrows=2, figsize=(12, 8))
+# ax = axes[0]
+# ax.imshow(predictions[:plot_steps].T, interpolation="none", cmap="viridis", aspect="auto")
+# ax.set_xlabel("steps")
+# ax.set_ylabel("output channel")
+# ax.set_title("Test Predictions")
+# ax = axes[1]
+# ax.imshow(targets[:plot_steps].T, interpolation="none", cmap="viridis", aspect="auto")
+# ax.set_xlabel("steps")
+# ax.set_ylabel("target channel")
+# ax.set_title("Test Targets")
+# plt.tight_layout()
+#
+# # trained weights
+# fig, ax = plt.subplots(figsize=(6, 6))
+# im = ax.imshow(W, aspect="equal", cmap="viridis", interpolation="none")
+# plt.colorbar(im, ax=ax)
+# ax.set_xlabel("neuron")
+# ax.set_ylabel("neuron")
+# fig.suptitle(f"Trained Recurrent Weights")
+# plt.tight_layout()
+# plt.show()

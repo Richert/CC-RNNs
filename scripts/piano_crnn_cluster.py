@@ -33,7 +33,7 @@ noise_lvl = 0.1
 key_dur = 1
 
 # get parameters for cluster condition
-data = pickle.load(open(f"../data/piano_crnn_{keys}keys_{fingers}fingers.pkl", "rb"))
+data = pickle.load(open(f"~/PycharmProjects/CC-RNNs/data/piano/piano_crnn_{keys}keys_{fingers}fingers.pkl", "rb"))
 cond = int(sys.argv[-1])
 alpha, motifs, motif_length = data["sweep"][cond]
 
