@@ -6,6 +6,8 @@ from src.functions import init_weights
 from itertools import combinations
 import pickle
 import sys
+path = sys.argv[-3]
+sys.path.append(path)
 
 # function definitions
 ######################
@@ -192,7 +194,7 @@ test_error = np.mean((predictions - targets)**2)
 
 results = {"W": rnn.W, "W_in": rnn.W_in, "W_out": W_r, "bias": bias,
            "inputs": input_patterns, "targets": target_patterns}
-pickle.dump(results, open(f"~/PycharmProjects/CC-RNNs/data/piano/piano_crnn_{keys}keys_{fingers}fingers.pkl", "wb"))
+pickle.dump(results, open(f"{path}/data/piano/piano_crnn_{keys}keys_{fingers}fingers.pkl", "wb"))
 
 # plotting
 ##########

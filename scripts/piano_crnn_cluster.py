@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import sys
+path = sys.argv[-4]
+sys.path.append(path)
 
 # function definitions
 ######################
@@ -33,7 +35,7 @@ noise_lvl = 0.1
 key_dur = 1
 
 # get parameters for cluster condition
-data = pickle.load(open(f"~/PycharmProjects/CC-RNNs/data/piano/piano_crnn_{keys}keys_{fingers}fingers.pkl", "rb"))
+data = pickle.load(open(f"{path}/data/piano/piano_crnn_{keys}keys_{fingers}fingers.pkl", "rb"))
 cond = int(sys.argv[-1])
 alpha, motifs, motif_length = data["sweep"][cond]
 
@@ -139,5 +141,4 @@ for i, (motif, target) in enumerate(zip(motif_col, target_col)):
                 results["sequence_targets"].append(target[step])
 
 # save results
-path = "~/PycharmProjects/CC-RNNs/data/piano"
-pickle.dump(results, open(f"{path}/piano_crnn_{keys}keys_{fingers}fingers_{cond}.pkl", "wb"))
+pickle.dump(results, open(f"{path}/data/piano/piano_crnn_{keys}keys_{fingers}fingers_{cond}.pkl", "wb"))

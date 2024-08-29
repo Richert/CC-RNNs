@@ -1,5 +1,7 @@
 import pickle
 import sys
+path = sys.argv[-3]
+sys.path.append(path)
 
 # define condition
 keys = int(sys.argv[-2])
