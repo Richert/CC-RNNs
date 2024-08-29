@@ -1,10 +1,10 @@
+import sys
+path = sys.argv[-4]
+sys.path.append(path)
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
-import sys
-path = sys.argv[-4]
-sys.path.append(path)
 from src.rnn import ConceptorRNN
 
 # function definitions

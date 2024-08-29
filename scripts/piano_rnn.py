@@ -1,11 +1,12 @@
+import sys
+path = sys.argv[-3]
+sys.path.append(path)
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from itertools import combinations
 import pickle
-import sys
-path = sys.argv[-3]
-sys.path.append(path)
+
 from src.rnn import RNN
 from src.functions import init_weights
 
