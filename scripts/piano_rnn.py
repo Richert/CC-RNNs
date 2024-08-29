@@ -1,6 +1,5 @@
 import sys
 path = sys.argv[-3]
-sys.path.append(path)
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
