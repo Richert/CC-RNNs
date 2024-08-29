@@ -5,6 +5,7 @@ import numpy as np
 from src.functions import init_weights
 from itertools import combinations
 import pickle
+import sys
 
 # function definitions
 ######################
@@ -71,8 +72,8 @@ plot_steps = 200
 state_vars = ["x", "y", "z"]
 
 # piano pattern parameters
-keys = 4
-fingers = 2
+keys = int(sys.argv[-2])
+fingers = int(sys.argv[-1])
 noise_lvl = 0.1
 min_dur = 1
 max_dur = 2

@@ -1,9 +1,9 @@
 import pickle
-import numpy
+import sys
 
 # define condition
-keys = 4
-fingers = 2
+keys = int(sys.argv[-2])
+fingers = int(sys.argv[-1])
 
 # load data
 data = pickle.load(open(f"~/PycharmProjects/CC-RNNs/data/piano/piano_crnn_{keys}keys_{fingers}fingers.pkl", "rb"))
