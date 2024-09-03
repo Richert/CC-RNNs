@@ -63,8 +63,9 @@ input_patterns, target_patterns = data["inputs"], data["targets"]
 n_patterns = len(input_patterns)
 
 # results collection
-results = {"alpha": alpha, "motifs": motifs, "motif_length": motif_length, "n_reps": n_reps,
-           "epsilon": [], "conceptors": [], "sequence_predictions": [], "sequence_targets": [],
+results = {"alpha": alpha, "motifs": motifs, "motif_length": motif_length,
+           "trial": [], "epsilon": [], "conceptors": [],
+           "sequence_predictions": [], "sequence_targets": [],
            "input_predictions": [], "input_targets": []}
 for n in range(n_reps):
 
@@ -151,6 +152,7 @@ for n in range(n_reps):
     results["input_targets"].append(inp_targets)
     results["sequence_predictions"].append(seq_predictions)
     results["sequence_targets"].append(seq_targets)
+    results["trial"].append(n)
     print(f"Finished {n+1} of {n_reps} random trials.")
 
 # save results
