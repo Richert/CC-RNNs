@@ -21,20 +21,26 @@ for f in os.listdir(path):
         # load data
         data = pickle.load(open(f"{path}/{f}", "rb"))
 
-        # get condition
-        results["alpha"].append(data["alpha"])
-        results["motifs"].append(data["motifs"])
-        results["motif_length"].append(data["motif_length"])
+        try:
 
-        # calculate error between predictions and targets for input-driven mode
-        predictions = np.asarray(data["input_predictions"]).flatten()
-        targets = np.asarray(data["input_targets"]).flatten()
-        results["input_error"].append(np.mean((predictions - targets)**2))
+            # get condition
+            results["alpha"].append(data["alpha"])
+            results["motifs"].append(data["motifs"])
+            results["motif_length"].append(data["motif_length"])
 
-        # calculate error between predictions and targets for autonomous mode
-        predictions = np.asarray(data["sequence_predictions"]).flatten()
-        targets = np.asarray(data["sequence_targets"]).flatten()
-        results["sequence_error"].append(np.mean((predictions - targets) ** 2))
+            # calculate error between predictions and targets for input-driven mode
+            predictions = np.asarray(data["input_predictions"]).flatten()
+            targets = np.asarray(data["input_targets"]).flatten()
+            results["input_error"].append(np.mean((predictions - targets)**2))
+
+            # calculate error between predictions and targets for autonomous mode
+            predictions = np.asarray(data["sequence_predictions"]).flatten()
+            targets = np.asarray(data["sequence_targets"]).flatten()
+            results["sequence_error"].append(np.mean((predictions - targets) ** 2))
+
+        except KeyError:
+
+            print(list(data.keys()))
 
 df = DataFrame.from_dict(results)
 motifs = np.unique(df["motifs"].values)
