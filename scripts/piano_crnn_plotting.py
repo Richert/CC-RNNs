@@ -13,7 +13,7 @@ fingers = sys.argv[-1]
 identifier = f"piano_crnn_{keys}keys_{fingers}fingers"
 
 # process simulation data into results
-results = {"input_error": [], "sequence_error": [], "alpha": [], "motifs": [], "motif_length": []}
+results = {"input_error": [], "sequence_error": [], "alpha": [], "motifs": [], "motif_length": [], "trial": []}
 
 for f in os.listdir(path):
     if identifier in f:
@@ -23,23 +23,27 @@ for f in os.listdir(path):
 
         try:
 
-            # get condition
-            results["alpha"].append(data["alpha"])
-            results["motifs"].append(data["motifs"])
-            results["motif_length"].append(data["motif_length"])
+            for trial in data["trial"]:
 
-            # calculate error between predictions and targets for input-driven mode
-            predictions = np.asarray(data["input_predictions"]).flatten()
-            targets = np.asarray(data["input_targets"]).flatten()
-            results["input_error"].append(np.mean((predictions - targets)**2))
+                # get condition
+                results["alpha"].append(data["alpha"][trial])
+                results["motifs"].append(data["motifs"][trial])
+                results["motif_length"].append(data["motif_length"][trial])
+                results["trial"].append(trial)
 
-            # calculate error between predictions and targets for autonomous mode
-            predictions = np.asarray(data["sequence_predictions"]).flatten()
-            targets = np.asarray(data["sequence_targets"]).flatten()
-            results["sequence_error"].append(np.mean((predictions - targets) ** 2))
+                # calculate error between predictions and targets for input-driven mode
+                predictions = np.asarray(data["input_predictions"][trial]).flatten()
+                targets = np.asarray(data["input_targets"][trial]).flatten()
+                results["input_error"].append(np.mean((predictions - targets)**2))
+
+                # calculate error between predictions and targets for autonomous mode
+                predictions = np.asarray(data["sequence_predictions"][trial]).flatten()
+                targets = np.asarray(data["sequence_targets"][trial]).flatten()
+                results["sequence_error"].append(np.mean((predictions - targets) ** 2))
 
         except KeyError:
 
+            print(f)
             print(list(data.keys()))
 
 df = DataFrame.from_dict(results)
@@ -58,8 +62,11 @@ for i in range(n_motif_lengths):
     sb.lineplot(data=df_tmp, x="alpha", y="input_error", hue="motifs")
     ax.set_xlabel("alpha")
     ax.set_xscale("log")
+    ax.set_title(f"Motif length: {i + 1}")
     if i == 0:
         ax.set_ylabel("MSE")
+    else:
+        ax.set_ylabel("")
 fig.suptitle("Input-driven motor command mode")
 plt.tight_layout()
 
@@ -76,6 +83,8 @@ for i in range(n_motif_lengths):
     ax.set_title(f"Motif length: {i+1}")
     if i == 0:
         ax.set_ylabel("MSE")
+    else:
+        ax.set_ylabel("")
 fig.suptitle("Autonomous motor sequence generation mode")
 plt.tight_layout()
 
