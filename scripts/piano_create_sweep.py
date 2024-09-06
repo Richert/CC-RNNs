@@ -11,8 +11,8 @@ data = pickle.load(open(f"{path}/data/piano/piano_crnn_{keys}keys_{fingers}finge
 
 # define sweep
 alphas = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0]
-motifs = [2, 4, 6, 8, 10]
-motif_lengths = [2, 4, 6, 8, 10]
+motifs = [2, 4, 6, 8]
+motif_lengths = [2, 4, 6, 8]
 sweep = []
 for alpha in alphas:
     for m in motifs:

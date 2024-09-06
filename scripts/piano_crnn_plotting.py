@@ -26,9 +26,9 @@ for f in os.listdir(path):
             for trial in data["trial"]:
 
                 # get condition
-                results["alpha"].append(data["alpha"][trial])
-                results["motifs"].append(data["motifs"][trial])
-                results["motif_length"].append(data["motif_length"][trial])
+                results["alpha"].append(data["alpha"])
+                results["motifs"].append(data["motifs"])
+                results["motif_length"].append(data["motif_length"])
                 results["trial"].append(trial)
 
                 # calculate error between predictions and targets for input-driven mode
