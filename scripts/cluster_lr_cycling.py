@@ -132,7 +132,7 @@ with torch.enable_grad():
         if current_loss < min_loss:
             break
 
-W = (rnn.L @ rnn.R).cpu().detach().numpy() + rnn.W.cpu().detach().numpy()
+W = (rnn.L @ rnn.R).cpu().detach().numpy() + rnn.L.cpu().detach().numpy()
 W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(rnn.R)).cpu().detach().numpy())
 z_col = np.asarray(z_col)
 

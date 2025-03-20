@@ -71,6 +71,19 @@ def init_weights(N: int, M: int, density: float):
     return W
 
 
+def init_dendrites(N: int, n_dendrites: int):
+    M = N*n_dendrites
+    W = np.zeros((N, M))
+    for neuron in range(N):
+        W[neuron, neuron*n_dendrites:(neuron+1)*n_dendrites] = np.random.rand(n_dendrites)
+    try:
+        lambdas = np.abs(np.linalg.eigvals(W))
+        W = np.squeeze(np.asarray(W/np.max(lambdas)))
+    except np.linalg.LinAlgError:
+        pass
+    return W
+
+
 def nrmse(y: np.ndarray, target: np.ndarray):
     combinedVar = 0.5 * (np.var(target,1) + np.var(y,1))
     error = y-target

@@ -139,7 +139,7 @@ with torch.enable_grad():
             for j in range(k):
                 W_z_tmp[j, :] *= rnn.C[j]
             loss /= backprop_steps
-            loss += alphas[1] * (torch.sum(torch.abs(rnn.W) @ W_z_tmp))
+            loss += alphas[1] * (torch.sum(torch.abs(rnn.L) @ W_z_tmp))
             loss.backward()
             current_loss = loss.item()
             loss_hist.append(current_loss)
@@ -163,8 +163,8 @@ W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[2])
 
 # retrieve trained network connectivity
 c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
+W = (rnn.L @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 
 # generate predictions
 with torch.no_grad():

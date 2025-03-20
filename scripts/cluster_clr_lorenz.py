@@ -159,7 +159,7 @@ with torch.enable_grad():
             W_r_tmp = torch.abs(rnn.L)
             for j in range(k):
                 W_r_tmp[j, :] *= rnn.C[j]
-            loss += alphas[1]*torch.sum(torch.abs(rnn.W) @ W_r_tmp)
+            loss += alphas[1]*torch.sum(torch.abs(rnn.L) @ W_r_tmp)
             loss /= backprop_steps
             loss.backward()
             current_loss = loss.item()
@@ -186,8 +186,8 @@ epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
 # inspect conceptor
 c = rnn.C.cpu().detach().numpy()
 k_star = np.sum(c)
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
+W = (rnn.L @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 
 # generate predictions
 with torch.no_grad():

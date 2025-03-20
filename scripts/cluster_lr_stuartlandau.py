@@ -132,7 +132,7 @@ with torch.enable_grad():
 
             optim.zero_grad()
             loss /= backprop_steps
-            loss += alphas[0] * torch.sum(torch.abs(rnn.W) @ torch.abs(rnn.L))
+            loss += alphas[0] * torch.sum(torch.abs(rnn.L) @ torch.abs(rnn.L))
             loss.backward()
             current_loss = loss.item()
             loss_hist.append(current_loss)
@@ -140,8 +140,8 @@ with torch.enable_grad():
             loss = torch.zeros((1,))
             rnn.detach()
 
-W = (rnn.W @ rnn.L).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.L)).cpu().detach().numpy())
+W = (rnn.L @ rnn.L).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(rnn.L)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################

@@ -1,4 +1,4 @@
-from src import ConceptorLowRankRNN
+from src.rnn import ConceptorLowRankRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np

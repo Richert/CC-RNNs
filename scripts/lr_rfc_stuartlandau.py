@@ -134,7 +134,7 @@ for i, omega in enumerate(omegas):
                 W_r_tmp = torch.abs(rnn.L)
                 for j in range(k):
                     W_r_tmp[j, :] *= rnn.C[j]
-                loss += epsilon*torch.sum(torch.abs(rnn.W) @ W_r_tmp)
+                loss += epsilon*torch.sum(torch.abs(rnn.L) @ W_r_tmp)
                 loss.backward()
                 current_loss = loss.item()
                 optim.step()

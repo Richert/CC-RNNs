@@ -130,8 +130,8 @@ with torch.enable_grad():
             loss = torch.zeros((1,))
             rnn.detach()
 
-W = (rnn.W @ rnn.L).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(rnn.L)).cpu().detach().numpy())
+W = (rnn.L @ rnn.L).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(rnn.L)).cpu().detach().numpy())
 z_col = np.asarray(z_col)
 
 # testing

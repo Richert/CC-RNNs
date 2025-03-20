@@ -121,8 +121,8 @@ W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
 
 # retrieve network connectivity
 c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.W @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.W) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
+W = (rnn.L @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
 
 # generate predictions
 with torch.no_grad():
