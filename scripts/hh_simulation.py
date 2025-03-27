@@ -13,13 +13,13 @@ device = "cpu"
 
 # simulation parameters
 dt = 1e-2
-steps = 10000
+steps = 20000
 
 # rnn parameters
 n_in = 1
 n_out = 1
-k = 5
-n_dendrites = 5
+k = 10
+n_dendrites = 10
 N = int(k*n_dendrites)
 sr = 0.99
 bias_scale = 0.1
@@ -40,7 +40,7 @@ rnn = HHRNN(torch.tensor(L, dtype=dtype, device=device), torch.tensor(R, device=
 
 # input definition
 inp = torch.zeros((steps, n_in), device=device, dtype=dtype) + 6.5
-inp[int(0.3*steps):int(0.6*steps), :] -= 40.0
+inp[int(0.3*steps):int(0.6*steps), :] += 10.0
 
 # model dynamics simulation
 y_col, z_col = [], []
