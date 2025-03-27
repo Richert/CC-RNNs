@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
+import pickle
 
 # function definitions
 ######################
@@ -21,6 +22,7 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 2000
 state_vars = ["x", "y"]
+visualization = {"connectivity": False, "inputs": False, "results": False}
 
 # task parameters
 min_mu, max_mu = -0.5, 0.5
@@ -63,17 +65,18 @@ L = np.abs(init_weights(N, k, density))
 R = init_dendrites(k, n_dendrites, normalize=True)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype, requires_grad=True)
 
-# fig, axes = plt.subplots(ncols=2, figsize=(12, 5))
-# ax = axes[0]
-# ax.imshow(L, aspect="auto", interpolation="none")
-# ax.set_xlabel("from: neurons")
-# ax.set_ylabel("to: dendrites")
-# ax = axes[1]
-# ax.imshow(R, aspect="auto", interpolation="none")
-# ax.set_xlabel("from: dendrites")
-# ax.set_ylabel("to: neurons")
-# plt.tight_layout()
-# plt.show()
+if visualization["connectivity"]:
+    fig, axes = plt.subplots(ncols=2, figsize=(12, 5))
+    ax = axes[0]
+    ax.imshow(L, aspect="auto", interpolation="none")
+    ax.set_xlabel("from: neurons")
+    ax.set_ylabel("to: dendrites")
+    ax = axes[1]
+    ax.imshow(R, aspect="auto", interpolation="none")
+    ax.set_xlabel("from: dendrites")
+    ax.set_ylabel("to: neurons")
+    plt.tight_layout()
+    plt.show()
 
 # generate input and targets
 ############################
@@ -100,17 +103,18 @@ with torch.no_grad():
 inputs = [np.random.choice(n_in) for _ in range(trials)]
 
 # plot targets
-fig, axes = plt.subplots(nrows=n_in, figsize=(12, 3*n_in))
-for i in range(n_in):
-    ax = axes[i]
-    ax.plot(targets[i][:, 0], label="x")
-    ax.plot(targets[i][:, 1], label="y")
-    ax.set_xlabel("time")
-    ax.set_ylabel("amplitude")
-    ax.legend()
-fig.suptitle("Target waveforms")
-plt.tight_layout()
-plt.show()
+if visualization["inputs"]:
+    fig, axes = plt.subplots(nrows=n_in, figsize=(12, 3*n_in))
+    for i in range(n_in):
+        ax = axes[i]
+        ax.plot(targets[i][:, 0], label="x")
+        ax.plot(targets[i][:, 1], label="y")
+        ax.set_xlabel("time")
+        ax.set_ylabel("amplitude")
+        ax.legend()
+    fig.suptitle("Target waveforms")
+    plt.tight_layout()
+    plt.show()
 
 # train LR-RNN weights
 ######################
@@ -134,7 +138,9 @@ init_state = rnn.y[:]
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+params = list(rnn.parameters()) + [W_r]
+param_keys = ["W", "W_z", "W_in", "bias", "W_r"]
+optim = torch.optim.Adam(params, lr=lr, betas=betas)
 rnn.clip(gradient_cutoff)
 
 # training
@@ -212,43 +218,52 @@ with torch.no_grad():
         predictions[cond].append(y_col / np.max(y_col))
         rnn_dynamics[cond].append(z_col)
 
+# save results
+##############
+
+pickle.dump({"parameters": {key: p.detach().cpu().numpy() for key, p in zip(params)}, "predictions": predictions,
+                  "inputs": inputs, "targets": targets, "N": N, "k": k, "theta": theta, "gamma": gamma, "dt": dt},
+            open("../data/fitting_results/hh_vanderpol_control.pkl", "wb"))
+
 # plotting
 ##########
 
-# prediction figure
-fig, axes = plt.subplots(ncols=2, nrows=n_in, figsize=(12, 9))
-for i in range(n_in):
-    for j in range(2):
-        ax = axes[i, j]
-        l = ax.plot(targets[i][:plot_steps, j], label="target", linestyle="dashed")
-        mean_prediction = np.mean(predictions[i], axis=0)[:plot_steps, j]
-        ax.plot(mean_prediction, label="prediction", linestyle="solid")
-        ax.set_ylabel(state_vars[j])
-        ax.set_title(f"condition = {i + 1}")
-        if i == n_in-1:
-            ax.set_xlabel("steps")
-            ax.legend()
-fig.suptitle("Model Predictions")
-plt.tight_layout()
+if visualization["results"]:
 
-# dynamics figure
-fig, axes = plt.subplots(ncols=2, nrows=n_in, figsize=(12, 3*n_in))
-n_neurons = 5
-for i in range(n_in):
-    mean_v = np.mean(rnn_dynamics[i], axis=0)
-    ax = axes[i, 0]
-    ax.plot(np.mean(mean_v, axis=-1))
-    ax.set_ylabel("v")
-    ax.set_xlabel("time")
-    ax.set_title("average model dynamics")
-    ax = axes[i, 1]
-    for j in range(n_neurons):
-        ax.plot(mean_v[:, j], label=f"neuron {j+1}")
-    ax.set_ylabel("v")
-    ax.set_xlabel("time")
-    ax.set_title(f"Trial-averaged neuron dynamics")
-    ax.legend()
-fig.suptitle("Model dynamics")
-plt.tight_layout()
+    # prediction figure
+    fig, axes = plt.subplots(ncols=2, nrows=n_in, figsize=(12, 9))
+    for i in range(n_in):
+        for j in range(2):
+            ax = axes[i, j]
+            l = ax.plot(targets[i][:plot_steps, j], label="target", linestyle="dashed")
+            mean_prediction = np.mean(predictions[i], axis=0)[:plot_steps, j]
+            ax.plot(mean_prediction, label="prediction", linestyle="solid")
+            ax.set_ylabel(state_vars[j])
+            ax.set_title(f"condition = {i + 1}")
+            if i == n_in-1:
+                ax.set_xlabel("steps")
+                ax.legend()
+    fig.suptitle("Model Predictions")
+    plt.tight_layout()
 
-plt.show()
+    # dynamics figure
+    fig, axes = plt.subplots(ncols=2, nrows=n_in, figsize=(12, 3*n_in))
+    n_neurons = 5
+    for i in range(n_in):
+        mean_v = np.mean(rnn_dynamics[i], axis=0)
+        ax = axes[i, 0]
+        ax.plot(np.mean(mean_v, axis=-1))
+        ax.set_ylabel("v")
+        ax.set_xlabel("time")
+        ax.set_title("average model dynamics")
+        ax = axes[i, 1]
+        for j in range(n_neurons):
+            ax.plot(mean_v[:, j], label=f"neuron {j+1}")
+        ax.set_ylabel("v")
+        ax.set_xlabel("time")
+        ax.set_title(f"Trial-averaged neuron dynamics")
+        ax.legend()
+    fig.suptitle("Model dynamics")
+    plt.tight_layout()
+
+    plt.show()
