@@ -53,12 +53,12 @@ out_scale = 0.02
 density = 0.5
 
 # training parameters
-trials = 100
+trials = 1000
 train_trials = int(0.9*trials)
 test_trials = trials - train_trials
-lr = 1e-2
+lr = 1e-3
 betas = (0.9, 0.999)
-batch_size = 50
+batch_size = 20
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -134,7 +134,7 @@ avg_input = torch.zeros((n_in,), device=device, dtype=dtype)
 with torch.no_grad():
     for step in range(init_steps):
         rnn.forward(avg_input)
-init_state = rnn.y[:]
+init_state = (v[:] for v in rnn.state_vars)
 
 # set up loss function
 loss_func = torch.nn.MSELoss()
