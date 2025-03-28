@@ -47,13 +47,14 @@ k = 20
 n_dendrites = 10
 N = int(k*n_dendrites)
 sr = 0.99
-bias_scale = 0.01
+bias_scale = 0.5
+bias = 6.5
 in_scale = 1.0
 out_scale = 0.02
 density = 0.5
 
 # training parameters
-trials = 1000
+trials = 2000
 train_trials = int(0.9*trials)
 test_trials = trials - train_trials
 lr = 1e-3
@@ -62,7 +63,7 @@ batch_size = 20
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
-bias = torch.tensor(bias_scale * np.random.randn(N), device=device, dtype=dtype)
+bias = torch.tensor(bias + bias_scale * np.random.randn(N), device=device, dtype=dtype)
 L = np.abs(init_weights(N, k, density))
 R = init_dendrites(k, n_dendrites, normalize=True)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype, requires_grad=True)
@@ -223,8 +224,9 @@ with torch.no_grad():
 # save results
 ##############
 
-pickle.dump({"parameters": {key: p.detach().cpu().numpy() for key, p in zip(params)}, "predictions": predictions,
-                  "inputs": inputs, "targets": targets, "N": N, "k": k, "theta": theta, "gamma": gamma, "dt": dt},
+pickle.dump({"parameters": {key: p.detach().cpu().numpy() for key, p in zip(param_keys, params)},
+             "predictions": predictions, "inputs": inputs, "targets": targets,
+             "N": N, "k": k, "theta": theta, "gamma": gamma, "dt": dt},
             open("../data/fitting_results/hh_vanderpol_control.pkl", "wb"))
 
 # plotting
