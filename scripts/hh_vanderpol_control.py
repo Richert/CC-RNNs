@@ -33,7 +33,7 @@ sigma = 500
 dt = 1e-2
 steps = 20000
 init_steps = 1000
-truncation_steps = 2000
+truncation_steps = 1000
 gradient_cutoff = 1e3
 
 # HH parameters
@@ -227,7 +227,7 @@ with torch.no_grad():
 pickle.dump({"parameters": {key: p.detach().cpu().numpy() for key, p in zip(param_keys, params)},
              "predictions": predictions, "inputs": inputs, "targets": targets,
              "N": N, "k": k, "theta": theta, "gamma": gamma, "dt": dt},
-            open("../data/fitting_results/hh_vanderpol_control.pkl", "wb"))
+            open("data/fitting_results/hh_vanderpol_control.pkl", "wb"))
 
 # plotting
 ##########
