@@ -125,7 +125,8 @@ for c in np.unique(conditions):
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+params = list(rnn.parameters()) + [W_r]
+optim = torch.optim.Adam(params, lr=lr, betas=betas)
 rnn.clip(gradient_cutoff)
 
 # training
@@ -203,6 +204,12 @@ with torch.no_grad():
         # save predictions
         predictions.append(np.asarray(y_col))
         z_dynamics.append(np.asarray(z_col))
+
+# save results
+results = {"predictions": predictions, "z_dynamics": z_dynamics, "train_trials": train_trials,
+           "conceptors": [c.detach().cpu().numpy() for c in rnn.conceptors.values()],
+           "params": [p.detach().cpu().numpy() for p in params]}
+pickle.dump(results, open(f"{path}/data/vanderpol_hh_fit.pkl", "wb"))
 
 # plotting
 ##########
