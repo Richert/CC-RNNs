@@ -1,4 +1,4 @@
-from src.rnn import ConceptorLowRankRNN
+from src.rnn import HHRNN
 from src.functions import init_weights, init_dendrites
 import torch
 import matplotlib.pyplot as plt
@@ -16,7 +16,7 @@ state_vars = ["y1", "y2"]
 visualization = {"connectivity": False, "inputs": True, "results": True}
 
 # load inputs and targets
-data = pickle.load(open("../data/vanderpol_inputs_sr20.pkl", "rb"))
+data = pickle.load(open("../data/vanderpol_inputs_sr1.pkl", "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
@@ -26,6 +26,12 @@ steps = inputs[0].shape[0]
 init_steps = 1000
 switch_test_cond = True
 
+# HH parameters
+theta = 40.0
+gamma = 10.0
+dt = 1e-2
+t_scale = 10
+
 # rnn parameters
 n_in = inputs[0].shape[-1] if len(inputs[0].shape) > 1 else 1
 n_out = targets[0].shape[-1]
@@ -33,8 +39,8 @@ k = 20
 n_dendrites = 10
 N = int(k*n_dendrites)
 sr = 0.99
-bias_scale = 0.01
-bias = 0.0
+bias_scale = 1.0
+bias = 10.0
 in_scale = 1.0
 out_scale = 0.02
 density = 0.5
@@ -43,14 +49,14 @@ density = 0.5
 trials = len(conditions)
 train_trials = int(0.9*trials)
 test_trials = trials - train_trials
-lr = 5e-3
+lr = 1e-3
 betas = (0.9, 0.999)
-batch_size = 50
+batch_size = 10
 gradient_cutoff = 0.5/lr
-truncation_steps = 1000
+truncation_steps = 200
 epsilon = 0.1
 alpha = 20.0
-lam = 1e-3
+lam = 1e-4
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -93,8 +99,8 @@ if visualization["inputs"]:
 ######################
 
 # initialize RFC
-rnn = ConceptorLowRankRNN(torch.tensor(L, dtype=dtype, device=device), torch.tensor(R, device=device, dtype=dtype),
-                          W_in, bias, alpha=alpha, lam=lam, g="ReLU")
+rnn = HHRNN(torch.tensor(L, dtype=dtype, device=device), torch.tensor(R, device=device, dtype=dtype),
+                          W_in, bias, alpha=alpha, lam=lam, theta=theta, gamma=gamma, dt=dt, g="ReLU")
 rnn.free_param("W")
 rnn.free_param("W_z")
 rnn.free_param("W_in")
@@ -137,8 +143,11 @@ with torch.enable_grad():
         # collect loss
         y_col = []
         for step in range(steps):
-            rnn.forward_c_adapt(inp[step:step+1])
-            y = W_r @ rnn.z
+            out = []
+            for _ in range(t_scale):
+                rnn.forward_c_adapt(inp[step:step+1])
+                out.append(rnn.f(rnn.z))
+            y = W_r @ torch.mean(torch.stack(out, dim=0), dim=0)
             y_col.append(y)
 
         # calculate loss
@@ -177,10 +186,14 @@ with torch.no_grad():
         y_col = []
         z_col = []
         for step in range(steps):
-            rnn.forward_c(inp[step:step+1])
-            y = W_r @ rnn.z
+            out = []
+            for _ in range(t_scale):
+                rnn.forward_c(inp[step:step + 1])
+                out.append(rnn.f(rnn.z))
+            z = torch.mean(torch.stack(out, dim=0), dim=0)
+            y = W_r @ z
             y_col.append(y)
-            z_col.append(rnn.z)
+            z_col.append(z)
             if step > 0.5*steps:
                 rnn.activate_conceptor(False if conditions[trial] else True)
 

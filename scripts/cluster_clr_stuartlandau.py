@@ -137,7 +137,7 @@ with torch.enable_grad():
             optim.zero_grad()
             W_z_tmp = torch.abs(rnn.L)
             for j in range(k):
-                W_z_tmp[j, :] *= rnn.C[j]
+                W_z_tmp[j, :] *= rnn.c_weights[j]
             loss /= backprop_steps
             loss += alphas[1] * (torch.sum(torch.abs(rnn.L) @ W_z_tmp))
             loss.backward()
@@ -162,9 +162,9 @@ y_col = torch.stack(y_col, dim=0)
 W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[2])
 
 # retrieve trained network connectivity
-c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.L @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
+c = rnn.c_weights.cpu().detach().numpy().squeeze()
+W = (rnn.L @ (torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy())
 
 # generate predictions
 with torch.no_grad():

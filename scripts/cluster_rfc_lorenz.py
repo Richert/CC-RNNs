@@ -144,10 +144,10 @@ W_r, epsilon = rnn.train_readout(y_col.T, targets[:loading_steps].T, alphas[1])
 epsilon = float(torch.mean(epsilon).cpu().detach().numpy())
 
 # inspect conceptor
-c = rnn.C.cpu().detach().numpy()
+c = rnn.c_weights.cpu().detach().numpy()
 k_star = np.sum(c)
-W = (rnn.L @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
+W = (rnn.L @ (torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy())
 
 # generate predictions
 with torch.no_grad():

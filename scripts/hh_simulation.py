@@ -18,11 +18,11 @@ steps = 20000
 # rnn parameters
 n_in = 1
 n_out = 1
-k = 10
+k = 20
 n_dendrites = 10
 N = int(k*n_dendrites)
 sr = 0.99
-bias_scale = 0.1
+bias_scale = 1.0
 density = 0.5
 
 # initialize rnn matrices
@@ -36,10 +36,10 @@ R = init_dendrites(k, n_dendrites)
 
 # model initialization
 rnn = HHRNN(torch.tensor(L, dtype=dtype, device=device), torch.tensor(R, device=device, dtype=dtype), W_in, bias, dt=dt,
-            theta=40.0, gamma=10.0)
+            theta=40.0, gamma=10.0, g="ReLU")
 
 # input definition
-inp = torch.zeros((steps, n_in), device=device, dtype=dtype) + 6.5
+inp = torch.zeros((steps, n_in), device=device, dtype=dtype) + 10.0
 inp[int(0.3*steps):int(0.6*steps), :] += 10.0
 
 # model dynamics simulation

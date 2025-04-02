@@ -133,7 +133,7 @@ for i, omega in enumerate(omegas):
                 optim.zero_grad()
                 W_r_tmp = torch.abs(rnn.L)
                 for j in range(k):
-                    W_r_tmp[j, :] *= rnn.C[j]
+                    W_r_tmp[j, :] *= rnn.c_weights[j]
                 loss += epsilon*torch.sum(torch.abs(rnn.L) @ W_r_tmp)
                 loss.backward()
                 current_loss = loss.item()
@@ -228,7 +228,7 @@ interp_col = []
 with torch.no_grad():
     rnn.y, rnn.z = init_states[omegas[0]]
     for step in range(interpolation_steps):
-        rnn.C = gamma[step]*c2 + (1-gamma[step])*c1
+        rnn.c_weights = gamma[step] * c2 + (1 - gamma[step]) * c1
         y = W_r @ rnn.forward_c_a()
         interp_col.append(y.cpu().detach().numpy())
 interp_col = np.asarray(interp_col)

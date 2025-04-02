@@ -219,7 +219,7 @@ gamma[ramp_steps:] = 1.0
 interp_col = []
 with torch.no_grad():
     for step in range(interpolation_steps):
-        rnn.C = gamma[step]*c1 + (1-gamma[step])*c2
+        rnn.c_weights = gamma[step] * c1 + (1 - gamma[step]) * c2
         y = W_r @ rnn.forward_c_a()
         interp_col.append(y.cpu().detach().numpy())
 interp_col = np.asarray(interp_col)

@@ -117,9 +117,9 @@ W_r, epsilon = rnn.train_readout(y_col.T, y_load.T, alphas[1])
 print(f"Readout training error: {float(torch.mean(epsilon).cpu().detach().numpy())}")
 
 # retrieve network connectivity
-c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.L @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
+c = rnn.c_weights.cpu().detach().numpy().squeeze()
+W = (rnn.L @ (torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy())
 print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions

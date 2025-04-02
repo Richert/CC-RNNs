@@ -117,7 +117,7 @@ fig, axes = plt.subplots(nrows=2*motifs, figsize=(12, 4*motifs))
 for i, (motif, target) in enumerate(zip(motif_col, target_col)):
 
     rnn.activate_conceptor(f"motif_{i}")
-    C = rnn.C.cpu().detach().numpy()
+    C = rnn.c_weights.cpu().detach().numpy()
 
     # collect states
     predictions, targets = [], []

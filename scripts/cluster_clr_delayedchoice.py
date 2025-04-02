@@ -143,9 +143,9 @@ with torch.enable_grad():
             rnn.detach()
 
 # retrieve network connectivity
-c = rnn.C.cpu().detach().numpy().squeeze()
-W = (rnn.L @ (torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy()
-W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.C) @ rnn.L)).cpu().detach().numpy())
+c = rnn.c_weights.cpu().detach().numpy().squeeze()
+W = (rnn.L @ (torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy()
+W_abs = np.sum((torch.abs(rnn.L) @ torch.abs(torch.diag(rnn.c_weights) @ rnn.L)).cpu().detach().numpy())
 
 # train final readout and generate predictions
 ##############################################

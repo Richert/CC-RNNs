@@ -17,7 +17,7 @@ sigma = 2.0
 theta = 0.0
 d = 1
 dt = 0.01
-sampling_rate = 20
+sampling_rate = 1
 steps = 2000
 
 # generate targets and inputs
@@ -50,4 +50,4 @@ for n in range(trials):
 
 # save results
 pickle.dump({"inputs": inputs, "targets": targets, "trial_conditions": conditions},
-            open("../data/vanderpol_inputs_numpy.pkl", "wb"))
+            open(f"../data/vanderpol_inputs_sr{sampling_rate}.pkl", "wb"))

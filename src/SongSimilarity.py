@@ -143,8 +143,8 @@ for r in range(nRuns):
             songCorr_t[i,j] = np.mean(np.diag(cdist(song1,song2,metric='correlation')))
             songEucl_t[i,j] = np.mean(np.diag(cdist(song1,song2,metric='euclidean')))
             
-            conceptor1 = np.reshape(SC.R.C[i],(1,len(SC.R.C[i])))
-            conceptor2 = np.reshape(SC.R.C[j],(1,len(SC.R.C[j])))
+            conceptor1 = np.reshape(SC.R.c_weights[i], (1, len(SC.R.c_weights[i])))
+            conceptor2 = np.reshape(SC.R.c_weights[j], (1, len(SC.R.c_weights[j])))
             conceptorCorr[i,j] = np.mean(np.diag(cdist(conceptor1,conceptor2,metric='correlation')))
             conceptorEucl[i,j] = np.mean(np.diag(cdist(conceptor1,conceptor2,metric='euclidean')))
             

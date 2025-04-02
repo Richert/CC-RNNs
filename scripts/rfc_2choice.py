@@ -136,7 +136,7 @@ with torch.enable_grad():
             print(f"Readout training loss (epoch {epoch}): {current_loss}")
 
 # inspect conceptor
-c = rnn.C.cpu().detach().numpy()
+c = rnn.c_weights.cpu().detach().numpy()
 print(f"Conceptor: {np.sum(c)}")
 
 # generate predictions

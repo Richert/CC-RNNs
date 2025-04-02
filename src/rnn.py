@@ -222,14 +222,143 @@ class FHNRNN(LowRankRNN):
         self.w = self.w + self.dt * dw
 
 
-class HHRNN(LowRankRNN):
+class ConceptorRNN(RNN):
+
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor):
+        super().__init__(W, W_in, bias)
+        self.conceptors = {}
+        self.C = torch.zeros((self.N, self.N), device=self.device, dtype=self.dtype)
+
+    def learn_conceptor(self, key, y: torch.tensor, alpha: float = 10.0):
+
+        R = (y.T @ y) / y.shape[0]
+        U, S, V = torch.linalg.svd(R, full_matrices=True)
+        S = torch.diag(S)
+        S = S @ torch.linalg.inv(S + torch.eye(self.N)/alpha**2)
+        self.conceptors[key] = U @ S @ U.T
+        self.C = self.conceptors[key]
+        return self.C
+
+    def activate_conceptor(self, key):
+        self.C = self.conceptors[key]
+
+    def _rhs_layer(self, x):
+        return self.C @ super()._rhs_layer(x)
+
+
+class AutoConceptorRNN(ConceptorRNN):
+
+    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, lam: float, alpha: float):
+
+        super().__init__(W, W_in, bias)
+        self.lam = lam
+        self.alpha_sq = alpha**(-2)
+
+    @classmethod
+    def random_init(cls, N: int, n_in: int, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
+                    density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
+                    dtype: torch.dtype = torch.float64):
+        ac = super().random_init(N, n_in, sr, density, bias_var, rf_var, device, dtype)
+        return cls(ac.W, ac.W_in, ac.bias, lam, alpha)
+
+    def store_conceptor(self, key: str):
+        self.conceptors[key] = self.C
+
+    def _update_layer(self, y):
+        super()._update_layer(y)
+        self.C = self.C + self.lam * ((self.y - self.C @ self.y) @ self.y.T) - self.C * self.alpha_sq
+
+
+class ConceptorLowRankRNN(LowRankRNN):
+
+    def __init__(self, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
+                 lam: float, alpha: float, g: Union[str, Callable] = "Identity"):
+
+        super().__init__(L, R, W_in, bias, g=g)
+        self.alpha_sq = alpha ** (-2)
+        self.lam = lam
+        self.c_weights = torch.zeros_like(self.z)
+        self.conceptors = {}
+
+    @classmethod
+    def random_init(cls, N: int, n_in: int, rank: int = 1, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
+                    density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
+                    dtype: torch.dtype = torch.float64):
+        lr = super().random_init(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
+        return cls(lr.L, lr.R, lr.W_in, lr.bias, lam, alpha)
+
+    def forward_c(self, x):
+        z = self.c_weights * super().forward(x)
+        self.z = z
+        return z
+
+    def forward_c_a(self):
+        z = self.c_weights * super().forward_a()
+        self.z = z
+        return z
+
+    def forward_c_adapt(self, x):
+        z = self.c_weights * super().forward(x)
+        self.c_weights = self.c_weights + self.lam * (self.z ** 2 - self.c_weights * self.z ** 2 - self.c_weights * self.alpha_sq)
+        self.z = z
+        return z
+
+    def activate_conceptor(self, key):
+        self.c_weights = self.conceptors[key]
+
+    def store_conceptor(self, key):
+        self.conceptors[key] = self.c_weights
+
+    def init_new_conceptor(self, init_value: str = "zero"):
+        if init_value == "zero":
+            self.c_weights = torch.zeros_like(self.z)
+        elif init_value == "random":
+            self.c_weights = torch.rand(size=self.z.size(), dtype=self.z.dtype, device=self.z.device)
+        else:
+            self.c_weights = torch.ones_like(self.z)
+
+    def detach(self):
+        super().detach()
+        self.c_weights = self.c_weights.detach()
+
+    @staticmethod
+    def combine_conceptors(C1: torch.Tensor, C2: torch.Tensor, operation: str, eps: float = 1e-3) -> torch.Tensor:
+
+        C_comb = torch.zeros_like(C1)
+        zero = eps
+        one = 1 - eps
+
+        if operation == "and":
+
+            idx = (C1 < zero) * (C2 < zero)
+            C_comb[idx == 1.0] = 0.0
+            C1_tmp = C1[idx < 1.0]
+            C2_tmp = C2[idx < 1.0]
+            C_comb[idx < 1.0] = (C1_tmp * C2_tmp) / (C1_tmp + C2_tmp - C1_tmp * C2_tmp)
+
+        elif operation == "or":
+
+            idx = (C1 > one) * (C2 > one)
+            C_comb[idx == 1.0] = 1.0
+            C1_tmp = C1[idx < 1.0]
+            C2_tmp = C2[idx < 1.0]
+            C_comb[idx < 1.0] = (C1_tmp + C2_tmp - 2 * C1_tmp * C2_tmp) / (1 - C1_tmp * C2_tmp)
+
+        else:
+
+            raise ValueError(f"Invalid operation for combining conceptors: {operation}.")
+
+        return C_comb
+
+
+class HHRNN(ConceptorLowRankRNN):
 
     def __init__(self, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
                  g_s: float = 120.0, g_p: float = 36.0, g_l: float = 0.3, E_s: float = 50.0, E_p: float = -77.0,
                  E_l: float = -54.4, C: float = 1.0, gamma: float = 1.0, theta: float = 30.0,
-                 dt: float = 1e-3, g: Union[str, Callable] = "Identity"):
+                 dt: float = 1e-3, g: Union[str, Callable] = "Identity", alpha: float = 100.0, lam: float = 1e-3):
 
-        super().__init__(L, R, W_in, bias, g=g)
+        super().__init__(L, R, W_in, bias, g=g, alpha=alpha, lam=lam)
         self.g_s = g_s
         self.g_p = g_p
         self.g_l = g_l
@@ -301,132 +430,3 @@ class HHRNN(LowRankRNN):
     @staticmethod
     def _beta_m(v: torch.Tensor):
         return 4.0*torch.exp(-(v+65.0)/18.0)
-
-
-class ConceptorRNN(RNN):
-
-    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor):
-        super().__init__(W, W_in, bias)
-        self.conceptors = {}
-        self.C = torch.zeros((self.N, self.N), device=self.device, dtype=self.dtype)
-
-    def learn_conceptor(self, key, y: torch.tensor, alpha: float = 10.0):
-
-        R = (y.T @ y) / y.shape[0]
-        U, S, V = torch.linalg.svd(R, full_matrices=True)
-        S = torch.diag(S)
-        S = S @ torch.linalg.inv(S + torch.eye(self.N)/alpha**2)
-        self.conceptors[key] = U @ S @ U.T
-        self.C = self.conceptors[key]
-        return self.C
-
-    def activate_conceptor(self, key):
-        self.C = self.conceptors[key]
-
-    def _rhs_layer(self, x):
-        return self.C @ super()._rhs_layer(x)
-
-
-class AutoConceptorRNN(ConceptorRNN):
-
-    def __init__(self, W: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor, lam: float, alpha: float):
-
-        super().__init__(W, W_in, bias)
-        self.lam = lam
-        self.alpha_sq = alpha**(-2)
-
-    @classmethod
-    def random_init(cls, N: int, n_in: int, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
-                    density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
-                    dtype: torch.dtype = torch.float64):
-        ac = super().random_init(N, n_in, sr, density, bias_var, rf_var, device, dtype)
-        return cls(ac.W, ac.W_in, ac.bias, lam, alpha)
-
-    def store_conceptor(self, key: str):
-        self.conceptors[key] = self.C
-
-    def _update_layer(self, y):
-        super()._update_layer(y)
-        self.C = self.C + self.lam * ((self.y - self.C @ self.y) @ self.y.T) - self.C * self.alpha_sq
-
-
-class ConceptorLowRankRNN(LowRankRNN):
-
-    def __init__(self, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
-                 lam: float, alpha: float):
-
-        super().__init__(L, R, W_in, bias)
-        self.alpha_sq = alpha ** (-2)
-        self.lam = lam
-        self.C = torch.zeros_like(self.z)
-        self.conceptors = {}
-
-    @classmethod
-    def random_init(cls, N: int, n_in: int, rank: int = 1, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
-                    density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
-                    dtype: torch.dtype = torch.float64):
-        lr = super().random_init(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
-        return cls(lr.L, lr.R, lr.W_in, lr.bias, lam, alpha)
-
-    def forward_c(self, x):
-        z = self.C * super().forward(x)
-        self.z = z
-        return z
-
-    def forward_c_a(self):
-        z = self.C * super().forward_a()
-        self.z = z
-        return z
-
-    def forward_c_adapt(self, x):
-        z = self.C * super().forward(x)
-        self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
-        self.z = z
-        return z
-
-    def activate_conceptor(self, key):
-        self.C = self.conceptors[key]
-
-    def store_conceptor(self, key):
-        self.conceptors[key] = self.C
-
-    def init_new_conceptor(self, init_value: str = "zero"):
-        if init_value == "zero":
-            self.C = torch.zeros_like(self.z)
-        elif init_value == "random":
-            self.C = torch.rand(size=self.z.size(), dtype=self.z.dtype, device=self.z.device)
-        else:
-            self.C = torch.ones_like(self.z)
-
-    def detach(self):
-        super().detach()
-        self.C = self.C.detach()
-
-    @staticmethod
-    def combine_conceptors(C1: torch.Tensor, C2: torch.Tensor, operation: str, eps: float = 1e-3) -> torch.Tensor:
-
-        C_comb = torch.zeros_like(C1)
-        zero = eps
-        one = 1 - eps
-
-        if operation == "and":
-
-            idx = (C1 < zero) * (C2 < zero)
-            C_comb[idx == 1.0] = 0.0
-            C1_tmp = C1[idx < 1.0]
-            C2_tmp = C2[idx < 1.0]
-            C_comb[idx < 1.0] = (C1_tmp * C2_tmp) / (C1_tmp + C2_tmp - C1_tmp * C2_tmp)
-
-        elif operation == "or":
-
-            idx = (C1 > one) * (C2 > one)
-            C_comb[idx == 1.0] = 1.0
-            C1_tmp = C1[idx < 1.0]
-            C2_tmp = C2[idx < 1.0]
-            C_comb[idx < 1.0] = (C1_tmp + C2_tmp - 2 * C1_tmp * C2_tmp) / (1 - C1_tmp * C2_tmp)
-
-        else:
-
-            raise ValueError(f"Invalid operation for combining conceptors: {operation}.")
-
-        return C_comb

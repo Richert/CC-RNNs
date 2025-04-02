@@ -108,7 +108,7 @@ for i, omega in enumerate(omegas):
     # initialize new conceptor
     rnn.init_new_conceptor(init_value="random")
     if i > 0:
-        rnn.C = rnn.combine_conceptors(rnn.C, 1 - rnn.conceptors[omegas[i-1]], operation="and")
+        rnn.c_weights = rnn.combine_conceptors(rnn.c_weights, 1 - rnn.conceptors[omegas[i - 1]], operation="and")
 
     # initial wash-out period
     avg_input = torch.mean(inputs, dim=0)
@@ -134,7 +134,7 @@ for i, omega in enumerate(omegas):
                 optim.zero_grad()
                 W_r_tmp = torch.abs(rnn.L)
                 for j in range(k):
-                    W_r_tmp[j, :] *= rnn.C[j]
+                    W_r_tmp[j, :] *= rnn.c_weights[j]
                 loss += epsilon*torch.sum(torch.abs(rnn.L) @ W_r_tmp)
                 loss.backward()
                 current_loss = loss.item()
@@ -227,7 +227,7 @@ for omega in omegas:
     with torch.no_grad():
         rnn.y, rnn.z = init_states[omega]
         for step in range(interp_steps):
-            rnn.C = gamma[step]*c2 + (1-gamma[step])*c1
+            rnn.c_weights = gamma[step] * c2 + (1 - gamma[step]) * c1
             y = W_r @ rnn.forward_c(inputs[step])
             interp_tmp.append(y.cpu().detach().numpy())
     interp_tmp = np.asarray(interp_tmp)
