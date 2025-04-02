@@ -11,7 +11,7 @@ import pickle
 # function definitions
 ######################
 
-def vanderpol(y: torch.Tensor, x: torch.Tensor, mu: float, alpha: float = 0.1) -> torch.Tensor:
+def vanderpol(y: torch.Tensor, x: torch.Tensor, mu: float, alpha: float = 0.5) -> torch.Tensor:
     y1_dot = alpha*y[1]
     y2_dot = alpha*(y[1]*(mu + x)*(1 - y[0]**2) - y[0])
     return torch.stack([y1_dot, y2_dot], dim=0)
@@ -24,17 +24,15 @@ dtype = torch.float64
 device = "cpu"
 plot_steps = 2000
 state_vars = ["x", "y"]
-visualization = {"connectivity": False, "inputs": False, "results": False}
+visualization = {"connectivity": False, "inputs": True, "results": True}
 
 # task parameters
 min_mu, max_mu = -0.5, 0.5
 noise_lvl = 1.0
 sigma = 500
 dt = 1e-2
-steps = 20000
+steps = 5000
 init_steps = 1000
-truncation_steps = 1000
-gradient_cutoff = 1e3
 
 # HH parameters
 theta = 40.0
@@ -43,23 +41,25 @@ gamma = 10.0
 # rnn parameters
 n_in = 3
 n_out = 1
-k = 20
+k = 50
 n_dendrites = 10
 N = int(k*n_dendrites)
 sr = 0.99
 bias_scale = 0.5
-bias = 6.5
+bias = 7.0
 in_scale = 1.0
 out_scale = 0.02
 density = 0.5
 
 # training parameters
-trials = 2000
+trials = 200
 train_trials = int(0.9*trials)
 test_trials = trials - train_trials
 lr = 1e-3
-betas = (0.9, 0.999)
-batch_size = 20
+betas = (0.9, 0.99)
+batch_size = 10
+gradient_cutoff = 1e6
+truncation_steps = 1000
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -224,10 +224,10 @@ with torch.no_grad():
 # save results
 ##############
 
-pickle.dump({"parameters": {key: p.detach().cpu().numpy() for key, p in zip(param_keys, params)},
-             "predictions": predictions, "inputs": inputs, "targets": targets,
-             "N": N, "k": k, "theta": theta, "gamma": gamma, "dt": dt},
-            open("data/fitting_results/hh_vanderpol_control.pkl", "wb"))
+# pickle.dump({"parameters": {key: p.detach().cpu().numpy() for key, p in zip(param_keys, params)},
+#              "predictions": predictions, "inputs": inputs, "targets": targets,
+#              "N": N, "k": k, "theta": theta, "gamma": gamma, "dt": dt},
+#             open("data/fitting_results/hh_vanderpol_control.pkl", "wb"))
 
 # plotting
 ##########

@@ -369,28 +369,20 @@ class ConceptorLowRankRNN(LowRankRNN):
         return cls(lr.L, lr.R, lr.W_in, lr.bias, lam, alpha)
 
     def forward_c(self, x):
-        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.W_in @ x + self.bias)
-        self.z = self.C * (self.R @ self.y)
-        return self.y
+        z = self.C * super().forward(x)
+        self.z = z
+        return z
 
     def forward_c_a(self):
-        self.y = torch.tanh((self.W + self.D) @ self.y + self.L @ self.z + self.bias)
-        self.z = self.C * (self.R @ self.y)
-        return self.y
+        z = self.C * super().forward_a()
+        self.z = z
+        return z
 
     def forward_c_adapt(self, x):
-        self.y = torch.tanh(self.W @ self.y + self.L @ self.z + self.W_in @ x + self.bias)
-        z = self.C * (self.R @ self.y)
+        z = self.C * super().forward(x)
         self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
         self.z = z
-        return self.y
-
-    def forward_c_a_adapt(self):
-        self.y = torch.tanh((self.W + self.D) @ self.y + self.L @ self.z + self.bias)
-        z = self.C * (self.R @ self.y)
-        self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
-        self.z = z
-        return self.y
+        return z
 
     def activate_conceptor(self, key):
         self.C = self.conceptors[key]
@@ -438,47 +430,3 @@ class ConceptorLowRankRNN(LowRankRNN):
             raise ValueError(f"Invalid operation for combining conceptors: {operation}.")
 
         return C_comb
-
-
-class ConceptorLowRankOnlyRNN(ConceptorLowRankRNN):
-
-    def __init__(self, W_in: torch.Tensor, bias: torch.Tensor, L: torch.Tensor, R: torch.Tensor,
-                 lam: float, alpha: float):
-
-        W = torch.empty((L.shape[0], L.shape[0]), dtype=L.dtype, device=L.device)
-        super().__init__(W, W_in, bias, L, R, lam, alpha)
-        self.W = 0.0
-
-    def forward(self, x):
-        self.y = torch.tanh(self.L @ self.z + self.W_in @ x + self.bias)
-        self.z = self.R @ self.y
-        return self.y
-
-    def forward_a(self):
-        self.y = torch.tanh(self.D @ self.y + self.L @ self.z + self.bias)
-        self.z = torch.relu(self.R @ self.y)
-        return self.y
-
-    def forward_c(self, x):
-        self.y = torch.tanh(self.L @ self.z + self.W_in @ x + self.bias)
-        self.z = torch.relu(self.C * (self.R @ self.y))
-        return self.y
-
-    def forward_c_a(self):
-        self.y = torch.tanh(self.D @ self.y + self.L @ self.z + self.bias)
-        self.z = torch.relu(self.C * (self.R @ self.y))
-        return self.y
-
-    def forward_c_adapt(self, x):
-        self.y = torch.tanh(self.L @ self.z + self.W_in @ x + self.bias)
-        z = torch.relu(self.C * (self.R @ self.y))
-        self.C = self.C + self.lam * (self.z ** 2 - self.C * self.z ** 2 - self.C * self.alpha_sq)
-        self.z = z
-        return self.y
-
-    def forward_c_a_adapt(self):
-        self.y = torch.tanh(self.D @ self.y + self.L @ self.z + self.bias)
-        z = torch.relu(self.C * (self.R @ self.y))
-        self.C = self.C + self.lam * (self.z**2 - self.C*self.z**2 - self.C*self.alpha_sq)
-        self.z = z
-        return self.y
