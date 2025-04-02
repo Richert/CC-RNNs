@@ -1,5 +1,3 @@
-import sys
-sys.path.append("/home/richard/PycharmProjects/CC-RNNs")
 from src.rnn import HHRNN
 from src.functions import init_weights, init_dendrites
 import torch
@@ -18,7 +16,8 @@ state_vars = ["y1", "y2"]
 visualization = {"connectivity": False, "inputs": False, "results": False}
 
 # load inputs and targets
-data = pickle.load(open("data/vanderpol_inputs_sr1.pkl", "rb"))
+path = "/home/richard/PycharmProjects/CC-RNNs"
+data = pickle.load(open(f"{path}/data/vanderpol_inputs_sr1.pkl", "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
