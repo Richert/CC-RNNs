@@ -1,3 +1,5 @@
+import sys
+sys.path.append("../")
 from src.rnn import HHRNN
 from src.functions import init_weights, init_dendrites
 import torch
