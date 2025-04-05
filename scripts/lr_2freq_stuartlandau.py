@@ -1,4 +1,4 @@
-from src.rnn import ConceptorLowRankRNN
+from src.rnn import LowRankCRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -84,8 +84,8 @@ for i, omega in enumerate(omegas):
 ######################
 
 # initialize RFC
-rnn = ConceptorLowRankRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
-                          torch.tensor(W_z, device=device, dtype=dtype), alpha=alpha, lam=lam)
+rnn = LowRankCRNN(torch.tensor(W, dtype=dtype, device=device), W_in, bias,
+                  torch.tensor(W_z, device=device, dtype=dtype), alpha=alpha, lam=lam)
 rnn.conceptors.update(conceptors)
 rnn.free_param("W")
 rnn.free_param("W_z")

@@ -71,14 +71,18 @@ def init_weights(N: int, M: int, density: float):
     return W
 
 
-def init_dendrites(N: int, n_dendrites: int, normalize: bool = True):
+def init_dendrites(N: int, n_dendrites: int, normalize: bool = True, min_dendrite: float = 0.1):
     M = N*n_dendrites
-    W = np.zeros((N, M))
+    R = np.zeros((N, M))
+    W = np.zeros((M, M))
     for neuron in range(N):
-        W[neuron, neuron*n_dendrites:(neuron+1)*n_dendrites] = np.random.rand(n_dendrites)
+        R[neuron, neuron*n_dendrites:(neuron+1)*n_dendrites] = (1.0-min_dendrite) * np.random.rand(n_dendrites) + min_dendrite
+        W[neuron*n_dendrites:(neuron+1)*n_dendrites, neuron*n_dendrites:(neuron+1)*n_dendrites] = (1.0-min_dendrite) * np.random.rand(n_dendrites, n_dendrites) + min_dendrite
         if normalize:
-            W[neuron, :] /= np.sum(W[neuron, :])
-    return W
+            R[neuron, :] /= np.sum(R[neuron, :])
+            for idx in range(neuron*n_dendrites, (neuron+1)*n_dendrites):
+                W[idx, :] /= np.sum(W[idx, :])
+    return W, R
 
 
 def nrmse(y: np.ndarray, target: np.ndarray):

@@ -1,4 +1,4 @@
-from src.rnn import ConceptorLowRankRNN
+from src.rnn import LowRankCRNN
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,9 +73,9 @@ alphas = (30.0, 1e-3)
 ######################
 
 # initialize RFC
-rnn = ConceptorLowRankRNN(W, W_in, bias,
-                          torch.tensor(L, device=device, dtype=dtype), torch.tensor(R, device=device, dtype=dtype),
-                          lam, alphas[0])
+rnn = LowRankCRNN(W, W_in, bias,
+                  torch.tensor(L, device=device, dtype=dtype), torch.tensor(R, device=device, dtype=dtype),
+                  lam, alphas[0])
 
 target_col, input_col, init_states = {}, {}, {}
 with torch.no_grad():

@@ -1,5 +1,7 @@
 import numpy as np
 import pickle
+import matplotlib.pyplot as plt
+
 
 def vanderpol(y1: np.ndarray, y2: np.ndarray, x: float, tau: float = 1.0) -> tuple:
     y1_dot = y2 / tau
@@ -20,18 +22,24 @@ dt = 0.01
 sampling_rate = 20
 steps = 2000
 
-# generate targets and inputs
+# condition parameters
 y0 = 2.0
+init_conditions = {0: (-y0, y0), 1: (y0, -y0), 2: (0.0, y0)}
+
+# plot parameters
+plot_examples = 6
+visualize = True
+
+# generate targets and inputs
 targets, inputs, conditions = [], [], []
 for n in range(trials):
     successful = False
     tau = (1.0 - min_tau) * np.random.rand() + min_tau
-    in_phase = np.random.choice(2)
+    c = np.random.choice(len(init_conditions))
     while not successful:
         y1 = np.zeros((2,)) - y0
         y2 = np.zeros((2,)) + y0
-        if not in_phase:
-            y1[0], y2[0] = y0, -y0
+        y1[0], y2[0] = init_conditions[c][0], init_conditions[c][1]
         x_col, y_col = [], []
         for step in range(steps + d):
             y1_dot, y2_dot = vanderpol(y1, y2, x=mu, tau=tau)
@@ -46,8 +54,23 @@ for n in range(trials):
             successful = True
     inputs.append(x_col[:-d])
     targets.append(y_col[d:])
-    conditions.append(in_phase)
+    conditions.append(c)
 
 # save results
 pickle.dump({"inputs": inputs, "targets": targets, "trial_conditions": conditions},
-            open(f"../data/2vdp_inputs_sr{sampling_rate}.pkl", "wb"))
+            open(f"../data/3vdp_inputs_sr{sampling_rate}.pkl", "wb"))
+
+# plot results
+fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2*plot_examples))
+for i, trial in enumerate(np.random.choice(trials, size=(plot_examples,))):
+    ax = axes[i]
+    ax.plot(inputs[trial], label="x")
+    ax.plot(targets[trial][:, 0], label="y1")
+    ax.plot(targets[trial][:, 1], label="y2")
+    ax.set_xlabel("time")
+    ax.set_ylabel("amplitude")
+    ax.set_title(f"training trial {trial+1}: in-phase = {conditions[trial]}")
+    ax.legend()
+fig.suptitle("Inputs (x) and Target Waveforms (y)")
+plt.tight_layout()
+plt.show()

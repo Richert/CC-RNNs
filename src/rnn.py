@@ -26,15 +26,6 @@ class RNN(torch.nn.Module):
         for v in self._state_vars:
             yield getattr(self, v)
 
-    @classmethod
-    def random_init(cls, N: int, n_in: int, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
-                    rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
-
-        W = torch.tensor(sr * init_weights(N, N, density), device=device, dtype=dtype)
-        W_in = torch.tensor(rf_var * np.random.randn(N, n_in), device=device, dtype=dtype)
-        bias = torch.tensor(bias_var * np.random.randn(N), device=device, dtype=dtype)
-        return cls(W, W_in, bias)
-
     def forward(self, x):
         self._update_layer(self._inp_layer(x))
         return self._out_layer()
@@ -130,7 +121,7 @@ class RNN(torch.nn.Module):
         return W_readout, tensor_nrmse(W_readout @ y, target)
 
     def _inp_layer(self, x):
-        return self.W_in @ x + self.bias
+        return self.W_in @ x
 
     def _noinp_layer(self):
         return self.D @ self.y + self.bias
@@ -139,7 +130,7 @@ class RNN(torch.nn.Module):
         return self.y
 
     def _update_layer(self, x):
-        self.y = self.f(self.W @ self.y + x)
+        self.y = self.f(self.W @ self.y + x + self.bias)
 
     @staticmethod
     def _get_activation_function(f: Union[str, Callable]):
@@ -154,27 +145,16 @@ class RNN(torch.nn.Module):
 
 class LowRankRNN(RNN):
 
-    def __init__(self, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
+    def __init__(self, W: torch.Tensor, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
                  f: Union[str, Callable] = "Tanh", g: Union[str, Callable] = "Identity"):
 
-        super().__init__(L, W_in, bias, f=f)
-        self.W_z = R
+        super().__init__(W, W_in, bias, f=f)
+        self.L = L
+        self.R = R
         self.rank = L.shape[1]
         self.z = torch.zeros((self.rank,), device=self.device, dtype=self.dtype)
         self.g = self._get_activation_function(g)
         self._state_vars = ["y", "z"]
-
-    @classmethod
-    def random_init(cls, N: int, n_in: int, rank: int = 1, sr: float = 1.0, density: float = 0.2, bias_var: float = 0.2,
-                    rf_var: float = 1.0, device: str = "cpu", dtype: torch.dtype = torch.float64):
-
-        rnn = super().random_init(N, n_in, sr*0.5, density, bias_var, rf_var, device, dtype)
-        L = init_weights(N, rank, density)
-        R = init_weights(rank, N, density)
-        sr_comb = np.max(np.abs(np.linalg.eigvals(np.dot(L, R))))
-        L *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
-        R *= np.sqrt(sr*0.5) / np.sqrt(sr_comb)
-        return cls(L, R, rnn.W_in, rnn.bias)
 
     def get_vf(self, grid_points: int, lower_bounds: Iterable, upper_bounds: Iterable, *args, **kwargs) -> tuple:
         return super().get_vf(self.L, self.R, grid_points, lower_bounds, upper_bounds, *args, **kwargs)
@@ -183,8 +163,175 @@ class LowRankRNN(RNN):
         return self.z
 
     def _update_layer(self, x):
-        self.y = self.f(self.W @ self.z + x)
-        self.z = self.g(self.W_z @ self.y)
+        self.y = self.f(self.W @ self.y + self.L @ self.z + x)
+        self.z = self.g(self.R @ self.y + self.bias)
+
+
+class LowRankCRNN(LowRankRNN):
+
+    def __init__(self, W: torch.Tensor, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
+                 lam: float, alpha: float, g: Union[str, Callable] = "Identity"):
+
+        super().__init__(W, L, R, W_in, bias, g=g)
+        self.alpha_sq = alpha ** (-2)
+        self.lam = lam
+        self.z_controllers = {}
+        self.y_controllers = {}
+        self.C_z = torch.ones_like(self.z)
+        self.C_y = torch.ones_like(self.y)
+
+    def update_z_controller(self):
+        self.C_z = self.C_z + self.lam * (self.z ** 2 - self.C_z * self.z ** 2 - self.C_z * self.alpha_sq)
+
+    def update_y_controller(self):
+        self.C_y = self.C_y + self.lam * (self.y ** 2 - self.C_y * self.y ** 2 - self.C_y * self.alpha_sq)
+
+    def activate_z_controller(self, key):
+        self.C_z = self.z_controllers[key]
+
+    def activate_y_controller(self, key):
+        self.C_y = self.y_controllers[key]
+
+    def store_z_controller(self, key):
+        self.z_controllers[key] = self.C_z
+
+    def store_y_controller(self, key):
+        self.y_controllers[key] = self.C_y
+
+    def init_new_z_controller(self, init_value: str = "zero"):
+        if init_value == "zero":
+            self.C_z = torch.zeros_like(self.z)
+        elif init_value == "random":
+            self.C_z = torch.rand(size=self.z.size(), dtype=self.z.dtype, device=self.z.device)
+        else:
+            self.C_z = torch.ones_like(self.z)
+
+    def init_new_y_controller(self, init_value: str = "zero"):
+        if init_value == "zero":
+            self.C_y = torch.zeros_like(self.y)
+        elif init_value == "random":
+            self.C_y = torch.rand(size=self.y.size(), dtype=self.y.dtype, device=self.y.device)
+        else:
+            self.C_y = torch.ones_like(self.y)
+
+    def detach(self):
+        super().detach()
+        self.C_z = self.C_z.detach()
+        self.C_y = self.C_y.detach()
+
+    def _update_layer(self, x):
+        self.y = self.C_y * self.f(self.W @ self.y + self.L @ self.z + x)
+        self.z = self.C_z * self.g(self.R @ self.y + self.bias)
+
+    @staticmethod
+    def combine_conceptors(C1: torch.Tensor, C2: torch.Tensor, operation: str, eps: float = 1e-3) -> torch.Tensor:
+
+        C_comb = torch.zeros_like(C1)
+        zero = eps
+        one = 1 - eps
+
+        if operation == "and":
+
+            idx = (C1 < zero) * (C2 < zero)
+            C_comb[idx == 1.0] = 0.0
+            C1_tmp = C1[idx < 1.0]
+            C2_tmp = C2[idx < 1.0]
+            C_comb[idx < 1.0] = (C1_tmp * C2_tmp) / (C1_tmp + C2_tmp - C1_tmp * C2_tmp)
+
+        elif operation == "or":
+
+            idx = (C1 > one) * (C2 > one)
+            C_comb[idx == 1.0] = 1.0
+            C1_tmp = C1[idx < 1.0]
+            C2_tmp = C2[idx < 1.0]
+            C_comb[idx < 1.0] = (C1_tmp + C2_tmp - 2 * C1_tmp * C2_tmp) / (1 - C1_tmp * C2_tmp)
+
+        else:
+
+            raise ValueError(f"Invalid operation for combining conceptors: {operation}.")
+
+        return C_comb
+
+
+class HHRNN(LowRankCRNN):
+
+    def __init__(self, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
+                 g_s: float = 120.0, g_p: float = 36.0, g_l: float = 0.3, E_s: float = 50.0, E_p: float = -77.0,
+                 E_l: float = -54.4, C: float = 1.0, gamma: float = 1.0, theta: float = 30.0,
+                 dt: float = 1e-3, g: Union[str, Callable] = "Identity", alpha: float = 100.0, lam: float = 1e-3):
+
+        super().__init__(L, R, W_in, bias, g=g, alpha=alpha, lam=lam)
+        self.g_s = g_s
+        self.g_p = g_p
+        self.g_l = g_l
+        self.E_s = E_s
+        self.E_p = E_p
+        self.E_l = E_l
+        self.C = C
+        self.u = torch.zeros_like(self.y)
+        self.w = torch.zeros_like(self.z)
+        self.dt = dt
+        self.gamma = gamma
+        self.theta = theta
+        self._state_vars = ["y", "u", "z", "w"]
+
+    def f(self, x):
+        return torch.sigmoid(self.gamma*(x-self.theta))
+
+    def _out_layer(self):
+        return self.f(self.z)
+
+    def _update_layer(self, x):
+        dy, du, dz, dw = self._rhs_layer(x, self.y, self.u, self.z, self.w)
+        self.y = self.y + self.dt * dy
+        self.u = self.u + self.dt * du
+        self.z = self.z + self.dt * dz
+        self.w = self.w + self.dt * dw
+
+    def _heun_update_layer(self, x):
+        dy, du, dz, dw = self._rhs_layer(x, self.y, self.u, self.z, self.w)
+        y_tmp = self.y + 0.5*self.dt * dy
+        u_tmp = self.u + 0.5*self.dt * du
+        z_tmp = self.z + 0.5*self.dt * dz
+        w_tmp = self.w + 0.5*self.dt * dw
+        dy, du, dz, dw = self._rhs_layer(x, y_tmp, u_tmp, z_tmp, w_tmp)
+        self.y = self.y + self.dt * dy
+        self.u = self.u + self.dt * du
+        self.z = self.z + self.dt * dz
+        self.w = self.w + self.dt * dw
+
+    def _rhs_layer(self, x, y, u, z, w):
+        dy = (self.W @ self.f(z) + x - self._sodium(y, u) - self._potassium(y, u) - self._leak(y)) / self.C
+        du = self._alpha_n(y) * (1 - u) - self._beta_n(y) * u
+        dz = (self.g(self.W_z @ y - z) - self._sodium(z, w) - self._potassium(z, w) - self._leak(z)) / self.C
+        dw = self._alpha_n(z) * (1 - w) - self._beta_n(z) * w
+        return dy, du, dz, dw
+
+    def _sodium(self, v, n):
+        alpha = self._alpha_m(v)
+        return self.g_s*(v-self.E_s)*(0.8-n)*(alpha/(alpha + self._beta_m(v)))**3
+
+    def _potassium(self, v, n):
+        return self.g_p*(v-self.E_p)*n**4
+
+    def _leak(self, v):
+        return self.g_l*(v-self.E_l)
+
+    @staticmethod
+    def _alpha_n(v: torch.Tensor):
+        return 0.01*(v + 55.0)/(1.0 - torch.exp(-(v+55.0)/10.0))
+
+    @staticmethod
+    def _beta_n(v: torch.Tensor):
+        return 0.125*torch.exp(-(v+65.0)/80.0)
+
+    @staticmethod
+    def _alpha_m(v: torch.Tensor):
+        return 0.1*(v+40.0)/(1.0 - torch.exp(-(v+40.0)/10.0))
+
+    @staticmethod
+    def _beta_m(v: torch.Tensor):
+        return 4.0*torch.exp(-(v+65.0)/18.0)
 
 
 class FHNRNN(LowRankRNN):
@@ -267,166 +414,3 @@ class AutoConceptorRNN(ConceptorRNN):
     def _update_layer(self, y):
         super()._update_layer(y)
         self.C = self.C + self.lam * ((self.y - self.C @ self.y) @ self.y.T) - self.C * self.alpha_sq
-
-
-class ConceptorLowRankRNN(LowRankRNN):
-
-    def __init__(self, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
-                 lam: float, alpha: float, g: Union[str, Callable] = "Identity"):
-
-        super().__init__(L, R, W_in, bias, g=g)
-        self.alpha_sq = alpha ** (-2)
-        self.lam = lam
-        self.c_weights = torch.zeros_like(self.z)
-        self.conceptors = {}
-
-    @classmethod
-    def random_init(cls, N: int, n_in: int, rank: int = 1, lam: float = 0.01, alpha: float = 10.0, sr: float = 1.0,
-                    density: float = 0.2, bias_var: float = 0.2, rf_var: float = 1.0, device: str = "cpu",
-                    dtype: torch.dtype = torch.float64):
-        lr = super().random_init(N, n_in, rank, sr, density, bias_var, rf_var, device, dtype)
-        return cls(lr.L, lr.R, lr.W_in, lr.bias, lam, alpha)
-
-    def forward_c(self, x):
-        z = self.c_weights * super().forward(x)
-        self.z = z
-        return z
-
-    def forward_c_a(self):
-        z = self.c_weights * super().forward_a()
-        self.z = z
-        return z
-
-    def forward_c_adapt(self, x):
-        z = self.c_weights * super().forward(x)
-        self.c_weights = self.c_weights + self.lam * (self.z ** 2 - self.c_weights * self.z ** 2 - self.c_weights * self.alpha_sq)
-        self.z = z
-        return z
-
-    def activate_conceptor(self, key):
-        self.c_weights = self.conceptors[key]
-
-    def store_conceptor(self, key):
-        self.conceptors[key] = self.c_weights
-
-    def init_new_conceptor(self, init_value: str = "zero"):
-        if init_value == "zero":
-            self.c_weights = torch.zeros_like(self.z)
-        elif init_value == "random":
-            self.c_weights = torch.rand(size=self.z.size(), dtype=self.z.dtype, device=self.z.device)
-        else:
-            self.c_weights = torch.ones_like(self.z)
-
-    def detach(self):
-        super().detach()
-        self.c_weights = self.c_weights.detach()
-
-    @staticmethod
-    def combine_conceptors(C1: torch.Tensor, C2: torch.Tensor, operation: str, eps: float = 1e-3) -> torch.Tensor:
-
-        C_comb = torch.zeros_like(C1)
-        zero = eps
-        one = 1 - eps
-
-        if operation == "and":
-
-            idx = (C1 < zero) * (C2 < zero)
-            C_comb[idx == 1.0] = 0.0
-            C1_tmp = C1[idx < 1.0]
-            C2_tmp = C2[idx < 1.0]
-            C_comb[idx < 1.0] = (C1_tmp * C2_tmp) / (C1_tmp + C2_tmp - C1_tmp * C2_tmp)
-
-        elif operation == "or":
-
-            idx = (C1 > one) * (C2 > one)
-            C_comb[idx == 1.0] = 1.0
-            C1_tmp = C1[idx < 1.0]
-            C2_tmp = C2[idx < 1.0]
-            C_comb[idx < 1.0] = (C1_tmp + C2_tmp - 2 * C1_tmp * C2_tmp) / (1 - C1_tmp * C2_tmp)
-
-        else:
-
-            raise ValueError(f"Invalid operation for combining conceptors: {operation}.")
-
-        return C_comb
-
-
-class HHRNN(ConceptorLowRankRNN):
-
-    def __init__(self, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
-                 g_s: float = 120.0, g_p: float = 36.0, g_l: float = 0.3, E_s: float = 50.0, E_p: float = -77.0,
-                 E_l: float = -54.4, C: float = 1.0, gamma: float = 1.0, theta: float = 30.0,
-                 dt: float = 1e-3, g: Union[str, Callable] = "Identity", alpha: float = 100.0, lam: float = 1e-3):
-
-        super().__init__(L, R, W_in, bias, g=g, alpha=alpha, lam=lam)
-        self.g_s = g_s
-        self.g_p = g_p
-        self.g_l = g_l
-        self.E_s = E_s
-        self.E_p = E_p
-        self.E_l = E_l
-        self.C = C
-        self.u = torch.zeros_like(self.y)
-        self.w = torch.zeros_like(self.z)
-        self.dt = dt
-        self.gamma = gamma
-        self.theta = theta
-        self._state_vars = ["y", "u", "z", "w"]
-
-    def f(self, x):
-        return torch.sigmoid(self.gamma*(x-self.theta))
-
-    def _out_layer(self):
-        return self.f(self.z)
-
-    def _update_layer(self, x):
-        dy, du, dz, dw = self._rhs_layer(x, self.y, self.u, self.z, self.w)
-        self.y = self.y + self.dt * dy
-        self.u = self.u + self.dt * du
-        self.z = self.z + self.dt * dz
-        self.w = self.w + self.dt * dw
-
-    def _heun_update_layer(self, x):
-        dy, du, dz, dw = self._rhs_layer(x, self.y, self.u, self.z, self.w)
-        y_tmp = self.y + 0.5*self.dt * dy
-        u_tmp = self.u + 0.5*self.dt * du
-        z_tmp = self.z + 0.5*self.dt * dz
-        w_tmp = self.w + 0.5*self.dt * dw
-        dy, du, dz, dw = self._rhs_layer(x, y_tmp, u_tmp, z_tmp, w_tmp)
-        self.y = self.y + self.dt * dy
-        self.u = self.u + self.dt * du
-        self.z = self.z + self.dt * dz
-        self.w = self.w + self.dt * dw
-
-    def _rhs_layer(self, x, y, u, z, w):
-        dy = (self.W @ self.f(z) + x - self._sodium(y, u) - self._potassium(y, u) - self._leak(y)) / self.C
-        du = self._alpha_n(y) * (1 - u) - self._beta_n(y) * u
-        dz = (self.g(self.W_z @ y - z) - self._sodium(z, w) - self._potassium(z, w) - self._leak(z)) / self.C
-        dw = self._alpha_n(z) * (1 - w) - self._beta_n(z) * w
-        return dy, du, dz, dw
-
-    def _sodium(self, v, n):
-        alpha = self._alpha_m(v)
-        return self.g_s*(v-self.E_s)*(0.8-n)*(alpha/(alpha + self._beta_m(v)))**3
-
-    def _potassium(self, v, n):
-        return self.g_p*(v-self.E_p)*n**4
-
-    def _leak(self, v):
-        return self.g_l*(v-self.E_l)
-
-    @staticmethod
-    def _alpha_n(v: torch.Tensor):
-        return 0.01*(v + 55.0)/(1.0 - torch.exp(-(v+55.0)/10.0))
-
-    @staticmethod
-    def _beta_n(v: torch.Tensor):
-        return 0.125*torch.exp(-(v+65.0)/80.0)
-
-    @staticmethod
-    def _alpha_m(v: torch.Tensor):
-        return 0.1*(v+40.0)/(1.0 - torch.exp(-(v+40.0)/10.0))
-
-    @staticmethod
-    def _beta_m(v: torch.Tensor):
-        return 4.0*torch.exp(-(v+65.0)/18.0)
