@@ -170,7 +170,7 @@ class LowRankRNN(RNN):
 class LowRankCRNN(LowRankRNN):
 
     def __init__(self, W: torch.Tensor, L: torch.Tensor, R: torch.Tensor, W_in: torch.Tensor, bias: torch.Tensor,
-                 lam: float, alpha: float, g: Union[str, Callable] = "Identity"):
+                 lam: float = 1e-3, alpha: float = 1.0, g: Union[str, Callable] = "Identity"):
 
         super().__init__(W, L, R, W_in, bias, g=g)
         self.alpha_sq = alpha ** (-2)
@@ -206,13 +206,15 @@ class LowRankCRNN(LowRankRNN):
         else:
             self.C_z = torch.ones_like(self.z)
 
-    def init_new_y_controller(self, init_value: str = "zero"):
+    def init_new_y_controller(self, init_value: Union[str, torch.Tensor] = "zero"):
         if init_value == "zero":
             self.C_y = torch.zeros_like(self.y)
         elif init_value == "random":
             self.C_y = torch.rand(size=self.y.size(), dtype=self.y.dtype, device=self.y.device)
-        else:
+        elif init_value == "ones":
             self.C_y = torch.ones_like(self.y)
+        else:
+            self.C_y = init_value
 
     def detach(self):
         super().detach()
