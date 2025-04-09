@@ -10,7 +10,7 @@ import pickle
 # general
 dtype = torch.float64
 device = "cpu"
-file = "/home/richard-gast/Documents/data/clr_dynamics.pkl"
+file = "/home/richard/data/clr_dynamics.pkl"
 
 # task parameters
 steps = 200
