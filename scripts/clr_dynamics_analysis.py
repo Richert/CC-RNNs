@@ -23,13 +23,36 @@ def memory_capacity(x: np.ndarray, y: np.ndarray, d_max: int, alpha: float = 1e-
     return capacities
 
 
-def timescale_heterogeneity(x: np.ndarray, n_bins: int) -> float:
+def timescale_heterogeneity(x: np.ndarray) -> float:
     fourier_transforms = []
     for i in range(x.shape[1]):
-        fourier_transforms.extend(np.fft.rfft(x[:, i]).tolist())
-    z, _ = np.histogram(np.abs(np.asarray(fourier_transforms))**2, bins=n_bins)
-    z = z / np.sum(z)
-    return entropy(z)
+        x_ft = np.abs(np.fft.rfft(x[:, i] - np.mean(x[:, i])))
+        fourier_transforms.append(x_ft)
+    z = np.sum(fourier_transforms, axis=0)
+    H = entropy(z / np.sum(z)) * np.sum(z)
+
+    # fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
+    # ax = axes[0]
+    # im = ax.imshow(x.T, aspect="auto", interpolation="none")
+    # plt.colorbar(im, ax=ax)
+    # ax.set_xlabel("steps")
+    # ax.set_ylabel("neurons")
+    # ax.set_title("Raw signals")
+    # ax = axes[1]
+    # im = ax.imshow(np.asarray(fourier_transforms), aspect="auto", interpolation="none")
+    # plt.colorbar(im, ax=ax)
+    # ax.set_xlabel("freqs")
+    # ax.set_ylabel("neurons")
+    # ax.set_title("FFT signals")
+    # ax = axes[2]
+    # ax.bar(np.arange(len(z)), z, width=0.7)
+    # ax.set_xlabel("freqs")
+    # ax.set_ylabel("p")
+    # ax.set_title(f"timescale distribution: H = {np.round(H, decimals=3)}")
+    # plt.tight_layout()
+    # plt.show()
+
+    return H
 
 
 # load data
@@ -48,7 +71,6 @@ df = DataFrame(columns=columns + ["lyapunov", "memory", "timescale_heterogeneity
 
 # analysis of model dynamics
 d_max = 20
-n_bins = 10
 for n in range(len(lyapunov)):
 
     # calculate maximum lyapunov exponent
@@ -63,7 +85,7 @@ for n in range(len(lyapunov)):
 
     # calculate time scale heterogeneity
     z = data["z_unperturbed"][n]
-    ts = timescale_heterogeneity(z, n_bins)
+    ts = timescale_heterogeneity(z)
 
     # store results
     for c in columns:

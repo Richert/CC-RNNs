@@ -10,19 +10,17 @@ data = pickle.load(open(f"{path}/data/clr_dynamics.pkl", "rb"))
 results = read_csv(f"{path}/results/clr_dynamics.csv")
 
 # plot raw dynamics
-n_examples = 2
-k = [100]
+n_examples = 1
 lam = [0.0]
 Delta = [0.0]
 sigma = [1.5]
-for k_tmp, lam_tmp, Delta_tmp, sigma_tmp in zip(k, lam, Delta, sigma):
+for lam_tmp, Delta_tmp, sigma_tmp in zip(lam, Delta, sigma):
 
     # get index of condition
-    k_idx = np.asarray(data["k"]) == k_tmp
     lam_idx = np.asarray(data["lambda"]) == lam_tmp
     delta_idx = np.asarray(data["Delta"]) == Delta_tmp
     sigma_idx = np.asarray(data["sigma"]) == sigma_tmp
-    final_idx = 1.0 * k_idx * lam_idx * delta_idx * sigma_idx
+    final_idx = 1.0 * lam_idx * delta_idx * sigma_idx
 
     # create figure
     fig = plt.figure(figsize=(12, 5*n_examples))
@@ -50,14 +48,12 @@ for k_tmp, lam_tmp, Delta_tmp, sigma_tmp in zip(k, lam, Delta, sigma):
     plt.tight_layout()
 
 # plot 2D matrices
-k = [100]
 lam = [0.0]
-for k_tmp, lam_tmp in zip(k, lam):
+for lam_tmp in lam:
 
     # reduce data to the plotting selection
-    k_idx = np.asarray(data["k"]) == k_tmp
     lam_idx = np.asarray(data["lambda"]) == lam_tmp
-    final_idx = 1.0 * k_idx * lam_idx
+    final_idx = 1.0 * lam_idx
     df = results.loc[final_idx > 0, :]
     deltas = np.unique(df.loc[:, "Delta"].values)
     sigmas = np.unique(df.loc[:, "sigma"].values)
