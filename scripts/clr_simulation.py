@@ -12,7 +12,7 @@ dtype = torch.float64
 device = "cpu"
 
 # simulation parameters
-steps = 100
+steps = 200
 
 # rnn parameters
 n_in = 1
@@ -20,15 +20,15 @@ n_out = 1
 k = 100
 n_dendrites = 10
 N = int(k*n_dendrites)
-in_scale = 1.0
-bias_scale = 0.32
+in_scale = 0.2
 density = 0.5
-g_l = 1.0
 g_w = 0.0
+sigma = 0.4
+Delta = 0.05
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
-bias = torch.tensor(bias_scale * np.random.randn(k), device=device, dtype=dtype)
+bias = torch.tensor(Delta * np.random.randn(k), device=device, dtype=dtype)
 L = init_weights(N, k, density)
 W, R = init_dendrites(k, n_dendrites)
 
@@ -36,13 +36,13 @@ W, R = init_dendrites(k, n_dendrites)
 ############
 
 # model initialization
-rnn = LowRankCRNN(torch.tensor(W*g_w, dtype=dtype, device=device), torch.tensor(L*g_l, dtype=dtype, device=device),
+rnn = LowRankCRNN(torch.tensor(W*g_w, dtype=dtype, device=device), torch.tensor(L, dtype=dtype, device=device),
                   torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
-rnn.C_z *= 0.8
+rnn.C_z *= sigma
 
 # input definition
 inp = torch.zeros((steps, n_in), device=device, dtype=dtype)
-inp[0, :] = 1.0
+# inp[0, :] = 1.0
 
 # model dynamics simulation
 y_col, z_col = [], []
@@ -51,9 +51,6 @@ with torch.no_grad():
         rnn.forward(inp[step])
         y_col.append(rnn.y.detach().cpu().numpy())
         z_col.append(rnn.z.detach().cpu().numpy())
-        if step == int(0.5*steps):
-            #rnn.bias += 0.2
-            rnn.C_z *= 0.9
 y_col = np.asarray(y_col)
 z_col = np.asarray(z_col)
 
