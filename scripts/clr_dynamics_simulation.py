@@ -15,8 +15,8 @@ device = "cpu"
 file = "/home/richard/data/clr_dynamics.pkl"
 
 # task parameters
-steps = 200
-noise_steps = 200
+steps = 500
+noise_steps = 500
 epsilon = 1e-2
 
 # rnn parameters
@@ -28,9 +28,9 @@ in_scale = 0.2
 N = int(k * n_dendrites)
 
 # sweep parameters
-lam = [0.0, 0.05, 0.1, 0.2, 0.4]
-Delta = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-sigma = [0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.1]
+lam = [0.0]
+Delta = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+sigma = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
 n_reps = 20
 n_trials = len(lam)*len(Delta)*len(sigma)*n_reps
 

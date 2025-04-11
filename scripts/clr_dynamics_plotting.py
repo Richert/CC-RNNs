@@ -13,7 +13,7 @@ results = read_csv(f"{path}/results/clr_dynamics.csv")
 n_examples = 1
 lam = [0.0]
 Delta = [0.0]
-sigma = [1.5]
+sigma = [1.9]
 for lam_tmp, Delta_tmp, sigma_tmp in zip(lam, Delta, sigma):
 
     # get index of condition
@@ -58,10 +58,11 @@ for lam_tmp in lam:
     deltas = np.unique(df.loc[:, "Delta"].values)
     sigmas = np.unique(df.loc[:, "sigma"].values)
 
-    # create 2D matrix of LE, MC, and TS
+    # create 2D matrix of LE, MC, PR, and TS
     LE = np.zeros((len(deltas), len(sigmas)))
     C = np.zeros_like(LE)
     TS = np.zeros_like(LE)
+    PR = np.zeros_like(LE)
     for i, Delta in enumerate(deltas):
         for j, sigma in enumerate(sigmas):
             idx1 = df.loc[:, "Delta"].values == Delta
@@ -69,13 +70,15 @@ for lam_tmp in lam:
             LE[i, j] = np.mean(df.loc[idx1 & idx2, "lyapunov"].values)
             C[i, j] = np.mean(df.loc[idx1 & idx2, "memory"].values)
             TS[i, j] = np.mean(df.loc[idx1 & idx2, "timescale_heterogeneity"].values)
+            PR[i, j] = np.mean(df.loc[idx1 & idx2, "dimensionality"].values)
     LE = DataFrame(columns=sigmas, index=deltas, data=LE)
     C = DataFrame(columns=sigmas, index=deltas, data=C)
     TS = DataFrame(columns=sigmas, index=deltas, data=TS)
+    PR = DataFrame(columns=sigmas, index=deltas, data=PR)
 
     # create LE figure
     fig, ax = plt.subplots(figsize=(8, 6))
-    sb.heatmap(LE, ax=ax, cmap="vlag", vmin=-0.3, vmax=0.3)
+    sb.heatmap(LE, ax=ax, cmap="vlag", vmin=np.min(LE), vmax=-np.min(LE))
     ax.set_xlabel("sigma")
     ax.set_ylabel("Delta")
     ax.set_title("Maximum Lyapunov Exponent")
@@ -95,6 +98,14 @@ for lam_tmp in lam:
     ax.set_xlabel("sigma")
     ax.set_ylabel("Delta")
     ax.set_title("Timescale Heterogeneity")
+    plt.tight_layout()
+
+    # create PR figure
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sb.heatmap(PR, ax=ax, cmap="cividis")
+    ax.set_xlabel("sigma")
+    ax.set_ylabel("Delta")
+    ax.set_title("Participation Ratio")
     plt.tight_layout()
 
 plt.show()

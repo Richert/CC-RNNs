@@ -30,16 +30,16 @@ noise_lvl = 0.01
 inputs = [inp + noise_lvl * np.random.randn(*inp.shape) for inp in inputs]
 
 # rnn parameters
-k = 100
+k = 10
 n_dendrites = 10
 n_in = 1
 n_out = 1
 density = 0.5
 in_scale = 0.2
-out_scale = 1.0
+out_scale = 0.2
 lam = 0.0
 Delta = 0.1
-sigma = 1.3
+sigma = 0.8
 N = int(k * n_dendrites)
 
 # training parameters
@@ -47,7 +47,7 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 5e-3
+lr = 1e-2
 betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e4
@@ -59,7 +59,7 @@ batches = int(augmentation * train_trials / batch_size)
 # initialize rnn matrices
 bias = torch.tensor(Delta * np.random.randn(k), device=device, dtype=dtype)
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
-L = init_weights(N, k, density)
+L = init_weights(N, k, density) * sigma
 W, R = init_dendrites(k, n_dendrites)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype)
 
@@ -103,31 +103,33 @@ if visualization["inputs"]:
 # model initialization
 rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
                   torch.tensor(L*(1-lam), dtype=dtype, device=device),
-                  torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
+                  torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU", lam=1e-3, alpha=1.0)
+rnn.free_param("W_in")
+rnn.free_param("bias")
+rnn.free_param("L")
 
 # input definition
 inp = torch.zeros((steps, n_in), device=device, dtype=dtype)
 
 # get initial state
-for step in range(init_steps):
-    x = torch.randn(n_in, dtype=dtype, device=device)
-    rnn.forward(x)
-init_state = [v[:] + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
+with torch.no_grad():
+    for step in range(init_steps):
+        x = torch.randn(n_in, dtype=dtype, device=device)
+        rnn.forward(x)
+init_state = [v.detach() + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
 
 # initialize z controllers
 unique_conditions = np.unique(conditions)
 other_conditions = {}
 for c in unique_conditions:
     rnn.init_new_z_controller(init_value="ones")
-    rnn.C_z *= sigma
-    rnn.C_z.requires_grad = True
     rnn.store_z_controller(c)
 
 # set up loss function
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.z_controllers.values()) + [W_in, bias, W_r], lr=lr, betas=betas)
+optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
 rnn.clip(gradient_cutoff)
 
 # training
@@ -153,6 +155,7 @@ with torch.enable_grad():
             y_col = []
             for step in range(steps):
                 z = rnn.forward(inp[step:step + 1])
+                rnn.update_z_controller()
                 y = W_r @ z
                 if step % truncation_steps == truncation_steps - 1:
                     rnn.detach()
@@ -163,8 +166,8 @@ with torch.enable_grad():
             loss += loss_func(y_col, target)
 
         # make update
-        for c in rnn.z_controllers.values():
-            loss += alpha*torch.sum(c)
+        # for c in rnn.z_controllers.values():
+        #     loss += alpha*torch.sum(c)
         optim.zero_grad()
         loss.backward()
         optim.step()

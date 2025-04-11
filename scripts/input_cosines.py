@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 
 # task parameters
 trials = 10000
-omegas = [4.0, 6.0, 8.0]
+omegas = [2.0]
 inp_width = 1
-steps = 100
+steps = 200
 dt = 0.01
 time = np.arange(steps) * dt
 

@@ -23,6 +23,13 @@ def memory_capacity(x: np.ndarray, y: np.ndarray, d_max: int, alpha: float = 1e-
     return capacities
 
 
+def participation_ratio(x: np.ndarray):
+    x_norm = np.asarray([x[:, i] - np.mean(x[:, i]) for i in range(x.shape[1])])
+    cov = x_norm.T @ x_norm
+    lambdas = np.real(np.linalg.eigvals(cov))
+    return np.sum(lambdas)**2/np.sum(lambdas**2)/cov.shape[0]
+
+
 def timescale_heterogeneity(x: np.ndarray) -> float:
     fourier_transforms = []
     for i in range(x.shape[1]):
@@ -65,9 +72,10 @@ data = pickle.load(open(load_file, "rb"))
 lyapunov = np.zeros((len(data["trial"]),))
 memory = np.zeros((len(data["trial"])))
 columns = list(data.keys())
+measures = ["lyapunov", "memory", "timescale_heterogeneity", "dimensionality"]
 for key in ["z_perturbed", "z_unperturbed", "z_memory", "x"]:
     columns.pop(columns.index(key))
-df = DataFrame(columns=columns + ["lyapunov", "memory", "timescale_heterogeneity"], index=np.arange(0, len(lyapunov)))
+df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 
 # analysis of model dynamics
 d_max = 20
@@ -87,12 +95,16 @@ for n in range(len(lyapunov)):
     z = data["z_unperturbed"][n]
     ts = timescale_heterogeneity(z)
 
+    # calculate dimensionality
+    dim = participation_ratio(z)
+
     # store results
     for c in columns:
         df.loc[n, c] = data[c][n]
     df.loc[n, "lyapunov"] = le
     df.loc[n, "memory"] = np.sum(mc)
     df.loc[n, "timescale_heterogeneity"] = ts
+    df.loc[n, "dimensionality"] = dim
 
 # save results
 df.to_csv(save_file)
