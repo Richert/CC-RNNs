@@ -77,7 +77,7 @@ for key in ["z_perturbed", "z_unperturbed", "z_memory", "x"]:
 df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 
 # analysis of model dynamics
-d_max = 30
+d_max = 50
 for n in range(len(lyapunov)):
 
     # calculate maximum lyapunov exponent
