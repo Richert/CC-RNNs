@@ -2,7 +2,6 @@ import numpy as np
 import pickle
 from pandas import DataFrame
 from src.functions import ridge
-import matplotlib.pyplot as plt
 
 
 def entropy(x: np.ndarray) -> float:
@@ -63,7 +62,7 @@ def timescale_heterogeneity(x: np.ndarray) -> float:
 
 
 # load data
-path = "/home/richard-gast/Documents/"
+path = "/home/richard"
 load_file = f"{path}/data/clr_dynamics.pkl"
 save_file = f"{path}/results/clr_dynamics.csv"
 data = pickle.load(open(load_file, "rb"))
@@ -78,7 +77,7 @@ for key in ["z_perturbed", "z_unperturbed", "z_memory", "x"]:
 df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 
 # analysis of model dynamics
-d_max = 20
+d_max = 50
 for n in range(len(lyapunov)):
 
     # calculate maximum lyapunov exponent

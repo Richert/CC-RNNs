@@ -30,7 +30,7 @@ noise_lvl = 0.01
 inputs = [inp + noise_lvl * np.random.randn(*inp.shape) for inp in inputs]
 
 # rnn parameters
-k = 10
+k = 100
 n_dendrites = 10
 n_in = 1
 n_out = 1
@@ -39,7 +39,7 @@ in_scale = 0.2
 out_scale = 0.2
 lam = 0.0
 Delta = 0.1
-sigma = 0.8
+sigma = 1.0
 N = int(k * n_dendrites)
 
 # training parameters
@@ -47,7 +47,7 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 1e-2
+lr = 1e-1
 betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e4
@@ -103,7 +103,7 @@ if visualization["inputs"]:
 # model initialization
 rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
                   torch.tensor(L*(1-lam), dtype=dtype, device=device),
-                  torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU", lam=1e-3, alpha=1.0)
+                  torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU", lam=1e-4, alpha=1.0)
 rnn.free_param("W_in")
 rnn.free_param("bias")
 rnn.free_param("L")
