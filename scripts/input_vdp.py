@@ -9,6 +9,9 @@ def vanderpol(y1: np.ndarray, y2: np.ndarray, x: float, tau: float = 1.0) -> tup
     return y1_dot, y2_dot
 
 
+# general parameters
+save_path = f"/home/richard/data"
+
 # task parameters
 trials = 10000
 min_mu, max_mu = -1.0, 1.0
@@ -52,7 +55,7 @@ for n in range(trials):
 
 # save results
 pickle.dump({"inputs": inputs, "targets": targets, "trial_conditions": conditions},
-            open(f"../data/vdp_{n_conditions}freqs.pkl", "wb"))
+            open(f"{save_path}/vdp_{n_conditions}freqs.pkl", "wb"))
 
 # plot results
 # fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2*plot_examples))
