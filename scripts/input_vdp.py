@@ -15,7 +15,7 @@ save_path = f"/home/richard/data"
 # task parameters
 trials = 10000
 min_mu, max_mu = -1.0, 1.0
-taus = [0.5, 1.0, 2.0]
+taus = [1.0, 2.0, 4.0]
 n_conditions = len(taus)
 d = 1
 dt = 0.01
@@ -43,7 +43,7 @@ for n in range(trials):
             y2 = y2 + dt * y2_dot
             if step % sampling_rate == 0:
                 y_col.append(y1)
-            if not np.isfinite(y1[0]):
+            if not np.isfinite(y_col[-1][0]):
                 break
         y_col = np.asarray(y_col)
         if np.isfinite(y_col[-1, 0]):
