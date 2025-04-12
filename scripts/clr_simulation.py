@@ -24,7 +24,7 @@ in_scale = 0.2
 density = 0.5
 g_w = 0.0
 sigma = 0.4
-Delta = 0.05
+Delta = 1.28
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)

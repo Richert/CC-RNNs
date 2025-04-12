@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 from pandas import DataFrame
 from src.functions import ridge
+import matplotlib.pyplot as plt
 
 
 def entropy(x: np.ndarray) -> float:
@@ -34,37 +35,42 @@ def participation_ratio(x: np.ndarray):
 def timescale_heterogeneity(x: np.ndarray) -> float:
     fourier_transforms = []
     for i in range(x.shape[1]):
-        x_ft = np.abs(np.fft.rfft(x[:, i] / np.max(x[:, i])))
+        x_max = np.max(np.abs(x[:, i]))
+        if x_max > 0:
+            x_norm = x[:, i] / x_max
+        else:
+            x_norm = x[:, i]
+        x_ft = np.abs(np.fft.rfft(x_norm))
         fourier_transforms.append(x_ft)
     z = np.sum(fourier_transforms, axis=0)
-    H = entropy(z / np.sum(z)) * np.sum(z)
+    H = np.log(entropy(z / np.sum(z)) * np.sum(z))
 
-    # fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
-    # ax = axes[0]
-    # im = ax.imshow(x.T, aspect="auto", interpolation="none")
-    # plt.colorbar(im, ax=ax)
-    # ax.set_xlabel("steps")
-    # ax.set_ylabel("neurons")
-    # ax.set_title("Raw signals")
-    # ax = axes[1]
-    # im = ax.imshow(np.asarray(fourier_transforms), aspect="auto", interpolation="none")
-    # plt.colorbar(im, ax=ax)
-    # ax.set_xlabel("freqs")
-    # ax.set_ylabel("neurons")
-    # ax.set_title("FFT signals")
-    # ax = axes[2]
-    # ax.bar(np.arange(len(z)), z, width=0.7)
-    # ax.set_xlabel("freqs")
-    # ax.set_ylabel("p")
-    # ax.set_title(f"timescale distribution: H = {np.round(H, decimals=3)}")
-    # plt.tight_layout()
-    # plt.show()
+    fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
+    ax = axes[0]
+    im = ax.imshow(x.T, aspect="auto", interpolation="none")
+    plt.colorbar(im, ax=ax)
+    ax.set_xlabel("steps")
+    ax.set_ylabel("neurons")
+    ax.set_title("Raw signals")
+    ax = axes[1]
+    im = ax.imshow(np.asarray(fourier_transforms), aspect="auto", interpolation="none")
+    plt.colorbar(im, ax=ax)
+    ax.set_xlabel("freqs")
+    ax.set_ylabel("neurons")
+    ax.set_title("FFT signals")
+    ax = axes[2]
+    ax.bar(np.arange(len(z)), z, width=0.7)
+    ax.set_xlabel("freqs")
+    ax.set_ylabel("p")
+    ax.set_title(f"timescale distribution: H = {np.round(H, decimals=3)}")
+    plt.tight_layout()
+    plt.show()
 
     return H
 
 
 # load data
-path = "/home/richard"
+path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/clr_dynamics.pkl"
 save_file = f"{path}/results/clr_dynamics.csv"
 data = pickle.load(open(load_file, "rb"))
