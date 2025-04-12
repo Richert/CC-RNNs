@@ -55,15 +55,15 @@ pickle.dump({"inputs": inputs, "targets": targets, "trial_conditions": condition
             open(f"../data/vdp_{n_conditions}freqs.pkl", "wb"))
 
 # plot results
-fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2*plot_examples))
-for i, trial in enumerate(np.random.choice(trials, size=(plot_examples,))):
-    ax = axes[i]
-    ax.plot(inputs[trial], label="x")
-    ax.plot(targets[trial], label="y")
-    ax.set_xlabel("time")
-    ax.set_ylabel("amplitude")
-    ax.set_title(f"training trial {trial+1}: tau = {conditions[trial]}")
-    ax.legend()
-fig.suptitle("Inputs (x) and Target Waveforms (y)")
-plt.tight_layout()
-plt.show()
+# fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2*plot_examples))
+# for i, trial in enumerate(np.random.choice(trials, size=(plot_examples,))):
+#     ax = axes[i]
+#     ax.plot(inputs[trial], label="x")
+#     ax.plot(targets[trial], label="y")
+#     ax.set_xlabel("time")
+#     ax.set_ylabel("amplitude")
+#     ax.set_title(f"training trial {trial+1}: tau = {conditions[trial]}")
+#     ax.legend()
+# fig.suptitle("Inputs (x) and Target Waveforms (y)")
+# plt.tight_layout()
+# plt.show()
