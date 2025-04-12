@@ -47,7 +47,7 @@ for n in range(trials):
         if np.isfinite(y_col[-1, 0]):
             successful = True
     inp = np.zeros((y_col.shape[0] - d, 2))
-    inp[:, 0] = y_col[:-d]
+    inp[:, 0] = y_col[:-d, 0]
     inp[:, 1] = mu
     inputs.append(inp)
     targets.append(y_col[d:])
