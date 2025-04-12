@@ -2,15 +2,17 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 
+
 def vanderpol(y1: np.ndarray, y2: np.ndarray, x: float, tau: float = 1.0) -> tuple:
     y1_dot = y2 / tau
     y2_dot = (y2*x*(1 - y1**2) - y1) / tau
     return y1_dot, y2_dot
 
+
 # task parameters
 trials = 10000
 min_mu, max_mu = -1.0, 1.0
-taus = [1.0]
+taus = [0.5, 1.0, 2.0]
 n_conditions = len(taus)
 d = 1
 dt = 0.01
@@ -22,7 +24,7 @@ plot_examples = 6
 visualize = True
 
 # generate targets and inputs
-y0 = 2.0
+y0 = 1.0
 targets, inputs, conditions = [], [], []
 for n in range(trials):
     successful = False
@@ -41,7 +43,10 @@ for n in range(trials):
         y_col = np.asarray(y_col)
         if np.isfinite(y_col[-1, 0]):
             successful = True
-    inputs.append(y_col[:-d])
+    inp = np.zeros((y_col.shape[0] - d, 2))
+    inp[:, 0] = y_col[:-d]
+    inp[:, 1] = mu
+    inputs.append(inp)
     targets.append(y_col[d:])
     conditions.append(tau)
 

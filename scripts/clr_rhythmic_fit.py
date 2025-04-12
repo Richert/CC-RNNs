@@ -16,7 +16,7 @@ state_vars = ["y"]
 visualization = {"connectivity": True, "inputs": True, "results": True}
 
 # load inputs and targets
-data = pickle.load(open("../data/cosine_inputs_1f.pkl", "rb"))
+data = pickle.load(open("../data/vdp_2freqs.pkl", "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
@@ -32,14 +32,12 @@ inputs = [inp + noise_lvl * np.random.randn(*inp.shape) for inp in inputs]
 # rnn parameters
 k = 100
 n_dendrites = 10
-n_in = 1
-n_out = 1
+n_in = inputs[0].shape[-1]
+n_out = targets[0].shape[-1]
 density = 0.5
 in_scale = 0.2
-out_scale = 1.0
+out_scale = 0.2
 lam = 0.0
-Delta = 0.1
-sigma = 1.3
 N = int(k * n_dendrites)
 
 # training parameters
@@ -47,19 +45,29 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 5e-3
+lr = 1e-2
 betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e4
-truncation_steps = 200
+truncation_steps = 100
 epsilon = 0.1
 alpha = 1e-1
 batches = int(augmentation * train_trials / batch_size)
 
+# sweep parameters
+Delta = [0.05, 0.2]
+sigma = []
+n_reps = 20
+n_trials = len(lam)*len(Delta)*len(sigma)*n_reps
+
+# prepare results
+results = {"lambda": [], "Delta": [], "sigma": [], "trial": [], "z_memory": [],
+           "z_perturbed": [], "z_unperturbed": [], "x": []}
+
 # initialize rnn matrices
 bias = torch.tensor(Delta * np.random.randn(k), device=device, dtype=dtype)
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
-L = init_weights(N, k, density)
+L = init_weights(N, k, density) * sigma
 W, R = init_dendrites(k, n_dendrites)
 W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype)
 
@@ -103,31 +111,32 @@ if visualization["inputs"]:
 # model initialization
 rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
                   torch.tensor(L*(1-lam), dtype=dtype, device=device),
-                  torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
+                  torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU", lam=1e-3, alpha=10.0)
+rnn.free_param("W_in")
+rnn.free_param("bias")
+rnn.free_param("L")
 
 # input definition
 inp = torch.zeros((steps, n_in), device=device, dtype=dtype)
 
 # get initial state
-for step in range(init_steps):
-    x = torch.randn(n_in, dtype=dtype, device=device)
-    rnn.forward(x)
-init_state = [v[:] + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
+with torch.no_grad():
+    for step in range(init_steps):
+        x = torch.randn(n_in, dtype=dtype, device=device)
+        rnn.forward(x)
+init_state = [v.detach() + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
 
 # initialize z controllers
 unique_conditions = np.unique(conditions)
-other_conditions = {}
-for c in unique_conditions:
-    rnn.init_new_z_controller(init_value="ones")
-    rnn.C_z *= sigma
-    rnn.C_z.requires_grad = True
-    rnn.store_z_controller(c)
+# for c in unique_conditions:
+#     rnn.init_new_z_controller(init_value="ones")
+#     rnn.store_z_controller(c)
 
 # set up loss function
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.z_controllers.values()) + [W_in, bias, W_r], lr=lr, betas=betas)
+optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
 rnn.clip(gradient_cutoff)
 
 # training
@@ -147,24 +156,26 @@ with torch.enable_grad():
             # initial condition
             rnn.detach()
             rnn.set_state(init_state)
-            rnn.activate_z_controller(conditions[trial])
+            # rnn.activate_z_controller(conditions[trial])
 
             # collect loss
             y_col = []
             for step in range(steps):
-                z = rnn.forward(inp[step:step + 1])
+                z = rnn.forward(inp[step])
+                rnn.update_z_controller()
                 y = W_r @ z
                 if step % truncation_steps == truncation_steps - 1:
                     rnn.detach()
                 y_col.append(y)
 
             # calculate loss
-            y_col = torch.stack(y_col, dim=0).squeeze()
+            y_col = torch.stack(y_col, dim=0)
             loss += loss_func(y_col, target)
+            # rnn.store_z_controller(conditions[trial])
 
         # make update
-        for c in rnn.z_controllers.values():
-            loss += alpha*torch.sum(c)
+        # for c in rnn.z_controllers.values():
+        #     loss += alpha*torch.sum(c)
         optim.zero_grad()
         loss.backward()
         optim.step()
@@ -191,18 +202,18 @@ with torch.no_grad():
 
         # initial condition
         rnn.set_state(init_state)
-        rnn.activate_z_controller(conditions[trial])
+        # rnn.activate_z_controller(conditions[trial])
 
         # make prediction
         y_col, z_col = [], []
         for step in range(steps):
-            z = rnn.forward(inp[step:step + 1])
+            z = rnn.forward(inp[step])
             y = W_r @ z
             y_col.append(y)
             z_col.append(z)
 
         # calculate loss
-        loss = loss_func(torch.stack(y_col, dim=0).squeeze(), target)
+        loss = loss_func(torch.stack(y_col, dim=0), target)
 
         # save predictions
         predictions.append(np.asarray(y_col))
@@ -254,14 +265,14 @@ if visualization["results"]:
     plt.tight_layout()
 
     # conceptors figure
-    conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.z_controllers.values()])
-    fig, ax = plt.subplots(figsize=(12, 2*len(conceptors)))
-    im = ax.imshow(conceptors, aspect="auto", interpolation="none", cmap="cividis")
-    plt.colorbar(im, ax=ax, shrink=0.8)
-    ax.set_xlabel("neurons")
-    ax.set_ylabel("conditions")
-    ax.set_title("Conceptors")
-    plt.tight_layout()
+    # conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.z_controllers.values()])
+    # fig, ax = plt.subplots(figsize=(12, 2*len(conceptors)))
+    # im = ax.imshow(conceptors, aspect="auto", interpolation="none", cmap="cividis")
+    # plt.colorbar(im, ax=ax, shrink=0.8)
+    # ax.set_xlabel("neurons")
+    # ax.set_ylabel("conditions")
+    # ax.set_title("Conceptors")
+    # plt.tight_layout()
 
     # training loss figure
     fig, ax = plt.subplots(figsize=(12, 4))

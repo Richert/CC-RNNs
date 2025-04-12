@@ -34,7 +34,7 @@ def participation_ratio(x: np.ndarray):
 def timescale_heterogeneity(x: np.ndarray) -> float:
     fourier_transforms = []
     for i in range(x.shape[1]):
-        x_ft = np.abs(np.fft.rfft(x[:, i] - np.mean(x[:, i])))
+        x_ft = np.abs(np.fft.rfft(x[:, i] / np.max(x[:, i])))
         fourier_transforms.append(x_ft)
     z = np.sum(fourier_transforms, axis=0)
     H = entropy(z / np.sum(z)) * np.sum(z)
