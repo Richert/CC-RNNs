@@ -177,8 +177,8 @@ class LowRankCRNN(LowRankRNN):
         self.lam = lam
         self.z_controllers = {}
         self.y_controllers = {}
-        self.C_z = torch.ones_like(self.z)
-        self.C_y = torch.ones_like(self.y)
+        self.C_z = torch.ones_like(self.z, device=self.device)
+        self.C_y = torch.ones_like(self.y, device=self.device)
 
     def update_z_controller(self):
         self.C_z = self.C_z + self.lam * (self.z ** 2 - self.C_z * self.z ** 2 - self.C_z * self.alpha_sq)
@@ -204,7 +204,7 @@ class LowRankCRNN(LowRankRNN):
         elif init_value == "random":
             self.C_z = torch.rand(size=self.z.size(), dtype=self.z.dtype, device=self.z.device)
         else:
-            self.C_z = torch.ones_like(self.z)
+            self.C_z = torch.ones_like(self.z, device=self.device)
 
     def init_new_y_controller(self, init_value: Union[str, torch.Tensor] = "zero"):
         if init_value == "zero":
@@ -212,9 +212,9 @@ class LowRankCRNN(LowRankRNN):
         elif init_value == "random":
             self.C_y = torch.rand(size=self.y.size(), dtype=self.y.dtype, device=self.y.device)
         elif init_value == "ones":
-            self.C_y = torch.ones_like(self.y)
+            self.C_y = torch.ones_like(self.y, device=self.device)
         else:
-            self.C_y = init_value
+            self.C_y = init_value.to(self.device)
 
     def detach(self):
         super().detach()

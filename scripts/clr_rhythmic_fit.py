@@ -1,3 +1,6 @@
+
+import sys
+sys.path.append("../")
 from src.rnn import LowRankCRNN
 from src.functions import init_weights, init_dendrites
 import torch
@@ -9,12 +12,13 @@ import pickle
 ######################
 
 # general
+n_conditions = 3
 dtype = torch.float64
-device = "cpu"
+device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard"
-load_file = f"{path}/data/vdp_3freqs.pkl"
-save_file = f"{path}/results/clr_rhythmic_fits.pkl"
+load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
+save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit.pkl"
 
 # load inputs and targets
 data = pickle.load(open(load_file, "rb"))
@@ -94,7 +98,7 @@ with torch.enable_grad():
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
-                init_state = [v.detach() + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
+                init_state = [v.detach() + epsilon*torch.randn(v.shape[0], device=device) for v in rnn.state_vars]
 
                 # set up loss function
                 loss_func = torch.nn.MSELoss()
@@ -109,7 +113,7 @@ with torch.enable_grad():
                 with torch.enable_grad():
                     for batch in range(batches):
 
-                        loss = torch.zeros((1,))
+                        loss = torch.zeros((1,), device=device, dtype=dtype)
 
                         for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
 
@@ -178,7 +182,7 @@ with torch.enable_grad():
 
                     # report progress
                     n += 1
-                    print(f"Finished {n} out of {n_trials} trials.")
+                    print(f"Finished {n} out of {n_trials} training runs.")
 
 # save results
 pickle.dump(results, open(save_file, "wb"))
