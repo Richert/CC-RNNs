@@ -45,26 +45,26 @@ def timescale_heterogeneity(x: np.ndarray) -> float:
     z = np.sum(fourier_transforms, axis=0)
     H = np.log(entropy(z / np.sum(z)) * np.sum(z))
 
-    fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
-    ax = axes[0]
-    im = ax.imshow(x.T, aspect="auto", interpolation="none")
-    plt.colorbar(im, ax=ax)
-    ax.set_xlabel("steps")
-    ax.set_ylabel("neurons")
-    ax.set_title("Raw signals")
-    ax = axes[1]
-    im = ax.imshow(np.asarray(fourier_transforms), aspect="auto", interpolation="none")
-    plt.colorbar(im, ax=ax)
-    ax.set_xlabel("freqs")
-    ax.set_ylabel("neurons")
-    ax.set_title("FFT signals")
-    ax = axes[2]
-    ax.bar(np.arange(len(z)), z, width=0.7)
-    ax.set_xlabel("freqs")
-    ax.set_ylabel("p")
-    ax.set_title(f"timescale distribution: H = {np.round(H, decimals=3)}")
-    plt.tight_layout()
-    plt.show()
+    # fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
+    # ax = axes[0]
+    # im = ax.imshow(x.T, aspect="auto", interpolation="none")
+    # plt.colorbar(im, ax=ax)
+    # ax.set_xlabel("steps")
+    # ax.set_ylabel("neurons")
+    # ax.set_title("Raw signals")
+    # ax = axes[1]
+    # im = ax.imshow(np.asarray(fourier_transforms), aspect="auto", interpolation="none")
+    # plt.colorbar(im, ax=ax)
+    # ax.set_xlabel("freqs")
+    # ax.set_ylabel("neurons")
+    # ax.set_title("FFT signals")
+    # ax = axes[2]
+    # ax.bar(np.arange(len(z)), z, width=0.7)
+    # ax.set_xlabel("freqs")
+    # ax.set_ylabel("p")
+    # ax.set_title(f"timescale distribution: H = {np.round(H, decimals=3)}")
+    # plt.tight_layout()
+    # plt.show()
 
     return H
 
