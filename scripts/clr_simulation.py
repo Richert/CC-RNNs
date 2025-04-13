@@ -12,7 +12,7 @@ dtype = torch.float64
 device = "cpu"
 
 # simulation parameters
-steps = 200
+steps = 500
 
 # rnn parameters
 n_in = 1
@@ -23,8 +23,10 @@ N = int(k*n_dendrites)
 in_scale = 0.2
 density = 0.5
 g_w = 0.0
-sigma = 0.4
-Delta = 1.28
+sigma1 = 0.5
+sigma2 = 3.0
+sigmas = np.linspace(sigma1, sigma2, num=steps)
+Delta = 0.3
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -38,16 +40,15 @@ W, R = init_dendrites(k, n_dendrites)
 # model initialization
 rnn = LowRankCRNN(torch.tensor(W*g_w, dtype=dtype, device=device), torch.tensor(L, dtype=dtype, device=device),
                   torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
-rnn.C_z *= sigma
 
 # input definition
 inp = torch.zeros((steps, n_in), device=device, dtype=dtype)
-# inp[0, :] = 1.0
 
 # model dynamics simulation
 y_col, z_col = [], []
 with torch.no_grad():
     for step in range(steps):
+        rnn.C_z = sigmas[step]
         rnn.forward(inp[step])
         y_col.append(rnn.y.detach().cpu().numpy())
         z_col.append(rnn.z.detach().cpu().numpy())
@@ -58,19 +59,10 @@ z_col = np.asarray(z_col)
 ##########
 
 # dynamics
-fig, axes = plt.subplots(nrows=2, figsize=(12, 6))
-ax = axes[0]
-for i in range(N):
-    ax.plot(y_col[:, i], label=f"dendrite {i}")
+fig, ax = plt.subplots(figsize=(10, 2))
+ax.imshow(z_col.T, aspect="auto", interpolation="none", cmap="Greys")
 ax.set_xlabel("time")
-ax.set_ylabel("y")
-ax.set_title("dendritic dynamics")
-ax = axes[1]
-for i in range(k):
-    ax.plot(z_col[:, i], label=f"soma {i}")
-ax.set_xlabel("time")
-ax.set_ylabel("z")
-ax.legend()
-ax.set_title("somatic dynamics")
+ax.set_ylabel("neuron")
 plt.tight_layout()
+
 plt.show()

@@ -54,54 +54,61 @@ for Delta_tmp, sigma_tmp in zip(Delta, sigma):
 deltas = np.unique(results.loc[:, "Delta"].values)
 sigmas = np.unique(results.loc[:, "sigma"].values)
 
-# create 2D matrix of LE, MC, PR, and TS
-LE = np.zeros((len(deltas), len(sigmas)))
-C = np.zeros_like(LE)
-TS = np.zeros_like(LE)
-PR = np.zeros_like(LE)
+# create 2D matrix of MC, PR, and TS
+C = np.zeros((len(deltas), len(sigmas)))
+TS = np.zeros_like(C)
+PR = np.zeros_like(C)
 for i, Delta in enumerate(deltas):
     for j, sigma in enumerate(sigmas):
         idx1 = results.loc[:, "Delta"].values == Delta
         idx2 = results.loc[:, "sigma"].values == sigma
-        LE[i, j] = np.mean(results.loc[idx1 & idx2, "lyapunov"].values)
         C[i, j] = np.mean(results.loc[idx1 & idx2, "memory"].values)
         TS[i, j] = np.mean(results.loc[idx1 & idx2, "timescale_heterogeneity"].values)
         PR[i, j] = np.mean(results.loc[idx1 & idx2, "dimensionality"].values)
-LE = DataFrame(columns=sigmas, index=deltas, data=LE)
-C = DataFrame(columns=sigmas, index=deltas, data=C)
-TS = DataFrame(columns=sigmas, index=deltas, data=TS)
-PR = DataFrame(columns=sigmas, index=deltas, data=PR)
+cols = np.round(sigmas, decimals=1)
+indices = np.round(deltas, decimals=2)
+C = DataFrame(columns=cols, index=indices, data=C)
+TS = DataFrame(columns=cols, index=indices, data=TS)
+PR = DataFrame(columns=cols, index=indices, data=PR)
 
 # create LE figure
-fig, ax = plt.subplots(figsize=(8, 6))
-sb.heatmap(LE, ax=ax, cmap="vlag", vmin=np.min(LE), vmax=-np.min(LE))
-ax.set_xlabel("sigma")
-ax.set_ylabel("Delta")
+fig, ax = plt.subplots(figsize=(5, 4))
+sb.lineplot(results, ax=ax, x="sigma", y="lyapunov", hue="Delta", err_style="band", palette="viridis")
+ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
+ax.set_ylabel(r"neural heterogeneity $\Delta$")
 ax.set_title("Maximum Lyapunov Exponent")
 plt.tight_layout()
+fig.canvas.draw()
+fig.savefig(f"{path}/results/clr_le.svg")
 
 # create MC figure
-fig, ax = plt.subplots(figsize=(8, 6))
+fig, ax = plt.subplots(figsize=(5, 4))
 sb.heatmap(C, ax=ax, cmap="cividis")
-ax.set_xlabel("sigma")
-ax.set_ylabel("Delta")
+ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
+ax.set_ylabel(r"neural heterogeneity $\Delta$")
 ax.set_title("Memory Capacity")
 plt.tight_layout()
+fig.canvas.draw()
+fig.savefig(f"{path}/results/clr_mc.svg")
 
 # create TS figure
-fig, ax = plt.subplots(figsize=(8, 6))
+fig, ax = plt.subplots(figsize=(5, 4))
 sb.heatmap(TS, ax=ax, cmap="cividis")
-ax.set_xlabel("sigma")
-ax.set_ylabel("Delta")
+ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
+ax.set_ylabel(r"neural heterogeneity $\Delta$")
 ax.set_title("Timescale Heterogeneity")
 plt.tight_layout()
+fig.canvas.draw()
+fig.savefig(f"{path}/results/clr_ts.svg")
 
 # create PR figure
-fig, ax = plt.subplots(figsize=(8, 6))
+fig, ax = plt.subplots(figsize=(5, 4))
 sb.heatmap(PR, ax=ax, cmap="cividis")
-ax.set_xlabel("sigma")
-ax.set_ylabel("Delta")
+ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
+ax.set_ylabel(r"neural heterogeneity $\Delta$")
 ax.set_title("Participation Ratio")
 plt.tight_layout()
+fig.canvas.draw()
+fig.savefig(f"{path}/results/clr_pr.svg")
 
 plt.show()
