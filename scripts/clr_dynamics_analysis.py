@@ -27,7 +27,7 @@ def memory_capacity(x: np.ndarray, y: np.ndarray, d_max: int, alpha: float = 1e-
 
 def participation_ratio(x: np.ndarray):
     x_norm = np.asarray([x[:, i] - np.mean(x[:, i]) for i in range(x.shape[1])])
-    cov = x_norm.T @ x_norm
+    cov = x_norm @ x_norm.T
     lambdas = np.real(np.linalg.eigvals(cov))
     return np.sum(lambdas)**2/np.sum(lambdas**2)/cov.shape[0]
 
