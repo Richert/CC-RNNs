@@ -14,7 +14,7 @@ import pickle
 # general
 n_conditions = 3
 dtype = torch.float64
-device = "cuda:0"
+device = "cpu"
 state_vars = ["y"]
 path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
