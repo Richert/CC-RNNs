@@ -18,7 +18,7 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
-save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit.pkl"
+save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit2.pkl"
 
 # load inputs and targets
 data = pickle.load(open(load_file, "rb"))
@@ -172,17 +172,17 @@ with torch.enable_grad():
                         loss = loss_func(torch.stack(y_col, dim=0), target)
                         test_loss.append(loss.item())
 
-                    # save results
-                    results["Delta"].append(Delta_tmp)
-                    results["sigma"].append(sigma_tmp)
-                    results["trial"].append(rep)
-                    results["train_epochs"].append(batch)
-                    results["train_loss"].append(loss_col)
-                    results["test_loss"].append(np.sum(test_loss))
+                # save results
+                results["Delta"].append(Delta_tmp)
+                results["sigma"].append(sigma_tmp)
+                results["trial"].append(rep)
+                results["train_epochs"].append(batch)
+                results["train_loss"].append(loss_col)
+                results["test_loss"].append(np.sum(test_loss))
 
-                    # report progress
-                    n += 1
-                    print(f"Finished {n} out of {n_trials} training runs.")
+                # report progress
+                n += 1
+                print(f"Finished {n} out of {n_trials} training runs.")
 
 # save results
 pickle.dump(results, open(save_file, "wb"))
