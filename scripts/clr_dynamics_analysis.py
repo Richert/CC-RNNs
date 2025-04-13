@@ -70,7 +70,7 @@ def timescale_heterogeneity(x: np.ndarray) -> float:
 
 
 # load data
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/clr_dynamics.pkl"
 save_file = f"{path}/results/clr_dynamics.csv"
 data = pickle.load(open(load_file, "rb"))
