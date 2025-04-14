@@ -99,7 +99,7 @@ for n in range(len(lyapunov)):
     mc = memory_capacity(x, z, d_max, alpha=1e-4)
 
     # calculate time scale heterogeneity
-    z = data["z_unperturbed"][n]
+    z = data["z_perturbed"][n]
     ts = timescale_heterogeneity(z)
 
     # calculate dimensionality
