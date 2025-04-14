@@ -21,13 +21,14 @@ epsilon = 1e-5
 
 # rnn parameters
 k = 200
+lam = 0.0
 n_in = 1
 n_dendrites = 10
 density = 0.5
 N = int(k * n_dendrites)
 
 # sweep parameters
-in_scales = [0.1, 0.2]
+in_scales = [0.05, 0.1, 0.2]
 Delta = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 sigma = np.arange(start=0.0, stop=3.1, step=0.1)
 n_reps = 20
@@ -54,8 +55,8 @@ with torch.no_grad():
                     W, R = init_dendrites(k, n_dendrites)
 
                     # model initialization
-                    rnn = LowRankCRNN(torch.tensor(W, dtype=dtype, device=device),
-                                      torch.tensor(L, dtype=dtype, device=device),
+                    rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
+                                      torch.tensor(L*(1-lam), dtype=dtype, device=device),
                                       torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
                     rnn.C_z *= sigma_tmp
 

@@ -85,6 +85,10 @@ sigmas = np.unique(results.loc[:, "sigma"].values)
 # create LE figure
 fig, ax = plt.subplots()
 sb.lineplot(results, ax=ax, x="sigma", y="lyapunov", hue="Delta", err_style="band", palette="viridis")
+zero_crossings = []
+for line, _ in zip(ax.get_lines(), deltas):
+    x, y = line.get_data()
+    zero_crossings.append(x[np.argmin(np.abs(y))])
 ax.set_ylim([-0.08, 0.02])
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$\lambda$")
@@ -100,6 +104,8 @@ fig, ax = plt.subplots()
 # ax.set_ylabel(r"neural heterogeneity $\Delta$")
 # ax.set_title("Memory Capacity")
 sb.lineplot(results, ax=ax, x="sigma", y="memory", hue="Delta", err_style="band", palette="viridis")
+for line, idx in zip(ax.get_lines(), zero_crossings):
+    ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$C$")
 ax.set_title(r"Memory Capacity $C$")
@@ -111,9 +117,11 @@ fig.savefig(f"{path}/results/clr_mc.svg")
 # create TS figure
 fig, ax = plt.subplots()
 sb.lineplot(results, ax=ax, x="sigma", y="timescale_heterogeneity", hue="Delta", err_style="band", palette="viridis")
+for line, idx in zip(ax.get_lines(), zero_crossings):
+    ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$H$")
-ax.set_title(r"Timescale Heterogeneity $H$")
+ax.set_title(r"Timescale Heterogeneity $\Delta$")
 plt.tight_layout()
 fig.canvas.draw()
 fig.savefig(f"{path}/results/clr_ts.svg")
@@ -121,6 +129,8 @@ fig.savefig(f"{path}/results/clr_ts.svg")
 # create PR figure
 fig, ax = plt.subplots()
 sb.lineplot(results, ax=ax, x="sigma", y="dimensionality", hue="Delta", err_style="band", palette="viridis")
+for line, idx in zip(ax.get_lines(), zero_crossings):
+    ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$D$")
 ax.set_title(r"Participation Ratio $D$")
