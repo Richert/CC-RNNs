@@ -21,10 +21,10 @@ epsilon = 1e-5
 
 # rnn parameters
 k = 200
-lam = 0.0
 n_in = 1
 n_dendrites = 10
 density = 0.5
+lam = 0.0
 N = int(k * n_dendrites)
 
 # sweep parameters
@@ -56,19 +56,23 @@ with torch.no_grad():
 
                     # model initialization
                     rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
-                                      torch.tensor(L*(1-lam), dtype=dtype, device=device),
+                                      torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
                                       torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
-                    rnn.C_z *= sigma_tmp
 
                     # input definition
                     inp = torch.randn((steps, n_in), device=device, dtype=dtype)
 
-                    # get initial state
+                    # get initial state and perturbed state
                     z0s = []
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
-                    perturbed_state = [v[:] + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
+                    successful = False
+                    while not successful:
+                        perturbed_state = [v[:] + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
+                        diffs = [torch.sum((v - v_p)**2) for v, v_p in zip(rnn.state_vars, perturbed_state)]
+                        if all([d.item() > 0 for d in diffs]):
+                            successful = True
 
                     # model simulation I
                     z1s = []

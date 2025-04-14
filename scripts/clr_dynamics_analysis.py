@@ -79,6 +79,7 @@ data = pickle.load(open(load_file, "rb"))
 lyapunov = np.zeros((len(data["trial"]),))
 memory = np.zeros((len(data["trial"])))
 columns = list(data.keys())
+n_trials = len(lyapunov)
 measures = ["lyapunov", "memory", "timescale_heterogeneity", "dimensionality"]
 for key in ["z_perturbed", "z_unperturbed", "z_init"]:
     columns.pop(columns.index(key))
@@ -86,7 +87,8 @@ df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 
 # analysis of model dynamics
 d_max = 50
-for n in range(len(lyapunov)):
+alpha = 1e-4
+for n in range(n_trials):
 
     # calculate maximum lyapunov exponent
     z, z_p = data["z_unperturbed"][n], data["z_perturbed"][n]
@@ -96,7 +98,7 @@ for n in range(len(lyapunov)):
 
     # calculate memory capacity
     x, z = data["x"][n], data["z_unperturbed"][n]
-    mc = memory_capacity(x, z, d_max, alpha=1e-4)
+    mc = memory_capacity(x, z, d_max, alpha=alpha)
 
     # calculate time scale heterogeneity
     z = data["z_unperturbed"][n]
@@ -113,6 +115,8 @@ for n in range(len(lyapunov)):
     df.loc[n, "memory"] = np.sum(mc)
     df.loc[n, "timescale_heterogeneity"] = ts
     df.loc[n, "dimensionality"] = dim
+
+    print(f"Finished trial {n+1} out of {n_trials}")
 
 # save results
 df.to_csv(save_file)
