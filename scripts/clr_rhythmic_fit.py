@@ -16,7 +16,7 @@ n_conditions = 3
 dtype = torch.float64
 device = "cpu"
 state_vars = ["y"]
-path = "/home/richard"
+path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
 save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit2.pkl"
 
@@ -61,7 +61,7 @@ batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
 Delta = [0.1, 0.4]
-sigma = np.arange(start=0.4, stop=2.5, step=0.2)
+sigma = np.arange(start=0.5, stop=2.2, step=0.2)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 

@@ -10,7 +10,7 @@ def vanderpol(y1: np.ndarray, y2: np.ndarray, x: float, tau: float = 1.0) -> tup
 
 
 # general parameters
-save_path = f"/home/richard/data"
+save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
