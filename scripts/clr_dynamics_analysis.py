@@ -95,14 +95,15 @@ for n in range(len(lyapunov)):
     le = np.log(d1/d0) / len(z)
 
     # calculate memory capacity
-    x, z = data["x"][n], data["z_memory"][n]
+    x, z = data["x"][n], data["z_unperturbed"][n]
     mc = memory_capacity(x, z, d_max, alpha=1e-4)
 
     # calculate time scale heterogeneity
-    z = data["z_perturbed"][n]
+    z = data["z_unperturbed"][n]
     ts = timescale_heterogeneity(z)
 
     # calculate dimensionality
+    z = data["z_unperturbed"][n]
     dim = participation_ratio(z)
 
     # store results

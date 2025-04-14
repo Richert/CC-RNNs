@@ -9,6 +9,17 @@ path = "/home/richard-gast/Documents"
 data = pickle.load(open(f"{path}/data/clr_dynamics.pkl", "rb"))
 results = read_csv(f"{path}/results/clr_dynamics.csv")
 
+# matplotlib settings
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rc('text', usetex=True)
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.figsize'] = (4, 3)
+plt.rcParams['font.size'] = 10.0
+plt.rcParams['axes.titlesize'] = 12
+plt.rcParams['axes.labelsize'] = 12
+plt.rcParams['lines.linewidth'] = 1.0
+markersize = 6
+
 # plot raw dynamics
 ###################
 
@@ -55,24 +66,24 @@ deltas = np.unique(results.loc[:, "Delta"].values)
 sigmas = np.unique(results.loc[:, "sigma"].values)
 
 # create 2D matrix of MC, PR, and TS
-C = np.zeros((len(deltas), len(sigmas)))
-TS = np.zeros_like(C)
-PR = np.zeros_like(C)
-for i, Delta in enumerate(deltas):
-    for j, sigma in enumerate(sigmas):
-        idx1 = results.loc[:, "Delta"].values == Delta
-        idx2 = results.loc[:, "sigma"].values == sigma
-        C[i, j] = np.mean(results.loc[idx1 & idx2, "memory"].values)
-        TS[i, j] = np.mean(results.loc[idx1 & idx2, "timescale_heterogeneity"].values)
-        PR[i, j] = np.mean(results.loc[idx1 & idx2, "dimensionality"].values)
-cols = np.round(sigmas, decimals=1)
-indices = np.round(deltas, decimals=2)
-C = DataFrame(columns=cols, index=indices, data=C)
-TS = DataFrame(columns=cols, index=indices, data=TS)
-PR = DataFrame(columns=cols, index=indices, data=PR)
+# C = np.zeros((len(deltas), len(sigmas)))
+# TS = np.zeros_like(C)
+# PR = np.zeros_like(C)
+# for i, Delta in enumerate(deltas):
+#     for j, sigma in enumerate(sigmas):
+#         idx1 = results.loc[:, "Delta"].values == Delta
+#         idx2 = results.loc[:, "sigma"].values == sigma
+#         C[i, j] = np.mean(results.loc[idx1 & idx2, "memory"].values)
+#         TS[i, j] = np.mean(results.loc[idx1 & idx2, "timescale_heterogeneity"].values)
+#         PR[i, j] = np.mean(results.loc[idx1 & idx2, "dimensionality"].values)
+# cols = np.round(sigmas, decimals=1)
+# indices = np.round(deltas, decimals=2)
+# C = DataFrame(columns=cols, index=indices, data=C)
+# TS = DataFrame(columns=cols, index=indices, data=TS)
+# PR = DataFrame(columns=cols, index=indices, data=PR)
 
 # create LE figure
-fig, ax = plt.subplots(figsize=(5, 4))
+fig, ax = plt.subplots()
 sb.lineplot(results, ax=ax, x="sigma", y="lyapunov", hue="Delta", err_style="band", palette="viridis")
 ax.set_ylim([-0.08, 0.02])
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
@@ -83,7 +94,7 @@ fig.canvas.draw()
 fig.savefig(f"{path}/results/clr_le.svg")
 
 # create MC figure
-fig, ax = plt.subplots(figsize=(5, 4))
+fig, ax = plt.subplots()
 # sb.heatmap(C, ax=ax, cmap="cividis")
 # ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 # ax.set_ylabel(r"neural heterogeneity $\Delta$")
@@ -92,12 +103,13 @@ sb.lineplot(results, ax=ax, x="sigma", y="memory", hue="Delta", err_style="band"
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$C$")
 ax.set_title(r"Memory Capacity $C$")
+ax.set_yticklabels([np.round(float(l._y), decimals=1) for l in ax.get_yticklabels()])
 plt.tight_layout()
 fig.canvas.draw()
 fig.savefig(f"{path}/results/clr_mc.svg")
 
 # create TS figure
-fig, ax = plt.subplots(figsize=(5, 4))
+fig, ax = plt.subplots()
 sb.lineplot(results, ax=ax, x="sigma", y="timescale_heterogeneity", hue="Delta", err_style="band", palette="viridis")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$H$")
@@ -107,7 +119,7 @@ fig.canvas.draw()
 fig.savefig(f"{path}/results/clr_ts.svg")
 
 # create PR figure
-fig, ax = plt.subplots(figsize=(5, 4))
+fig, ax = plt.subplots()
 sb.lineplot(results, ax=ax, x="sigma", y="dimensionality", hue="Delta", err_style="band", palette="viridis")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$D$")
