@@ -17,7 +17,7 @@ file = "/home/richard/data/clr_dynamics.pkl"
 # task parameters
 steps = 500
 init_steps = 50
-epsilon = 1e-4
+epsilon = 1e-5
 
 # rnn parameters
 k = 200
@@ -34,7 +34,8 @@ n_reps = 20
 n_trials = len(in_scales)*len(Delta)*len(sigma)*n_reps
 
 # prepare results
-results = {"in_scale": [], "Delta": [], "sigma": [], "trial": [], "z_init": [], "z_perturbed": [], "z_unperturbed": []}
+results = {"in_scale": [], "Delta": [], "sigma": [], "trial": [], "x": [],
+           "z_init": [], "z_perturbed": [], "z_unperturbed": []}
 
 # simulations
 #############
@@ -86,6 +87,7 @@ with torch.no_grad():
                     results["Delta"].append(Delta_tmp)
                     results["sigma"].append(sigma_tmp)
                     results["trial"].append(trial)
+                    results["x"].append(inp)
                     results["z_init"].append(np.asarray(z0s))
                     results["z_unperturbed"].append(np.asarray(z1s))
                     results["z_perturbed"].append(np.asarray(z2s))
