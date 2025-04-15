@@ -81,7 +81,7 @@ memory = np.zeros((len(data["trial"])))
 columns = list(data.keys())
 n_trials = len(lyapunov)
 measures = ["lyapunov", "memory", "timescale_heterogeneity", "dimensionality"]
-for key in ["z_perturbed", "z_unperturbed", "z_init"]:
+for key in ["z_perturbed", "z_unperturbed", "z_init", "x"]:
     columns.pop(columns.index(key))
 df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 

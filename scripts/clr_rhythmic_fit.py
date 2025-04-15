@@ -16,9 +16,9 @@ n_conditions = 3
 dtype = torch.float64
 device = "cpu"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
-save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit2.pkl"
+save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit.pkl"
 
 # load inputs and targets
 data = pickle.load(open(load_file, "rb"))
@@ -40,7 +40,7 @@ n_dendrites = 10
 n_in = inputs[0].shape[-1]
 n_out = targets[0].shape[-1]
 density = 0.5
-in_scale = 0.2
+in_scale = 0.1
 out_scale = 0.2
 lam = 0.0
 N = int(k * n_dendrites)
@@ -56,12 +56,11 @@ batch_size = 50
 gradient_cutoff = 1e4
 truncation_steps = 100
 epsilon = 0.1
-alpha = 1e-1
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
 Delta = [0.1, 0.4]
-sigma = np.arange(start=0.5, stop=2.2, step=0.2)
+sigma = np.arange(start=0.2, stop=2.1, step=0.2)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 
@@ -86,9 +85,8 @@ with torch.enable_grad():
 
                 # model initialization
                 rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
-                                  torch.tensor(L*(1-lam), dtype=dtype, device=device),
+                                  torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
                                   torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
-                rnn.C_z *= sigma_tmp
                 rnn.free_param("W_in")
                 rnn.free_param("bias")
                 rnn.free_param("L")
@@ -182,7 +180,7 @@ with torch.enable_grad():
 
                 # report progress
                 n += 1
-                print(f"Finished {n} out of {n_trials} training runs.")
+                print(f"Finished {n} out of {n_trials} training runs ({batch + 1} training epochs, final loss: {loss_col[-1]}).")
 
 # save results
 pickle.dump(results, open(save_file, "wb"))

@@ -58,8 +58,12 @@ for Delta_tmp, sigma_tmp in zip(Delta, sigma):
         ax.set_title(f"trial {trial + 1} - random dynamics")
     plt.tight_layout()
 
-# plot 2D matrices
-##################
+# line plots
+############
+
+# choose input strength
+in_scale = 0.1
+results = results.loc[results.loc[:, "in_scale"] == in_scale, :]
 
 # reduce data to the plotting selection
 deltas = np.unique(results.loc[:, "Delta"].values)
@@ -89,7 +93,7 @@ zero_crossings = []
 for line, _ in zip(ax.get_lines(), deltas):
     x, y = line.get_data()
     zero_crossings.append(x[np.argmin(np.abs(y))])
-ax.set_ylim([-0.08, 0.02])
+ax.set_ylim([-0.06, 0.025])
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$\lambda$")
 ax.set_title(r"Maximum Lyapunov Exponent $\lambda$")
