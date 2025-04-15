@@ -4,7 +4,6 @@ sys.path.append("../")
 from src.rnn import LowRankCRNN
 from src.functions import init_weights, init_dendrites
 import torch
-import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 
@@ -70,117 +69,118 @@ results = {"Delta": [], "sigma": [], "trial": [], "train_epochs": [], "train_los
 # model training
 ################
 
-with torch.enable_grad():
-    n = 0
-    for Delta_tmp in Delta:
-        for sigma_tmp in sigma:
-            for rep in range(n_reps):
+n = 0
+for Delta_tmp in Delta:
+    for sigma_tmp in sigma:
+        for rep in range(n_reps):
 
-                # initialize rnn matrices
-                bias = torch.tensor(Delta_tmp * np.random.randn(k), device=device, dtype=dtype)
-                W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
-                L = init_weights(N, k, density)
-                W, R = init_dendrites(k, n_dendrites)
-                W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype)
+            print(f"Starting the {n+1}th out of {n_trials} training runs (Delta = {Delta_tmp}, sigma = {sigma_tmp}, rep = {rep})")
 
-                # model initialization
-                rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
-                                  torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
-                                  torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
-                rnn.free_param("W_in")
-                rnn.free_param("bias")
-                rnn.free_param("L")
+            # initialize rnn matrices
+            bias = torch.tensor(Delta_tmp * np.random.randn(k), device=device, dtype=dtype)
+            W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
+            L = init_weights(N, k, density)
+            W, R = init_dendrites(k, n_dendrites)
+            W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype)
 
-                # get initial state
-                with torch.no_grad():
-                    for step in range(init_steps):
-                        x = torch.randn(n_in, dtype=dtype, device=device)
-                        rnn.forward(x)
-                init_state = [v.detach() + epsilon*torch.randn(v.shape[0], device=device) for v in rnn.state_vars]
+            # model initialization
+            rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
+                              torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
+                              torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
+            rnn.free_param("W_in")
+            rnn.free_param("bias")
+            rnn.free_param("L")
 
-                # set up loss function
-                loss_func = torch.nn.MSELoss()
+            # get initial state
+            with torch.no_grad():
+                for step in range(init_steps):
+                    x = torch.randn(n_in, dtype=dtype, device=device)
+                    rnn.forward(x)
+            init_state = [v.detach() + epsilon*torch.randn(v.shape[0], device=device) for v in rnn.state_vars]
 
-                # set up optimizer
-                optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
-                rnn.clip(gradient_cutoff)
+            # set up loss function
+            loss_func = torch.nn.MSELoss()
 
-                # training
-                train_loss = 0.0
-                loss_col = []
-                with torch.enable_grad():
-                    for batch in range(batches):
+            # set up optimizer
+            optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+            rnn.clip(gradient_cutoff)
 
-                        loss = torch.zeros((1,), device=device, dtype=dtype)
+            # training
+            train_loss = 0.0
+            loss_col = []
+            with torch.enable_grad():
+                for batch in range(batches):
 
-                        for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
+                    loss = torch.zeros((1,), device=device, dtype=dtype)
 
-                            # get input and target timeseries
-                            inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
-                            target = torch.tensor(targets[trial], device=device, dtype=dtype)
-
-                            # initial condition
-                            rnn.detach()
-                            rnn.set_state(init_state)
-
-                            # collect loss
-                            y_col = []
-                            for step in range(steps):
-                                z = rnn.forward(inp[step])
-                                y = W_r @ z
-                                if step % truncation_steps == truncation_steps - 1:
-                                    rnn.detach()
-                                y_col.append(y)
-
-                            # calculate loss
-                            y_col = torch.stack(y_col, dim=0)
-                            loss += loss_func(y_col, target)
-
-                        # make update
-                        optim.zero_grad()
-                        loss.backward()
-                        optim.step()
-
-                        # store and print loss
-                        train_loss = loss.item()
-                        loss_col.append(train_loss)
-                        if train_loss < epsilon:
-                            break
-
-                # generate predictions
-                test_loss = []
-                with torch.no_grad():
-                    for trial in range(train_trials, trials):
+                    for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
 
                         # get input and target timeseries
                         inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
                         target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
                         # initial condition
+                        rnn.detach()
                         rnn.set_state(init_state)
 
-                        # make prediction
+                        # collect loss
                         y_col = []
                         for step in range(steps):
                             z = rnn.forward(inp[step])
                             y = W_r @ z
+                            if step % truncation_steps == truncation_steps - 1:
+                                rnn.detach()
                             y_col.append(y)
 
                         # calculate loss
-                        loss = loss_func(torch.stack(y_col, dim=0), target)
-                        test_loss.append(loss.item())
+                        y_col = torch.stack(y_col, dim=0)
+                        loss += loss_func(y_col, target)
 
-                # save results
-                results["Delta"].append(Delta_tmp)
-                results["sigma"].append(sigma_tmp)
-                results["trial"].append(rep)
-                results["train_epochs"].append(batch)
-                results["train_loss"].append(loss_col)
-                results["test_loss"].append(np.sum(test_loss))
+                    # make update
+                    optim.zero_grad()
+                    loss.backward()
+                    optim.step()
 
-                # report progress
-                n += 1
-                print(f"Finished {n} out of {n_trials} training runs ({batch + 1} training epochs, final loss: {loss_col[-1]}).")
+                    # store and print loss
+                    train_loss = loss.item()
+                    loss_col.append(train_loss)
+                    if train_loss < epsilon:
+                        break
+
+            # generate predictions
+            test_loss = []
+            with torch.no_grad():
+                for trial in range(train_trials, trials):
+
+                    # get input and target timeseries
+                    inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
+                    target = torch.tensor(targets[trial], device=device, dtype=dtype)
+
+                    # initial condition
+                    rnn.set_state(init_state)
+
+                    # make prediction
+                    y_col = []
+                    for step in range(steps):
+                        z = rnn.forward(inp[step])
+                        y = W_r @ z
+                        y_col.append(y)
+
+                    # calculate loss
+                    loss = loss_func(torch.stack(y_col, dim=0), target)
+                    test_loss.append(loss.item())
+
+            # save results
+            results["Delta"].append(Delta_tmp)
+            results["sigma"].append(sigma_tmp)
+            results["trial"].append(rep)
+            results["train_epochs"].append(batch)
+            results["train_loss"].append(loss_col)
+            results["test_loss"].append(np.sum(test_loss))
+
+            # report progress
+            n += 1
+            print(f"Finished after {batch + 1} training epochs. Final loss: {loss_col[-1]}.")
 
 # save results
 pickle.dump(results, open(save_file, "wb"))
