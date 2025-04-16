@@ -13,7 +13,7 @@ import pickle
 # general
 n_conditions = 3
 dtype = torch.float64
-device = "cpu"
+device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
@@ -76,7 +76,7 @@ for Delta_tmp in Delta:
     for sigma_tmp in sigma:
         for rep in range(n_reps):
 
-            print(f"Starting the {n+1}th out of {n_trials} training runs (Delta = {Delta_tmp}, sigma = {sigma_tmp}, rep = {rep})")
+            print(f"Starting run {n+1} out of {n_trials} training runs (Delta = {Delta_tmp}, sigma = {sigma_tmp}, rep = {rep})")
 
             # initialize rnn matrices
             bias = torch.tensor(Delta_tmp * np.random.randn(k), device=device, dtype=dtype)
