@@ -43,7 +43,8 @@ def timescale_heterogeneity(x: np.ndarray) -> float:
         x_ft = np.abs(np.fft.rfft(x_norm))
         fourier_transforms.append(x_ft)
     z = np.sum(fourier_transforms, axis=0)
-    H = np.log(entropy(z / np.sum(z)) * np.sum(z))
+    # H = np.log(entropy(z / np.sum(z)) * np.sum(z))
+    H = entropy(z / np.sum(z))
 
     # fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
     # ax = axes[0]
