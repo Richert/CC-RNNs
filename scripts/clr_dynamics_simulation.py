@@ -28,7 +28,7 @@ lam = 0.0
 N = int(k * n_dendrites)
 
 # sweep parameters
-in_scales = [0.05, 0.1, 0.2]
+in_scales = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 Delta = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 sigma = np.arange(start=0.0, stop=3.1, step=0.1)
 n_reps = 20
