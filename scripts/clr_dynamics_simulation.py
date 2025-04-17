@@ -35,46 +35,59 @@ n_reps = 20
 n_trials = len(in_scales)*len(Delta)*len(sigma)*n_reps
 
 # prepare results
-results = {"in_scale": [], "Delta": [], "sigma": [], "trial": [], "x": [],
-           "z_init": [], "z_perturbed": [], "z_unperturbed": []}
+results = {"in_scale": [], "Delta": [], "sigma": [], "trial": [], "x": [], "z_noinp": [], "z_inp": [], "z_inp_p": []}
 
 # simulations
 #############
 
 with torch.no_grad():
     n = 0
-    for in_scale in in_scales:
-        for Delta_tmp in Delta:
-            for sigma_tmp in sigma:
-                for trial in range(n_reps):
+    for trial in range(n_reps):
 
-                    # initialize rnn matrices
-                    bias = torch.tensor(Delta_tmp * np.random.randn(k), device=device, dtype=dtype)
-                    W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
-                    L = init_weights(N, k, density)
-                    W, R = init_dendrites(k, n_dendrites)
+        # initialize rnn matrices
+        bias = torch.tensor(np.random.randn(k), device=device, dtype=dtype)
+        W_in = torch.tensor(np.random.randn(N, n_in), device=device, dtype=dtype)
+        L = init_weights(N, k, density)
+        W, R = init_dendrites(k, n_dendrites)
 
-                    # model initialization
-                    rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
-                                      torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
-                                      torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
+        # model initialization
+        rnn = LowRankCRNN(torch.tensor(W * lam, dtype=dtype, device=device),
+                          torch.tensor(L * (1-lam), dtype=dtype, device=device),
+                          torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
 
-                    # input definition
-                    inp = torch.randn((steps, n_in), device=device, dtype=dtype)
+        # input definition
+        inp = torch.randn((steps, n_in), device=device, dtype=dtype)
 
-                    # get initial state and perturbed state
-                    z0s = []
+        for in_scale in in_scales:
+            for Delta_tmp in Delta:
+                for sigma_tmp in sigma:
+
+                    # impose condition
+                    rnn.C_y = sigma_tmp
+                    rnn.bias = Delta_tmp * bias
+                    rnn.W_in = in_scale * W_in
+
+                    # get random initial state and perturbed state
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     successful = False
                     while not successful:
+                        init_state = [v[:] for v in rnn.state_vars]
                         perturbed_state = [v[:] + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
-                        diffs = [torch.sum((v - v_p)**2) for v, v_p in zip(rnn.state_vars, perturbed_state)]
+                        diffs = [torch.sum((v - v_p)**2) for v, v_p in zip(init_state, perturbed_state)]
                         if all([d.item() > 0 for d in diffs]):
                             successful = True
 
-                    # model simulation I
+                    # simulation a - zero input
+                    z0s = []
+                    x = torch.zeros(n_in, dtype=dtype, device=device)
+                    for step in range(init_steps):
+                        z0s.append(rnn.z)
+                        rnn.forward(x)
+
+                    # simulation b - random input
+                    rnn.set_state(init_state)
                     z1s = []
                     for step in range(steps):
                         z1s.append(rnn.z)
@@ -93,9 +106,9 @@ with torch.no_grad():
                     results["sigma"].append(sigma_tmp)
                     results["trial"].append(trial)
                     results["x"].append(inp)
-                    results["z_init"].append(np.asarray(z0s))
-                    results["z_unperturbed"].append(np.asarray(z1s))
-                    results["z_perturbed"].append(np.asarray(z2s))
+                    results["z_noinp"].append(np.asarray(z0s))
+                    results["z_inp"].append(np.asarray(z1s))
+                    results["z_inp_p"].append(np.asarray(z2s))
 
                     # report progress
                     n += 1
