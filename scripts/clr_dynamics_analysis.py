@@ -28,8 +28,10 @@ def memory_capacity(x: np.ndarray, y: np.ndarray, d_max: int, alpha: float = 1e-
 def participation_ratio(x: np.ndarray):
     x_norm = np.asarray([x[:, i] - np.mean(x[:, i]) for i in range(x.shape[1])])
     cov = x_norm @ x_norm.T
-    lambdas = np.real(np.linalg.eigvals(cov))
-    return np.sum(lambdas)**2/np.sum(lambdas**2)/cov.shape[0]
+    lambdas = np.linalg.eigvals(cov)
+    l_real, l_imag = np.real(lambdas), np.imag(lambdas)
+    idx = np.sort(l_real)
+    return np.sum(l_real)**2/np.sum(l_real**2)/cov.shape[0], l_real[idx], l_imag[idx]
 
 
 def timescale_heterogeneity(x: np.ndarray) -> float:
@@ -82,7 +84,8 @@ memory = np.zeros((len(data["trial"])))
 columns = list(data.keys())
 n_trials = len(lyapunov)
 measures = ["lyapunov", "memory", "timescale_heterogeneity", "dimensionality"]
-for key in ["z_perturbed", "z_unperturbed", "z_init", "x"]:
+for key in ["z_perturbed", "z_unperturbed", "z_init", "x",
+            "l1_real", "l1_imag", "l2_real", "l2_imag", "l3_real", "l3_imag", "l4_real", "l4_imag"]:
     columns.pop(columns.index(key))
 df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 
@@ -107,7 +110,7 @@ for n in range(n_trials):
 
     # calculate dimensionality
     z = data["z_unperturbed"][n]
-    dim = participation_ratio(z)
+    dim, eigs_real, eigs_imag = participation_ratio(z)
 
     # store results
     for c in columns:
@@ -116,6 +119,10 @@ for n in range(n_trials):
     df.loc[n, "memory"] = np.sum(mc)
     df.loc[n, "timescale_heterogeneity"] = ts
     df.loc[n, "dimensionality"] = dim
+    for i in range(1, 5):
+        df.loc[n, f"l{i}_real"] = eigs_real[-i]
+        df.loc[n, f"l{i}_imag"] = eigs_imag[-i]
+
 
     print(f"Finished trial {n+1} out of {n_trials}")
 
