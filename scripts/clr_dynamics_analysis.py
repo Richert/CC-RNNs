@@ -30,7 +30,7 @@ def participation_ratio(x: np.ndarray):
     cov = x_norm @ x_norm.T
     lambdas = np.linalg.eigvals(cov)
     l_real, l_imag = np.real(lambdas), np.imag(lambdas)
-    idx = np.sort(l_real)
+    idx = np.argsort(l_real)
     return np.sum(l_real)**2/np.sum(l_real**2)/cov.shape[0], l_real[idx], l_imag[idx]
 
 
