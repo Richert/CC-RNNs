@@ -84,8 +84,8 @@ memory = np.zeros((len(data["trial"])))
 columns = list(data.keys())
 n_trials = len(lyapunov)
 measures = ["lyapunov", "memory", "timescale_heterogeneity", "dimensionality"]
-for key in ["z_perturbed", "z_unperturbed", "z_init", "x",
-            "l1_real", "l1_imag", "l2_real", "l2_imag", "l3_real", "l3_imag", "l4_real", "l4_imag"]:
+for key in ["z_noinp", "z_inp", "z_inp_p", "x", "l1_real", "l1_imag", "l2_real", "l2_imag",
+            "l3_real", "l3_imag", "l4_real", "l4_imag"]:
     columns.pop(columns.index(key))
 df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 
@@ -95,21 +95,21 @@ alpha = 1e-4
 for n in range(n_trials):
 
     # calculate maximum lyapunov exponent
-    z, z_p = data["z_unperturbed"][n], data["z_perturbed"][n]
+    z, z_p = data["z_inp"][n], data["z_inp_p"][n]
     d0 = np.sqrt(np.sum((z[0] - z_p[0])**2))
     d1 = np.sqrt(np.sum((z[-1] - z_p[-1])**2))
     le = np.log(d1/d0) / len(z)
 
     # calculate memory capacity
-    x, z = data["x"][n], data["z_unperturbed"][n]
+    x, z = data["x"][n], data["z_inp"][n]
     mc = memory_capacity(x, z, d_max, alpha=alpha)
 
     # calculate time scale heterogeneity
-    z = data["z_unperturbed"][n]
+    z = data["z_noinp"][n]
     ts = timescale_heterogeneity(z)
 
     # calculate dimensionality
-    z = data["z_unperturbed"][n]
+    z = data["z_noinp"][n]
     dim, eigs_real, eigs_imag = participation_ratio(z)
 
     # store results
