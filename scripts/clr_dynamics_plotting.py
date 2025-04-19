@@ -62,7 +62,7 @@ for Delta_tmp, sigma_tmp in zip(Delta, sigma):
 ############
 
 # choose input strength
-in_scale = 0.1
+in_scale = 0.5
 results = results.loc[results.loc[:, "in_scale"] == in_scale, :]
 
 # reduce data to the plotting selection

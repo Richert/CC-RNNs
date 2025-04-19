@@ -45,8 +45,8 @@ def timescale_heterogeneity(x: np.ndarray) -> float:
         x_ft = np.abs(np.fft.rfft(x_norm))
         fourier_transforms.append(x_ft)
     z = np.sum(fourier_transforms, axis=0)
-    # H = np.log(entropy(z / np.sum(z)) * np.sum(z))
-    H = entropy(z / np.sum(z))
+    H = np.log(entropy(z / np.sum(z)) * np.sum(z))
+    # H = entropy(z / np.sum(z))
 
     # fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
     # ax = axes[0]
@@ -90,7 +90,7 @@ for key in ["z_noinp", "z_inp", "z_inp_p", "x"]:
 df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 
 # analysis of model dynamics
-d_max = 50
+d_max = 40
 alpha = 1e-4
 for n in range(n_trials):
 

@@ -63,7 +63,7 @@ with torch.no_grad():
                 for sigma_tmp in sigma:
 
                     # impose condition
-                    rnn.C_y = sigma_tmp
+                    rnn.L = L * sigma_tmp
                     rnn.bias = Delta_tmp * bias
                     rnn.W_in = in_scale * W_in
 
