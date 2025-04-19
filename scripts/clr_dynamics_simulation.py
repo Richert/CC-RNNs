@@ -47,13 +47,14 @@ with torch.no_grad():
         # initialize rnn matrices
         bias = torch.tensor(np.random.randn(k), device=device, dtype=dtype)
         W_in = torch.tensor(np.random.randn(N, n_in), device=device, dtype=dtype)
-        L = init_weights(N, k, density)
+        L = torch.tensor(init_weights(N, k, density), device=device, dtype=dtype)
         W, R = init_dendrites(k, n_dendrites)
 
         # model initialization
         rnn = LowRankCRNN(torch.tensor(W * lam, dtype=dtype, device=device),
-                          torch.tensor(L * (1-lam), dtype=dtype, device=device),
-                          torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
+                          L * (1-lam),
+                          torch.tensor(R, device=device, dtype=dtype),
+                          W_in, bias, g="ReLU")
 
         # input definition
         inp = torch.randn((steps, n_in), device=device, dtype=dtype)
