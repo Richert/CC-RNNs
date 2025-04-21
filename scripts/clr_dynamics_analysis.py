@@ -29,12 +29,11 @@ def participation_ratio(x: np.ndarray):
     x_norm = np.asarray([x[:, i] - np.mean(x[:, i]) for i in range(x.shape[1])])
     cov = x_norm @ x_norm.T
     lambdas = np.linalg.eigvals(cov)
-    l_real, l_imag = np.real(lambdas), np.imag(lambdas)
-    idx = np.argsort(l_real)
-    return np.sum(l_real)**2/np.sum(l_real**2)/cov.shape[0], l_real[idx], l_imag[idx]
+    l_real = np.real(lambdas)
+    return np.sum(l_real)**2/np.sum(l_real**2)/cov.shape[0]
 
 
-def timescale_heterogeneity(x: np.ndarray) -> float:
+def timescale_heterogeneity(x: np.ndarray) -> tuple:
     fourier_transforms = []
     for i in range(x.shape[1]):
         x_max = np.max(np.abs(x[:, i]))
@@ -45,8 +44,7 @@ def timescale_heterogeneity(x: np.ndarray) -> float:
         x_ft = np.abs(np.fft.rfft(x_norm))
         fourier_transforms.append(x_ft)
     z = np.sum(fourier_transforms, axis=0)
-    H = np.log(entropy(z / np.sum(z)) * np.sum(z))
-    # H = entropy(z / np.sum(z))
+    H = entropy(z / np.sum(z))
 
     # fig, axes = plt.subplots(nrows=3, figsize=(12, 9))
     # ax = axes[0]
@@ -69,7 +67,7 @@ def timescale_heterogeneity(x: np.ndarray) -> float:
     # plt.tight_layout()
     # plt.show()
 
-    return H
+    return H, np.sum(z)
 
 
 # load data
@@ -83,8 +81,7 @@ lyapunov = np.zeros((len(data["trial"]),))
 memory = np.zeros((len(data["trial"])))
 columns = list(data.keys())
 n_trials = len(lyapunov)
-measures = ["lyapunov", "memory", "timescale_heterogeneity", "dimensionality", "l1_real", "l1_imag",
-            "l2_real", "l2_imag", "l3_real", "l3_imag", "l4_real", "l4_imag"]
+measures = ["lyapunov", "memory", "entropy", "psd", "dimensionality"]
 for key in ["z_noinp", "z_inp", "z_inp_p", "x"]:
     columns.pop(columns.index(key))
 df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
@@ -106,23 +103,20 @@ for n in range(n_trials):
 
     # calculate time scale heterogeneity
     z = data["z_noinp"][n]
-    ts = timescale_heterogeneity(z)
+    H, psd = timescale_heterogeneity(z)
 
     # calculate dimensionality
-    z = data["z_noinp"][n]
-    dim, eigs_real, eigs_imag = participation_ratio(z)
+    z = data["z_inp"][n]
+    dim = participation_ratio(z)
 
     # store results
     for c in columns:
         df.loc[n, c] = data[c][n]
     df.loc[n, "lyapunov"] = le
     df.loc[n, "memory"] = np.sum(mc)
-    df.loc[n, "timescale_heterogeneity"] = ts
+    df.loc[n, "entropy"] = H
+    df.loc[n, "psd"] = psd
     df.loc[n, "dimensionality"] = dim
-    for i in range(1, 5):
-        df.loc[n, f"l{i}_real"] = eigs_real[-i]
-        df.loc[n, f"l{i}_imag"] = eigs_imag[-i]
-
 
     print(f"Finished trial {n+1} out of {n_trials}")
 
