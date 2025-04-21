@@ -19,37 +19,6 @@ plt.rcParams['axes.labelsize'] = 12
 plt.rcParams['lines.linewidth'] = 1.0
 markersize = 6
 
-# plot eigenvalue evolution
-############################
-
-# reduce data to the plotting selection
-Delta = 0.4
-in_scale = 0.2
-results_tmp = results.loc[results.loc[:, "Delta"] == Delta, :]
-results_tmp = results_tmp.loc[results_tmp.loc[:, "in_scale"] == in_scale, :]
-
-# create figure for real parts of eigenvalues
-fig, ax = plt.subplots()
-for i in range(1, 5):
-    sb.lineplot(results_tmp, ax=ax, x="sigma", y=f"l{i}_real", err_style="band")
-ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
-ax.set_ylabel(r"$real(\lambda)$")
-ax.set_title(r"Real part of covariance eigenvalues")
-plt.tight_layout()
-fig.canvas.draw()
-fig.savefig(f"{path}/results/clr_real.svg")
-
-# create figure for imaginary parts of eigenvalues
-fig, ax = plt.subplots()
-for i in range(1, 5):
-    sb.lineplot(results_tmp, ax=ax, x="sigma", y=f"l{i}_imag", err_style="band")
-ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
-ax.set_ylabel(r"$imag(\lambda)$")
-ax.set_title(r"Imaginary part of covariance eigenvalues")
-plt.tight_layout()
-fig.canvas.draw()
-fig.savefig(f"{path}/results/clr_imag.svg")
-
 # line plots for a single in-scale
 ##################################
 
@@ -112,7 +81,7 @@ fig.savefig(f"{path}/results/clr_mc.svg")
 
 # create TS figure
 fig, ax = plt.subplots()
-sb.lineplot(results_tmp, ax=ax, x="sigma", y="timescale_heterogeneity", hue="Delta", err_style="band", palette="viridis")
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="entropy", hue="Delta", err_style="band", palette="viridis")
 for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
@@ -121,6 +90,18 @@ ax.set_title(r"Timescale Heterogeneity $H$")
 plt.tight_layout()
 fig.canvas.draw()
 fig.savefig(f"{path}/results/clr_ts.svg")
+
+# create PSD figure
+fig, ax = plt.subplots()
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="psd", hue="Delta", err_style="band", palette="viridis")
+for line, idx in zip(ax.get_lines(), zero_crossings):
+    ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
+ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
+ax.set_ylabel(r"$\rho$")
+ax.set_title(r"Power Spectral Density $\rho$")
+plt.tight_layout()
+fig.canvas.draw()
+fig.savefig(f"{path}/results/clr_psd.svg")
 
 # create PR figure
 fig, ax = plt.subplots()
@@ -196,7 +177,7 @@ fig.savefig(f"{path}/results/clr_mc2.svg")
 
 # create TS figure
 fig, ax = plt.subplots()
-sb.lineplot(results_tmp, ax=ax, x="sigma", y="timescale_heterogeneity", hue="in_scale", err_style="band", palette="viridis")
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="entropy", hue="in_scale", err_style="band", palette="viridis")
 for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
@@ -205,6 +186,18 @@ ax.set_title(r"Timescale Heterogeneity $H$")
 plt.tight_layout()
 fig.canvas.draw()
 fig.savefig(f"{path}/results/clr_ts2.svg")
+
+# create PSD figure
+fig, ax = plt.subplots()
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="psd", hue="in_scale", err_style="band", palette="viridis")
+for line, idx in zip(ax.get_lines(), zero_crossings):
+    ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
+ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
+ax.set_ylabel(r"$\rho$")
+ax.set_title(r"Power Spectral Density $\rho$")
+plt.tight_layout()
+fig.canvas.draw()
+fig.savefig(f"{path}/results/clr_psd2.svg")
 
 # create PR figure
 fig, ax = plt.subplots()

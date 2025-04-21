@@ -67,7 +67,7 @@ def timescale_heterogeneity(x: np.ndarray) -> tuple:
     # plt.tight_layout()
     # plt.show()
 
-    return H, np.sum(z)
+    return H, np.sum(z)**2/np.sum(z**2)/len(z)
 
 
 # load data
