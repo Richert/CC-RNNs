@@ -27,7 +27,7 @@ conditions = data["trial_conditions"]
 
 # task parameters
 steps = inputs[0].shape[0]
-init_steps = 100
+init_steps = 20
 noise_lvl = 0.01
 
 # add noise to input
@@ -58,8 +58,8 @@ epsilon = 0.1
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-Delta = [0.1, 0.4]
-sigma = np.arange(start=0.2, stop=2.1, step=0.2)
+Delta = [0.0, 0.4]
+sigma = np.arange(start=0.2, stop=1.7, step=0.2)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 
@@ -88,15 +88,7 @@ for Delta_tmp in Delta:
                               torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
                               torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
             rnn.free_param("W_in")
-            rnn.free_param("bias")
             rnn.free_param("L")
-
-            # get initial state
-            with torch.no_grad():
-                for step in range(init_steps):
-                    x = torch.randn(n_in, dtype=dtype, device=device)
-                    rnn.forward(x)
-            init_state = [v.detach() + epsilon*torch.randn(v.shape[0], device=device) for v in rnn.state_vars]
 
             # set up loss function
             loss_func = torch.nn.MSELoss()
@@ -119,9 +111,11 @@ for Delta_tmp in Delta:
                         inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
                         target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
-                        # initial condition
+                        # get initial state
+                        for step in range(init_steps):
+                            x = torch.randn(n_in, dtype=dtype, device=device)
+                            rnn.forward(x)
                         rnn.detach()
-                        rnn.set_state(init_state)
 
                         # collect loss
                         y_col = []

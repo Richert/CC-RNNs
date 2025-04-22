@@ -48,6 +48,8 @@ with torch.no_grad():
         W_in = torch.tensor(np.random.randn(N, n_in), device=device, dtype=dtype)
         L = torch.tensor(init_weights(N, k, density), device=device, dtype=dtype)
         W, R = init_dendrites(k, n_dendrites)
+        W = torch.tensor(W*lam, dtype=dtype, device=device)
+        R = torch.tensor(R, device=device, dtype=dtype)
 
         # input definition
         inp = torch.randn((steps, n_in), device=device, dtype=dtype)
@@ -67,10 +69,7 @@ with torch.no_grad():
                 for sigma_tmp in sigma:
 
                     # model initialization
-                    rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
-                                      L*(1-lam)*sigma_tmp,
-                                      torch.tensor(R, device=device, dtype=dtype),
-                                      W_in*in_scale, bias*Delta_tmp, g="ReLU")
+                    rnn = LowRankCRNN(W, L*(1-lam)*sigma_tmp, R, W_in*in_scale, bias*Delta_tmp, g="ReLU")
 
                     # simulation a - zero input
                     rnn.set_state(init_state)
