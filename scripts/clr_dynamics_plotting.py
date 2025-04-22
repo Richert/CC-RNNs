@@ -98,10 +98,10 @@ for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$\rho$")
-ax.set_title(r"Power Spectral Density $\rho$")
+ax.set_title(r"Spectral Participation Ratio $D_f$")
 plt.tight_layout()
 fig.canvas.draw()
-fig.savefig(f"{path}/results/clr_psd.svg")
+fig.savefig(f"{path}/results/clr_spectral_pr.svg")
 
 # create PR figure
 fig, ax = plt.subplots()
@@ -194,10 +194,10 @@ for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 ax.set_ylabel(r"$\rho$")
-ax.set_title(r"Power Spectral Density $\rho$")
+ax.set_title(r"Spectral Participation Ratio $D_f$")
 plt.tight_layout()
 fig.canvas.draw()
-fig.savefig(f"{path}/results/clr_psd2.svg")
+fig.savefig(f"{path}/results/clr_spectral_pr2.svg")
 
 # create PR figure
 fig, ax = plt.subplots()

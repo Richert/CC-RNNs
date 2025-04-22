@@ -23,7 +23,7 @@ plt.rcParams['lines.linewidth'] = 1.0
 markersize = 6
 
 # simulation parameters
-steps = 500
+steps = 1000
 
 # rnn parameters
 n_in = 1
@@ -33,9 +33,9 @@ N = int(k*n_dendrites)
 in_scale = 0.05
 density = 0.5
 sigma1 = 0.0
-sigma2 = 3.0
+sigma2 = 0.001
 sigmas = np.linspace(sigma1, sigma2, num=steps)
-Deltas = [0.1, 0.4]
+Deltas = [0.0, 0.4]
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -45,6 +45,7 @@ W, R = init_dendrites(k, n_dendrites)
 
 # input definition
 inp = torch.randn((steps, n_in), device=device, dtype=dtype)
+inp[int(0.5*steps):, :] = 0.0
 
 # simulation
 ############

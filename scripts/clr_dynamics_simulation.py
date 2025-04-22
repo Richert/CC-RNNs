@@ -16,7 +16,6 @@ file = "/home/richard/data/clr_dynamics.pkl"
 
 # task parameters
 steps = 500
-init_steps = 50
 epsilon = 1e-5
 
 # rnn parameters
@@ -50,40 +49,32 @@ with torch.no_grad():
         L = torch.tensor(init_weights(N, k, density), device=device, dtype=dtype)
         W, R = init_dendrites(k, n_dendrites)
 
-        # model initialization
-        rnn = LowRankCRNN(torch.tensor(W * lam, dtype=dtype, device=device),
-                          L * (1-lam),
-                          torch.tensor(R, device=device, dtype=dtype),
-                          W_in, bias, g="ReLU")
-
         # input definition
         inp = torch.randn((steps, n_in), device=device, dtype=dtype)
+
+        # get initial and perturbed state
+        while not successful:
+            init_state = [2*torch.rand(N, device=device) - 1.0, 2.0*torch.rand(k, device=device)]
+            perturbed_state = [v[:] + epsilon * torch.randn(v.shape[0]) for v in init_state]
+            diffs = [torch.sum((v - v_p) ** 2) for v, v_p in zip(init_state, perturbed_state)]
+            if all([d.item() > 0 for d in diffs]):
+                successful = True
 
         for in_scale in in_scales:
             for Delta_tmp in Delta:
                 for sigma_tmp in sigma:
 
-                    # impose condition
-                    rnn.L = L * sigma_tmp
-                    rnn.bias = Delta_tmp * bias
-                    rnn.W_in = in_scale * W_in
-
-                    # get random initial state and perturbed state
-                    for step in range(init_steps):
-                        x = torch.randn(n_in, dtype=dtype, device=device)
-                        rnn.forward(x)
-                    successful = False
-                    while not successful:
-                        init_state = [v[:] for v in rnn.state_vars]
-                        perturbed_state = [v[:] + epsilon*torch.randn(v.shape[0]) for v in rnn.state_vars]
-                        diffs = [torch.sum((v - v_p)**2) for v, v_p in zip(init_state, perturbed_state)]
-                        if all([d.item() > 0 for d in diffs]):
-                            successful = True
+                    # model initialization
+                    rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
+                                      L*(1-lam)*sigma_tmp,
+                                      torch.tensor(R, device=device, dtype=dtype),
+                                      W_in*in_scale, bias*Delta_tmp, g="ReLU")
 
                     # simulation a - zero input
+                    rnn.set_state(init_state)
                     z0s = []
                     x = torch.zeros(n_in, dtype=dtype, device=device)
-                    for step in range(init_steps):
+                    for step in range(steps):
                         z0s.append(rnn.z)
                         rnn.forward(x)
 
