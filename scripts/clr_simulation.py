@@ -33,7 +33,7 @@ N = int(k*n_dendrites)
 in_scale = 0.05
 density = 0.5
 sigma1 = 0.0
-sigma2 = 0.001
+sigma2 = 1.2
 sigmas = np.linspace(sigma1, sigma2, num=steps)
 Deltas = [0.0, 0.4]
 

@@ -55,7 +55,8 @@ with torch.no_grad():
         # get initial and perturbed state
         successful = False
         while not successful:
-            init_state = [2*torch.rand(N, device=device) - 1.0, 2.0*torch.rand(k, device=device)]
+            init_state = [2*torch.rand(N, device=device, dtype=dtype) - 1.0,
+                          2.0*torch.rand(k, device=device, dtype=dtype)]
             perturbed_state = [v[:] + epsilon * torch.randn(v.shape[0]) for v in init_state]
             diffs = [torch.sum((v - v_p) ** 2) for v, v_p in zip(init_state, perturbed_state)]
             if all([d.item() > 0 for d in diffs]):
