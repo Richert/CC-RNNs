@@ -53,6 +53,7 @@ with torch.no_grad():
         inp = torch.randn((steps, n_in), device=device, dtype=dtype)
 
         # get initial and perturbed state
+        successful = False
         while not successful:
             init_state = [2*torch.rand(N, device=device) - 1.0, 2.0*torch.rand(k, device=device)]
             perturbed_state = [v[:] + epsilon * torch.randn(v.shape[0]) for v in init_state]
