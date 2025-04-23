@@ -87,12 +87,13 @@ for Delta_tmp in Delta:
             rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
                               torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
                               torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
+            rnn.free_param("W_in")
 
             # set up loss function
             loss_func = torch.nn.MSELoss()
 
             # set up optimizer
-            optim = torch.optim.Adam([W_r], lr=lr, betas=betas)
+            optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
             rnn.clip(gradient_cutoff)
 
             # training
