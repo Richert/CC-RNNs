@@ -81,7 +81,7 @@ for Delta_tmp in Delta:
             W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
             L = init_weights(N, k, density)
             W, R = init_dendrites(k, n_dendrites)
-            W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype)
+            W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype, requires_grad=True)
 
             # model initialization
             rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
@@ -150,8 +150,11 @@ for Delta_tmp in Delta:
                     inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
                     target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
-                    # initial condition
-                    rnn.set_state(init_state)
+                    # get initial state
+                    for step in range(init_steps):
+                        x = torch.randn(n_in, dtype=dtype, device=device)
+                        rnn.forward(x)
+                    rnn.detach()
 
                     # make prediction
                     y_col = []
@@ -176,5 +179,5 @@ for Delta_tmp in Delta:
             n += 1
             print(f"Finished after {batch + 1} training epochs. Final loss: {loss_col[-1]}.")
 
-# save results
-pickle.dump(results, open(save_file, "wb"))
+        # save results
+        pickle.dump(results, open(save_file, "wb"))

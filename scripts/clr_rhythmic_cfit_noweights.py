@@ -15,7 +15,7 @@ n_conditions = 3
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
 save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_cfit.pkl"
 
@@ -83,33 +83,24 @@ for Delta_tmp in Delta:
             W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
             L = init_weights(N, k, density)
             W, R = init_dendrites(k, n_dendrites)
-            W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype)
+            W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype, requires_grad=True)
 
             # model initialization
             rnn = LowRankCRNN(torch.tensor(W*0.0, dtype=dtype, device=device),
                               torch.tensor(L*sigma_tmp, dtype=dtype, device=device),
                               torch.tensor(R, device=device, dtype=dtype),
                               W_in, bias, g="ReLU", alpha=alpha, lam=lam)
-            rnn.free_param("W_in")
-            rnn.free_param("L")
 
             # initialize controllers
             for c in unique_conditions:
                 rnn.init_new_y_controller(init_value="random")
                 rnn.store_y_controller(c)
 
-            # get initial state
-            with torch.no_grad():
-                for step in range(init_steps):
-                    x = torch.randn(n_in, dtype=dtype, device=device)
-                    rnn.forward(x)
-            init_state = [v.detach() + epsilon*torch.randn(v.shape[0], device=device) for v in rnn.state_vars]
-
             # set up loss function
             loss_func = torch.nn.MSELoss()
 
             # set up optimizer
-            optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+            optim = torch.optim.Adam([W_r], lr=lr, betas=betas)
             rnn.clip(gradient_cutoff)
 
             # training
@@ -126,9 +117,11 @@ for Delta_tmp in Delta:
                         inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
                         target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
-                        # initial condition
+                        # get initial state
+                        for step in range(init_steps):
+                            x = torch.randn(n_in, dtype=dtype, device=device)
+                            rnn.forward(x)
                         rnn.detach()
-                        rnn.set_state(init_state)
                         rnn.activate_y_controller(conditions[trial])
 
                         # collect loss
@@ -168,8 +161,11 @@ for Delta_tmp in Delta:
                     inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
                     target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
-                    # initial condition
-                    rnn.set_state(init_state)
+                    # get initial state
+                    for step in range(init_steps):
+                        x = torch.randn(n_in, dtype=dtype, device=device)
+                        rnn.forward(x)
+                    rnn.detach()
                     rnn.activate_y_controller(conditions[trial])
 
                     # make prediction
@@ -195,5 +191,5 @@ for Delta_tmp in Delta:
             n += 1
             print(f"Finished after {batch + 1} training epochs. Final loss: {loss_col[-1]}.")
 
-# save results
-pickle.dump(results, open(save_file, "wb"))
+        # save results
+        pickle.dump(results, open(save_file, "wb"))
