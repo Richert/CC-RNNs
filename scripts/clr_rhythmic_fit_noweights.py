@@ -17,7 +17,7 @@ device = "cuda:1"
 state_vars = ["y"]
 path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
-save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit.pkl"
+save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit_noweights.pkl"
 
 # load inputs and targets
 data = pickle.load(open(load_file, "rb"))
@@ -58,7 +58,7 @@ epsilon = 0.1
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-Delta = [0.1, 0.4]
+Delta = [0.0, 0.4]
 sigma = np.arange(start=0.2, stop=1.7, step=0.2)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
@@ -87,14 +87,12 @@ for Delta_tmp in Delta:
             rnn = LowRankCRNN(torch.tensor(W*lam, dtype=dtype, device=device),
                               torch.tensor(L*(1-lam)*sigma_tmp, dtype=dtype, device=device),
                               torch.tensor(R, device=device, dtype=dtype), W_in, bias, g="ReLU")
-            rnn.free_param("W_in")
-            rnn.free_param("L")
 
             # set up loss function
             loss_func = torch.nn.MSELoss()
 
             # set up optimizer
-            optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+            optim = torch.optim.Adam([W_r], lr=lr, betas=betas)
             rnn.clip(gradient_cutoff)
 
             # training

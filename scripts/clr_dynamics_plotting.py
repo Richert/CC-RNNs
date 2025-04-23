@@ -23,7 +23,7 @@ markersize = 6
 ##################################
 
 # choose input strength
-in_scale = 0.01
+in_scale = 0.1
 results_tmp = results.loc[results.loc[:, "in_scale"] == in_scale, :]
 
 # reduce data to the plotting selection
@@ -119,7 +119,7 @@ fig.savefig(f"{path}/results/clr_pr.svg")
 ###############################
 
 # choose input strength
-Delta = 0.0
+Delta = 0.1
 results_tmp = results.loc[results.loc[:, "Delta"] == Delta, :]
 
 # reduce data to the plotting selection
