@@ -11,31 +11,20 @@ import matplotlib.pyplot as plt
 dtype = torch.float64
 device = "cpu"
 
-# matplotlib settings
-plt.rcParams["font.family"] = "Times New Roman"
-plt.rc('text', usetex=True)
-plt.rcParams['figure.dpi'] = 100
-plt.rcParams['figure.figsize'] = (7.5, 3)
-plt.rcParams['font.size'] = 10.0
-plt.rcParams['axes.titlesize'] = 12
-plt.rcParams['axes.labelsize'] = 12
-plt.rcParams['lines.linewidth'] = 1.0
-markersize = 6
-
 # simulation parameters
 steps = 1000
 
 # rnn parameters
 n_in = 1
-k = 100
+k = 200
 n_dendrites = 10
 N = int(k*n_dendrites)
-in_scale = 0.05
+in_scale = 0.1
 density = 0.5
 sigma1 = 0.0
-sigma2 = 1.2
+sigma2 = 2.0
 sigmas = np.linspace(sigma1, sigma2, num=steps)
-Deltas = [0.0, 0.4]
+Deltas = [0.0, 0.1, 0.2, 0.4]
 
 # initialize rnn matrices
 W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
@@ -68,6 +57,17 @@ for Delta in Deltas:
 
 # plotting
 ##########
+
+# matplotlib settings
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rc('text', usetex=True)
+plt.rcParams['figure.dpi'] = 100
+plt.rcParams['figure.figsize'] = (12.0, 2.0*len(Deltas))
+plt.rcParams['font.size'] = 10.0
+plt.rcParams['axes.titlesize'] = 12
+plt.rcParams['axes.labelsize'] = 12
+plt.rcParams['lines.linewidth'] = 1.0
+markersize = 6
 
 fig, axes = plt.subplots(nrows=len(Deltas))
 neurons = np.random.choice(N, size=(100,))

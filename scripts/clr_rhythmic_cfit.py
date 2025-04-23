@@ -60,7 +60,7 @@ alpha = 10.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-Delta = [0.1, 0.4]
+Delta = [0.0, 0.3]
 sigma = np.arange(start=0.2, stop=2.1, step=0.2)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
@@ -91,7 +91,6 @@ for Delta_tmp in Delta:
                               torch.tensor(R, device=device, dtype=dtype),
                               W_in, bias, g="ReLU", alpha=alpha, lam=lam)
             rnn.free_param("W_in")
-            rnn.free_param("bias")
             rnn.free_param("L")
 
             # initialize controllers
