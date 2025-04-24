@@ -17,7 +17,7 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
-save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_cfit.pkl"
+save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_cfit_noweights.pkl"
 
 # load inputs and targets
 data = pickle.load(open(load_file, "rb"))
