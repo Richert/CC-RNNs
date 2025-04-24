@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import seaborn as sb
 
 # load data
-path = "/home/richard-gast/Documents"
-task = "clr_rhythmic_3freq"
-conditions = ["cfit"]
+path = "/home/richard-gast/Documents/results"
+task = "clr_rhythmic_3freqs"
+conditions = ["fit"]
 
 # matplotlib settings
 plt.rcParams["font.family"] = "Times New Roman"
@@ -26,7 +26,7 @@ for cond in conditions:
     data = pickle.load(open(f"{path}/{task}_{cond}.pkl", "rb"))
     for key, val in data.items():
         results[key].extend(val)
-    results[cond].extend([cond]*len(data["trial"]))
+    results["condition"].extend([cond]*len(data["trial"]))
 df = DataFrame.from_dict(results)
 
 # find
@@ -43,14 +43,14 @@ for i, Delta in enumerate(deltas):
     # plot number of training epochs
     ax = fig.add_subplot(grid[i, 0])
     sb.lineplot(df_tmp, x="sigma", y="train_epochs", hue="condition")
-    ax.title("Number of training epochs")
+    ax.set_title("Number of training epochs")
     ax.set_ylabel("epochs")
     ax.set_xlabel(r"$\sigma$")
 
     # plot test loss
     ax = fig.add_subplot(grid[i, 1])
     sb.lineplot(df_tmp, x="sigma", y="test_loss", hue="condition")
-    ax.title("Loss on test trials")
+    ax.set_title("Loss on test trials")
     ax.set_ylabel("MSE")
     ax.set_xlabel(r"$\sigma$")
 

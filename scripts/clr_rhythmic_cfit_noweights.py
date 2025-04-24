@@ -93,15 +93,18 @@ for Delta_tmp in Delta:
             rnn.free_param("W_in")
 
             # initialize controllers
+            conceptors = []
             for c in unique_conditions:
                 rnn.init_new_y_controller(init_value="random")
+                rnn.C_y.requires_grad = True
+                conceptors.append(rnn.C_y)
                 rnn.store_y_controller(c)
 
             # set up loss function
             loss_func = torch.nn.MSELoss()
 
             # set up optimizer
-            optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+            optim = torch.optim.Adam(list(rnn.parameters()) + conceptors + [W_r], lr=lr, betas=betas)
             rnn.clip(gradient_cutoff)
 
             # training
@@ -129,7 +132,6 @@ for Delta_tmp in Delta:
                         y_col = []
                         for step in range(steps):
                             z = rnn.forward(inp[step])
-                            rnn.update_y_controller()
                             y = W_r @ z
                             if step % truncation_steps == truncation_steps - 1:
                                 rnn.detach()
