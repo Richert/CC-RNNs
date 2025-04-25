@@ -13,7 +13,7 @@ import pickle
 # general
 n_conditions = 3
 dtype = torch.float64
-device = "cuda:0"
+device = "cpu"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/mixed_{n_conditions}ds.pkl"
@@ -28,11 +28,11 @@ unique_conditions = np.unique(conditions)
 
 # task parameters
 steps = inputs[0].shape[0]
-init_steps = 100
-noise_lvl = 0.01
+init_steps = 20
+noise_lvl = 0.0001
 
 # add noise to input
-inputs = [inp[:, :1] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]-1) for inp in inputs]
+inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
 
 # rnn parameters
 k = 100
@@ -49,14 +49,14 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 1e-2
+lr = 5e-3
 betas = (0.9, 0.999)
-batch_size = 50
-gradient_cutoff = 1e4
+batch_size = 20
+gradient_cutoff = 1e6
 truncation_steps = 100
 epsilon = 0.1
-lam = 1e-3
-alpha = 10.0
+lam = 1e-4
+alpha = 3.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -147,6 +147,7 @@ for rep in range(n_reps):
                     optim.zero_grad()
                     loss.backward()
                     optim.step()
+                    rnn.detach()
 
                     # store and print loss
                     train_loss = loss.item()
@@ -183,16 +184,19 @@ for rep in range(n_reps):
                     test_loss.append(loss.item())
 
             # save results
+            c_dim = [torch.sum(c)**2/N for c in rnn.y_controllers.values()]
             results["Delta"].append(Delta_tmp)
             results["sigma"].append(sigma_tmp)
             results["trial"].append(rep)
             results["train_epochs"].append(batch)
             results["train_loss"].append(loss_col)
             results["test_loss"].append(np.sum(test_loss))
+            results["c_dim"].append(c_dim)
 
             # report progress
             n += 1
             print(f"Finished after {batch + 1} training epochs. Final loss: {loss_col[-1]}.")
+            print(f"Conceptor dimensions: {c_dim}")
 
             # save results
             pickle.dump(results, open(save_file, "wb"))

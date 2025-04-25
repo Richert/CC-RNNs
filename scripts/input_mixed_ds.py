@@ -9,7 +9,7 @@ def vanderpol(y: np.ndarray, x: float = 1.0, tau: float = 1.0) -> np.ndarray:
     y2_dot = (y2*x*(1 - y1**2) - y1) / tau
     return np.asarray([y1_dot, y2_dot])
 
-def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 1.0) -> np.ndarray:
+def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 5.0) -> np.ndarray:
     y_dot = (x*y - y**3) / tau
     return y_dot
 
@@ -28,7 +28,7 @@ trials = 1000
 min_mu, max_mu = -1.0, 1.0
 ds_dims = [1, 2, 3]
 n_conditions = len(ds_dims)
-d = 5
+d = 1
 dt = 0.01
 sampling_rate = 10
 steps = 10000

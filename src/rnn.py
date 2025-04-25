@@ -218,8 +218,10 @@ class LowRankCRNN(LowRankRNN):
 
     def detach(self):
         super().detach()
-        self.C_z = self.C_z.detach()
-        self.C_y = self.C_y.detach()
+        for key, val in self.z_controllers.items():
+            self.z_controllers[key] = val.detach()
+        for key, val in self.y_controllers.items():
+            self.y_controllers[key] = val.detach()
 
     def _update_layer(self, x):
         self.y = self.C_y * self.f(self.W @ self.y + self.L @ self.z + x)
