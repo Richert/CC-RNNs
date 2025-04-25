@@ -7,7 +7,7 @@ import seaborn as sb
 # load data
 path = "/home/richard-gast/Documents/results"
 task = "clr_rhythmic_3freqs"
-conditions = ["fit"]
+conditions = ["fit", "cfit"]
 
 # matplotlib settings
 plt.rcParams["font.family"] = "Times New Roman"
