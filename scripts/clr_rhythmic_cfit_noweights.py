@@ -72,9 +72,9 @@ results = {"Delta": [], "sigma": [], "trial": [], "train_epochs": [], "train_los
 ################
 
 n = 0
-for Delta_tmp in Delta:
-    for sigma_tmp in sigma:
-        for rep in range(n_reps):
+for rep in range(n_reps):
+    for Delta_tmp in Delta:
+        for sigma_tmp in sigma:
 
             print(f"Starting run {n+1} out of {n_trials} training runs (Delta = {Delta_tmp}, sigma = {sigma_tmp}, rep = {rep})")
 
@@ -194,5 +194,5 @@ for Delta_tmp in Delta:
             n += 1
             print(f"Finished after {batch + 1} training epochs. Final loss: {loss_col[-1]}.")
 
-        # save results
-        pickle.dump(results, open(save_file, "wb"))
+            # save results
+            pickle.dump(results, open(save_file, "wb"))
