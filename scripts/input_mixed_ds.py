@@ -37,8 +37,9 @@ steps = 10000
 plot_examples = 6
 visualize = True
 
-# link rhs functions with dimensions
+# define conditions
 rhs_funcs = {1: pitchfork, 2: vanderpol, 3: lorenz}
+inp_channels = {1: [0], 2: [1, 2], 3: [3, 4, 5]}
 
 # generate targets and inputs
 targets, inputs, conditions = [], [], []
@@ -58,8 +59,10 @@ for n in range(trials):
         y_col = np.asarray(y_col)
         if np.isfinite(y_col[-1, 0]):
             successful = True
-    inputs.append(y_col[:-d, :])
-    targets.append(y_col[d:])
+    inp = np.zeros((y_col.shape[0], sum(ds_dims)))
+    inp[:, inp_channels[dim]] = y_col
+    inputs.append(inp[:-d, :])
+    targets.append(inp[d:, :])
     conditions.append(dim)
     print(f"Finished trial {n+1} of {trials}.")
 
