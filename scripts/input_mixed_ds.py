@@ -20,13 +20,14 @@ def lorenz(y: np.ndarray, s: float = 10.0, r: float = 28.0, b: float = 2.667) ->
     y3_dot = y1*y2 - b*y3
     return np.asarray([y1_dot, y2_dot, y3_dot])
 
+
 # general parameters
 save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
-trials = 1000
+trials = 6000
 min_mu, max_mu = -1.0, 1.0
-ds_dims = [1, 2, 3]
+ds_dims = [1, 2]
 n_conditions = len(ds_dims)
 d = 1
 dt = 0.01

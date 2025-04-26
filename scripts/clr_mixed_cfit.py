@@ -1,4 +1,3 @@
-
 import sys
 sys.path.append("../")
 from src.rnn import LowRankCRNN
@@ -6,18 +5,21 @@ from src.functions import init_weights, init_dendrites
 import torch
 import numpy as np
 import pickle
+import matplotlib.pyplot as plt
 
 # parameter definition
 ######################
 
 # general
-n_conditions = 3
+n_conditions = 2
 dtype = torch.float64
 device = "cpu"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/mixed_{n_conditions}ds.pkl"
 save_file = f"{path}/results/clr_mixed_{n_conditions}ds_cfit.pkl"
+visualize_results = True
+plot_examples = 5
 
 # load inputs and targets
 data = pickle.load(open(load_file, "rb"))
@@ -56,7 +58,7 @@ gradient_cutoff = 1e6
 truncation_steps = 100
 epsilon = 0.1
 lam = 1e-4
-alpha = 3.0
+alpha = 5.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -95,8 +97,8 @@ for rep in range(n_reps):
 
             # initialize controllers
             for c in unique_conditions:
-                rnn.init_new_y_controller(init_value="random")
-                rnn.store_y_controller(c)
+                rnn.init_new_z_controller(init_value="random")
+                rnn.store_z_controller(c)
 
             # set up loss function
             loss_func = torch.nn.MSELoss()
@@ -124,13 +126,13 @@ for rep in range(n_reps):
                             x = torch.randn(n_in, dtype=dtype, device=device)
                             rnn.forward(x)
                         rnn.detach()
-                        rnn.activate_y_controller(conditions[trial])
+                        rnn.activate_z_controller(conditions[trial])
 
                         # collect loss
                         y_col = []
                         for step in range(steps):
                             z = rnn.forward(inp[step])
-                            rnn.update_y_controller()
+                            rnn.update_z_controller()
                             y = W_r @ z
                             if step % truncation_steps == truncation_steps - 1:
                                 rnn.detach()
@@ -141,7 +143,7 @@ for rep in range(n_reps):
                         loss += loss_func(y_col, target)
 
                         # store controller
-                        rnn.store_y_controller(conditions[trial])
+                        rnn.store_z_controller(conditions[trial])
 
                     # make update
                     optim.zero_grad()
@@ -157,7 +159,7 @@ for rep in range(n_reps):
                         break
 
             # generate predictions
-            test_loss = []
+            test_loss, predictions, dynamics = [], [], []
             with torch.no_grad():
                 for trial in range(train_trials, trials):
 
@@ -170,14 +172,17 @@ for rep in range(n_reps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
-                    rnn.activate_y_controller(conditions[trial])
+                    rnn.activate_z_controller(conditions[trial])
 
                     # make prediction
-                    y_col = []
+                    y_col, z_col = [], []
                     for step in range(steps):
                         z = rnn.forward(inp[step])
                         y = W_r @ z
                         y_col.append(y)
+                        z_col.append(z)
+                    predictions.append(np.asarray(y_col))
+                    dynamics.append(np.asarray(z_col))
 
                     # calculate loss
                     loss = loss_func(torch.stack(y_col, dim=0), target)
@@ -200,3 +205,60 @@ for rep in range(n_reps):
 
             # save results
             pickle.dump(results, open(save_file, "wb"))
+
+            if visualize_results:
+
+                # prediction figure
+                fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2 * plot_examples))
+                for i, trial in enumerate(np.random.choice(test_trials, size=(plot_examples,))):
+                    ax = axes[i]
+                    ax.plot(targets[train_trials + trial][:, 0], label="target 1", linestyle="dashed", color="black")
+                    ax.plot(targets[train_trials + trial][:, 1], label="target 2", linestyle="dashed",
+                            color="darkorange")
+                    ax.plot(predictions[trial][:, 0], label="prediction 1", linestyle="solid", color="black")
+                    ax.plot(predictions[trial][:, 1], label="prediction 2", linestyle="solid", color="darkorange")
+                    ax.axvline(x=int(0.5 * steps), color="grey", linestyle="dashed")
+                    ax.set_ylabel("amplitude")
+                    ax.set_title(f"test trial {trial + 1}")
+                    if i == plot_examples - 1:
+                        ax.set_xlabel("steps")
+                        ax.legend()
+                fig.suptitle("Model Predictions")
+                plt.tight_layout()
+
+                # dynamics figure
+                fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2 * plot_examples))
+                n_neurons = 5
+                for i in range(plot_examples):
+                    mean_v = np.mean(dynamics[i], axis=-1)
+                    ax = axes[i]
+                    ax.plot(mean_v, color="black", label="mean")
+                    for j in np.random.choice(k, size=(n_neurons,)):
+                        ax.plot(dynamics[i][:, j], label=f"neuron {j + 1}")
+                    ax.axvline(x=int(0.5 * steps), color="grey", linestyle="dashed")
+                    ax.set_ylabel("amplitude")
+                    if i == plot_examples - 1:
+                        ax.set_xlabel("steps")
+                        ax.legend()
+                fig.suptitle("RNN dynamics")
+                plt.tight_layout()
+
+                # conceptors figure
+                conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.z_controllers.values()])
+                fig, ax = plt.subplots(figsize=(12, 2 * len(conceptors)))
+                im = ax.imshow(conceptors, aspect="auto", interpolation="none", cmap="cividis")
+                plt.colorbar(im, ax=ax, shrink=0.8)
+                ax.set_xlabel("neurons")
+                ax.set_ylabel("conditions")
+                ax.set_title("Conceptors")
+                plt.tight_layout()
+
+                # training loss figure
+                fig, ax = plt.subplots(figsize=(12, 4))
+                ax.plot(loss_col)
+                ax.set_xlabel("training batch")
+                ax.set_ylabel("MSE")
+                ax.set_title("Training loss")
+                plt.tight_layout()
+
+                plt.show()
