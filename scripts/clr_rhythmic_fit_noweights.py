@@ -58,8 +58,8 @@ epsilon = 0.1
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-Delta = [0.1, 0.4]
-sigma = np.arange(start=0.2, stop=1.7, step=0.2)
+Delta = [0.1]
+sigma = np.arange(start=0.4, stop=1.41, step=0.1)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 

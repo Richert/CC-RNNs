@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 ######################
 
 # general
-n_conditions = 2
+n_conditions = 3
 dtype = torch.float64
 device = "cpu"
 state_vars = ["y"]
@@ -31,7 +31,7 @@ unique_conditions = np.unique(conditions)
 # task parameters
 steps = inputs[0].shape[0]
 init_steps = 20
-noise_lvl = 0.0001
+noise_lvl = 0.0
 
 # add noise to input
 inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
@@ -58,7 +58,7 @@ gradient_cutoff = 1e6
 truncation_steps = 100
 epsilon = 0.1
 lam = 1e-4
-alpha = 5.0
+alpha = 4.5
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -189,7 +189,7 @@ for rep in range(n_reps):
                     test_loss.append(loss.item())
 
             # save results
-            c_dim = [torch.sum(c)**2/N for c in rnn.y_controllers.values()]
+            c_dim = [torch.sum(c)/k for c in rnn.z_controllers.values()]
             results["Delta"].append(Delta_tmp)
             results["sigma"].append(sigma_tmp)
             results["trial"].append(rep)
@@ -212,12 +212,9 @@ for rep in range(n_reps):
                 fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2 * plot_examples))
                 for i, trial in enumerate(np.random.choice(test_trials, size=(plot_examples,))):
                     ax = axes[i]
-                    ax.plot(targets[train_trials + trial][:, 0], label="target 1", linestyle="dashed", color="black")
-                    ax.plot(targets[train_trials + trial][:, 1], label="target 2", linestyle="dashed",
-                            color="darkorange")
-                    ax.plot(predictions[trial][:, 0], label="prediction 1", linestyle="solid", color="black")
-                    ax.plot(predictions[trial][:, 1], label="prediction 2", linestyle="solid", color="darkorange")
-                    ax.axvline(x=int(0.5 * steps), color="grey", linestyle="dashed")
+                    ax.plot(targets[train_trials + trial], label="targets", linestyle="dashed")
+                    for j, line in enumerate(ax.get_lines()):
+                        ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid", color=line.get_color())
                     ax.set_ylabel("amplitude")
                     ax.set_title(f"test trial {trial + 1}")
                     if i == plot_examples - 1:

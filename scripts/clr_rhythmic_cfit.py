@@ -56,17 +56,17 @@ gradient_cutoff = 1e4
 truncation_steps = 100
 epsilon = 0.1
 lam = 1e-3
-alpha = 10.0
+alpha = 5.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-Delta = [0.1, 0.4]
-sigma = np.arange(start=0.2, stop=1.7, step=0.2)
+Delta = [0.1]
+sigma = np.arange(start=0.4, stop=1.41, step=0.1)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 
 # prepare results
-results = {"Delta": [], "sigma": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": []}
+results = {"Delta": [], "sigma": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": [], "cdim": []}
 
 # model training
 ################
@@ -182,12 +182,14 @@ for rep in range(n_reps):
                     test_loss.append(loss.item())
 
             # save results
+            c_dim = [torch.mean(c).detach().cpu().numpy() for c in rnn.y_controllers.values()]
             results["Delta"].append(Delta_tmp)
             results["sigma"].append(sigma_tmp)
             results["trial"].append(rep)
             results["train_epochs"].append(batch)
             results["train_loss"].append(loss_col)
             results["test_loss"].append(np.sum(test_loss))
+            results["cdim"].append(np.mean(c_dim))
 
             # report progress
             n += 1

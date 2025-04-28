@@ -25,14 +25,15 @@ def lorenz(y: np.ndarray, s: float = 10.0, r: float = 28.0, b: float = 2.667) ->
 save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
-trials = 6000
+trials = 10000
 min_mu, max_mu = -1.0, 1.0
-ds_dims = [1, 2]
+ds_dims = [1, 2, 3]
 n_conditions = len(ds_dims)
 d = 1
 dt = 0.01
-sampling_rate = 10
-steps = 10000
+sampling_rate = 5
+steps = 5000
+init_scale = 2.0
 
 # plot parameters
 plot_examples = 6
@@ -49,7 +50,7 @@ for n in range(trials):
     dim = np.random.choice(ds_dims)
     rhs = rhs_funcs[dim]
     while not successful:
-        y = np.random.randn(dim)
+        y = init_scale * np.random.randn(dim)
         y_col = []
         for step in range(steps + d):
             y = y + dt * rhs(y)
@@ -63,7 +64,7 @@ for n in range(trials):
     inp = np.zeros((y_col.shape[0], sum(ds_dims)))
     inp[:, inp_channels[dim]] = y_col
     inputs.append(inp[:-d, :])
-    targets.append(inp[d:, :])
+    targets.append(inp[d:, :] / np.max(np.abs(inp)))
     conditions.append(dim)
     print(f"Finished trial {n+1} of {trials}.")
 
@@ -76,12 +77,12 @@ if visualize:
     fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2*plot_examples))
     for i, trial in enumerate(np.random.choice(trials, size=(plot_examples,))):
         ax = axes[i]
-        ax.plot(inputs[trial], label="x")
-        ax.plot(targets[trial], label="y")
+        # ax.plot(inputs[trial], label="x")
+        ax.plot(targets[trial])
         ax.set_xlabel("time")
         ax.set_ylabel("amplitude")
         ax.set_title(f"training trial {trial+1}: dim = {conditions[trial]}")
-        ax.legend()
+        # ax.legend()
     fig.suptitle("Inputs (x) and Target Waveforms (y)")
     plt.tight_layout()
     plt.show()
