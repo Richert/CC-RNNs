@@ -27,7 +27,7 @@ save_path = f"/home/richard-gast/Documents/data"
 # task parameters
 trials = 10000
 min_mu, max_mu = -1.0, 1.0
-ds_dims = [1, 2, 3]
+ds_dims = [1]
 n_conditions = len(ds_dims)
 d = 1
 dt = 0.01
@@ -64,7 +64,7 @@ for n in range(trials):
     inp = np.zeros((y_col.shape[0], sum(ds_dims)))
     inp[:, inp_channels[dim]] = y_col
     inputs.append(inp[:-d, :])
-    targets.append(inp[d:, :] / np.max(np.abs(inp)))
+    targets.append(inp[d:, :])
     conditions.append(dim)
     print(f"Finished trial {n+1} of {trials}.")
 

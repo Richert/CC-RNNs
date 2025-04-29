@@ -144,16 +144,16 @@ for rep in range(n_reps):
                         # store controller
                         rnn.store_y_controller(conditions[trial])
 
-                    # make update
-                    optim.zero_grad()
-                    loss.backward()
-                    optim.step()
-
                     # store and print loss
                     train_loss = loss.item()
                     loss_col.append(train_loss)
                     if train_loss < epsilon:
                         break
+
+                    # make update
+                    optim.zero_grad()
+                    loss.backward()
+                    optim.step()
 
             # generate predictions
             test_loss = []
