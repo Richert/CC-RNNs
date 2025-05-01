@@ -18,7 +18,7 @@ state_vars = ["y"]
 path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
 save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_fit.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 5
 
 # load inputs and targets

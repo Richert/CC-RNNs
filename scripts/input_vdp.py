@@ -26,7 +26,7 @@ init_scale = 2.0
 
 # plot parameters
 plot_examples = 6
-visualize = True
+visualize = False
 
 # generate targets and inputs
 y0 = 1.0
