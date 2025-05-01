@@ -63,13 +63,13 @@ lr = 1e-2
 betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e10
-truncation_steps = 50
-epsilon = 0.05
+truncation_steps = 100
+epsilon = 1.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
 Delta = [0.1]
-sigma = np.arange(start=0.4, stop=1.41, step=0.1)
+sigma = np.arange(start=1.2, stop=1.41, step=0.1)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 

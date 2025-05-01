@@ -53,15 +53,15 @@ lr = 1e-2
 betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e10
-truncation_steps = 50
-epsilon = 0.05
-lam = 1e-4
-alpha = 5.0
+truncation_steps = 100
+epsilon = 1.0
+lam = 5e-5
+alpha = 4.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
 Delta = [0.1]
-sigma = np.arange(start=0.4, stop=1.41, step=0.1)
+sigma = np.arange(start=0.8, stop=1.41, step=0.1)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 
@@ -236,6 +236,16 @@ for rep in range(n_reps):
                         ax.set_xlabel("steps")
                         ax.legend()
                 fig.suptitle("RNN dynamics")
+                plt.tight_layout()
+
+                # conceptors figure
+                conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.y_controllers.values()])
+                fig, ax = plt.subplots(figsize=(12, 2 * len(conceptors)))
+                im = ax.imshow(conceptors, aspect="auto", interpolation="none", cmap="cividis")
+                plt.colorbar(im, ax=ax, shrink=0.8)
+                ax.set_xlabel("neurons")
+                ax.set_ylabel("conditions")
+                ax.set_title("Conceptors")
                 plt.tight_layout()
 
                 # training loss figure

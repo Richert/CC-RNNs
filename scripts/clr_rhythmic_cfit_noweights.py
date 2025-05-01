@@ -1,4 +1,3 @@
-
 import sys
 sys.path.append("../")
 from src.rnn import LowRankCRNN
@@ -27,11 +26,12 @@ data = pickle.load(open(load_file, "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
-unique_conditions = np.unique(conditions)
+unique_conditions = np.unique(conditions, axis=0)
 
 # task parameters
 steps = inputs[0].shape[0]
 init_steps = 20
+auto_steps = 100
 noise_lvl = 0.0
 
 # rnn parameters
@@ -54,7 +54,9 @@ betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e10
 truncation_steps = 50
-epsilon = 0.01
+epsilon = 0.1
+lam = 1e-4
+alpha = 5.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -87,22 +89,21 @@ for rep in range(n_reps):
             rnn = LowRankCRNN(torch.tensor(W*0.0, dtype=dtype, device=device),
                               torch.tensor(L*sigma_tmp, dtype=dtype, device=device),
                               torch.tensor(R, device=device, dtype=dtype),
-                              W_in, bias, g="ReLU")
-            rnn.free_param("W_in")
+                              W_in, bias, g="ReLU", alpha=alpha, lam=lam)
 
             # initialize controllers
             conceptors = []
             for c in unique_conditions:
                 rnn.init_new_y_controller(init_value="random")
                 rnn.C_y.requires_grad = True
-                conceptors.append(rnn.C_y)
-                rnn.store_y_controller(c)
+                rnn.store_y_controller(tuple(c))
+                conceptors.append(rnn.y_controllers[tuple(c)])
 
             # set up loss function
             loss_func = torch.nn.MSELoss()
 
             # set up optimizer
-            optim = torch.optim.Adam(list(rnn.parameters()) + conceptors + [W_r], lr=lr, betas=betas)
+            optim = torch.optim.Adam(conceptors + [W_r], lr=lr, betas=betas)
             rnn.clip(gradient_cutoff)
 
             # training
@@ -135,13 +136,11 @@ for rep in range(n_reps):
                             if step % truncation_steps == truncation_steps - 1:
                                 rnn.detach()
                             y_col.append(y)
+                        rnn.store_y_controller(conditions[trial])
 
                         # calculate loss
                         y_col = torch.stack(y_col, dim=0)
                         loss += loss_func(y_col, target)
-
-                        # store controller
-                        rnn.store_y_controller(conditions[trial])
 
                     # store and print loss
                     train_loss = loss.item()
@@ -154,6 +153,7 @@ for rep in range(n_reps):
                     optim.zero_grad()
                     loss.backward()
                     optim.step()
+                    rnn.detach()
 
             # generate predictions
             test_loss, predictions, dynamics = [], [], []
@@ -174,9 +174,8 @@ for rep in range(n_reps):
                     # make prediction
                     y_col, z_col = [], []
                     for step in range(steps):
-                        if step > init_steps:
-                            inp[step, :-1] = y
-                        z = rnn.forward(inp[step])
+                        x = inp[step] if step < auto_steps else y
+                        z = rnn.forward(x)
                         y = W_r @ z
                         y_col.append(y)
                         z_col.append(z)
@@ -194,7 +193,7 @@ for rep in range(n_reps):
             results["trial"].append(rep)
             results["train_epochs"].append(batch)
             results["train_loss"].append(loss_col)
-            results["test_loss"].append(np.mean(test_loss))
+            results["test_loss"].append(np.sum(test_loss))
             results["cdim"].append(np.mean(c_dim))
 
             # report progress
@@ -212,7 +211,8 @@ for rep in range(n_reps):
                     ax = axes[i]
                     ax.plot(targets[train_trials + trial], label="targets", linestyle="dashed")
                     for j, line in enumerate(ax.get_lines()):
-                        ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid", color=line.get_color())
+                        ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid",
+                                color=line.get_color())
                     ax.set_ylabel("amplitude")
                     ax.set_title(f"test trial {trial + 1}")
                     if i == plot_examples - 1:
