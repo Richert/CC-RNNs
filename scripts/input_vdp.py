@@ -3,10 +3,11 @@ import pickle
 import matplotlib.pyplot as plt
 
 
-def vanderpol(y1: np.ndarray, y2: np.ndarray, x: float, tau: float = 1.0) -> tuple:
+def vanderpol(y: np.ndarray, x: float = 1.0, tau: float = 1.0) -> np.ndarray:
+    y1, y2 = y[0], y[1]
     y1_dot = y2 / tau
     y2_dot = (y2*x*(1 - y1**2) - y1) / tau
-    return y1_dot, y2_dot
+    return np.asarray([y1_dot, y2_dot])
 
 
 # general parameters
@@ -14,17 +15,18 @@ save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
-min_mu, max_mu = -1.0, 1.0
+mus = [0.5]
 taus = [1.0, 2.0, 4.0]
 n_conditions = len(taus)
 d = 1
 dt = 0.01
 sampling_rate = 20
 steps = 10000
+init_scale = 2.0
 
 # plot parameters
 plot_examples = 6
-visualize = False
+visualize = True
 
 # generate targets and inputs
 y0 = 1.0
@@ -32,28 +34,22 @@ targets, inputs, conditions = [], [], []
 for n in range(trials):
     successful = False
     tau = np.random.choice(taus)
-    mu = (max_mu - min_mu) * np.random.rand() + min_mu
+    mu = np.random.choice(mus)
     while not successful:
-        y1 = np.zeros((1,)) - y0
-        y2 = np.zeros((1,)) + y0
+        y = init_scale * np.random.randn(2)
         y_col = []
         for step in range(steps + d):
-            y1_dot, y2_dot = vanderpol(y1, y2, x=mu, tau=tau)
-            y1 = y1 + dt * y1_dot
-            y2 = y2 + dt * y2_dot
+            y = y + dt * vanderpol(y, tau=tau)
             if step % sampling_rate == 0:
-                y_col.append(y1)
+                y_col.append(y)
             if not np.isfinite(y_col[-1][0]):
                 break
         y_col = np.asarray(y_col)
         if np.isfinite(y_col[-1, 0]):
             successful = True
-    inp = np.zeros((y_col.shape[0] - d, 2))
-    inp[:, 0] = y_col[:-d, 0]
-    inp[:, 1] = mu
-    inputs.append(inp)
+    inputs.append(y_col[:-d])
     targets.append(y_col[d:])
-    conditions.append(tau)
+    conditions.append((mu, tau))
     print(f"Finished trial {n+1} of {trials}.")
 
 # save results

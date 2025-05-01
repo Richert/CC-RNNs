@@ -26,7 +26,7 @@ data = pickle.load(open(load_file, "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
-unique_conditions = np.unique(conditions)
+unique_conditions = np.unique(conditions, axis=0)
 
 # task parameters
 steps = inputs[0].shape[0]
@@ -54,8 +54,8 @@ betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e10
 truncation_steps = 50
-epsilon = 0.01
-lam = 1e-3
+epsilon = 0.05
+lam = 1e-4
 alpha = 5.0
 batches = int(augmentation * train_trials / batch_size)
 
@@ -89,77 +89,34 @@ for rep in range(n_reps):
             rnn = LowRankCRNN(torch.tensor(W*0.0, dtype=dtype, device=device),
                               torch.tensor(L*sigma_tmp, dtype=dtype, device=device),
                               torch.tensor(R, device=device, dtype=dtype),
-                              W_in, bias, g="ReLU")
+                              W_in, bias, g="ReLU", alpha=alpha, lam=lam)
             rnn.free_param("L")
 
             # initialize controllers
             for c in unique_conditions:
                 rnn.init_new_y_controller(init_value="random")
-                rnn.store_y_controller(c)
+                rnn.store_y_controller(tuple(c))
 
-                # set up loss function
-                loss_func = torch.nn.MSELoss()
+            # set up loss function
+            loss_func = torch.nn.MSELoss()
 
-                # set up optimizer
-                optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
-                rnn.clip(gradient_cutoff)
+            # set up optimizer
+            optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+            rnn.clip(gradient_cutoff)
 
-                # training
-                train_loss = 0.0
-                loss_col = []
-                with torch.enable_grad():
-                    for batch in range(batches):
+            # training
+            train_loss = 0.0
+            loss_col = []
+            with torch.enable_grad():
+                for batch in range(batches):
 
-                        loss = torch.zeros((1,), device=device, dtype=dtype)
+                    loss = torch.zeros((1,), device=device, dtype=dtype)
 
-                        for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
-
-                            # get input and target timeseries
-                            inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
-                            inp += noise_lvl * torch.randn(*inp.shape, device=device)
-                            target = torch.tensor(targets[trial], device=device, dtype=dtype)
-
-                            # get initial state
-                            rnn.activate_y_controller(conditions[trial])
-                            for step in range(init_steps):
-                                x = torch.randn(n_in, dtype=dtype, device=device)
-                                rnn.forward(x)
-                                rnn.update_y_controller()
-                            rnn.detach()
-
-                            # collect loss
-                            y_col = []
-                            for step in range(steps):
-                                z = rnn.forward(inp[step])
-                                rnn.update_y_controller()
-                                y = W_r @ z
-                                if step % truncation_steps == truncation_steps - 1:
-                                    rnn.detach()
-                                y_col.append(y)
-
-                            # calculate loss
-                            y_col = torch.stack(y_col, dim=0)
-                            loss += loss_func(y_col, target)
-
-                        # store and print loss
-                        train_loss = loss.item()
-                        loss_col.append(train_loss)
-                        print(f"Training epoch {batch + 1} / {batches}: MSE = {loss_col[-1]}")
-                        if train_loss < epsilon:
-                            break
-
-                        # make update
-                        optim.zero_grad()
-                        loss.backward()
-                        optim.step()
-
-                # generate predictions
-                test_loss, predictions, dynamics = [], [], []
-                with torch.no_grad():
-                    for trial in range(train_trials, trials):
+                    for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
 
                         # get input and target timeseries
                         inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
+                        inp += noise_lvl * torch.randn(*inp.shape, device=device)
                         target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
                         # get initial state
@@ -167,23 +124,67 @@ for rep in range(n_reps):
                         for step in range(init_steps):
                             x = torch.randn(n_in, dtype=dtype, device=device)
                             rnn.forward(x)
+                            rnn.update_y_controller()
                         rnn.detach()
 
-                        # make prediction
-                        y_col, z_col = [], []
+                        # collect loss
+                        y_col = []
                         for step in range(steps):
-                            if step > auto_steps:
-                                inp[step, :-n_conditions] = y
                             z = rnn.forward(inp[step])
+                            rnn.update_y_controller()
                             y = W_r @ z
+                            if step % truncation_steps == truncation_steps - 1:
+                                rnn.detach()
                             y_col.append(y)
-                            z_col.append(z)
-                        predictions.append(np.asarray([y.detach().cpu().numpy() for y in y_col]))
-                        dynamics.append(np.asarray([z.detach().cpu().numpy() for z in z_col]))
+                        rnn.store_y_controller(conditions[trial])
 
                         # calculate loss
-                        loss = loss_func(torch.stack(y_col, dim=0), target)
-                        test_loss.append(loss.item())
+                        y_col = torch.stack(y_col, dim=0)
+                        loss += loss_func(y_col, target)
+
+                    # store and print loss
+                    train_loss = loss.item()
+                    loss_col.append(train_loss)
+                    print(f"Training epoch {batch + 1} / {batches}: MSE = {loss_col[-1]}")
+                    if train_loss < epsilon:
+                        break
+
+                    # make update
+                    optim.zero_grad()
+                    loss.backward()
+                    optim.step()
+                    rnn.detach()
+
+            # generate predictions
+            test_loss, predictions, dynamics = [], [], []
+            with torch.no_grad():
+                for trial in range(train_trials, trials):
+
+                    # get input and target timeseries
+                    inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
+                    target = torch.tensor(targets[trial], device=device, dtype=dtype)
+
+                    # get initial state
+                    rnn.activate_y_controller(conditions[trial])
+                    for step in range(init_steps):
+                        x = torch.randn(n_in, dtype=dtype, device=device)
+                        rnn.forward(x)
+                    rnn.detach()
+
+                    # make prediction
+                    y_col, z_col = [], []
+                    for step in range(steps):
+                        x = inp[step] if step < auto_steps else y
+                        z = rnn.forward(x)
+                        y = W_r @ z
+                        y_col.append(y)
+                        z_col.append(z)
+                    predictions.append(np.asarray([y.detach().cpu().numpy() for y in y_col]))
+                    dynamics.append(np.asarray([z.detach().cpu().numpy() for z in z_col]))
+
+                    # calculate loss
+                    loss = loss_func(torch.stack(y_col, dim=0), target)
+                    test_loss.append(loss.item())
 
             # save results
             c_dim = [torch.mean(c).detach().cpu().numpy() for c in rnn.y_controllers.values()]

@@ -26,16 +26,16 @@ data = pickle.load(open(load_file, "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
-unique_conditions = np.unique(conditions)
+unique_conditions = np.unique(conditions, axis=0)
 
 # add condition information to input
 inputs_new = []
 for inp, cond in zip(inputs, conditions):
     inp_new = np.zeros((inp.shape[0], inp.shape[1]+n_conditions))
-    idx = np.argwhere(unique_conditions == cond).squeeze()
+    idx = np.argwhere([tuple(uc) == cond for uc in unique_conditions]).squeeze()
     inp_new[:, :-n_conditions] = inp
     inp_new[:, idx-n_conditions] = 1.0
-    inputs_new.append(inp_new)
+    inputs_new.append(inp_new.copy())
 inputs = inputs_new
 
 # task parameters
@@ -64,7 +64,7 @@ betas = (0.9, 0.999)
 batch_size = 50
 gradient_cutoff = 1e10
 truncation_steps = 50
-epsilon = 0.01
+epsilon = 0.05
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -152,6 +152,7 @@ for rep in range(n_reps):
                     optim.zero_grad()
                     loss.backward()
                     optim.step()
+                    rnn.detach()
 
             # generate predictions
             test_loss, predictions, dynamics = [], [], []
@@ -172,7 +173,7 @@ for rep in range(n_reps):
                     y_col, z_col = [], []
                     for step in range(steps):
                         if step > auto_steps:
-                            inp[step, :-n_conditions] = y
+                            inp[step, :n_out] = y
                         z = rnn.forward(inp[step])
                         y = W_r @ z
                         y_col.append(y)
@@ -190,7 +191,7 @@ for rep in range(n_reps):
             results["trial"].append(rep)
             results["train_epochs"].append(batch)
             results["train_loss"].append(loss_col)
-            results["test_loss"].append(np.mean(test_loss))
+            results["test_loss"].append(np.sum(test_loss))
 
             # report progress
             n += 1
@@ -207,7 +208,8 @@ for rep in range(n_reps):
                     ax = axes[i]
                     ax.plot(targets[train_trials + trial], label="targets", linestyle="dashed")
                     for j, line in enumerate(ax.get_lines()):
-                        ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid", color=line.get_color())
+                        ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid",
+                                color=line.get_color())
                     ax.set_ylabel("amplitude")
                     ax.set_title(f"test trial {trial + 1}")
                     if i == plot_examples - 1:
