@@ -69,7 +69,7 @@ batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
 Delta = [0.1]
-sigma = np.arange(start=1.2, stop=1.41, step=0.1)
+sigma = np.arange(start=0.4, stop=1.41, step=0.1)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 

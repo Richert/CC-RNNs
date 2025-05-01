@@ -55,8 +55,8 @@ batch_size = 50
 gradient_cutoff = 1e10
 truncation_steps = 100
 epsilon = 1.0
-lam = 5e-5
-alpha = 4.0
+lam = 2e-5
+alpha = 3.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
