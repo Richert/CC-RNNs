@@ -58,7 +58,7 @@ sigma = 0.8
 N = int(k * n_dendrites)
 
 # training parameters
-trials = 1000
+trials = 10000
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 lr = 0.1
