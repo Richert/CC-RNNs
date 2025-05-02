@@ -11,7 +11,7 @@ def vanderpol(y: np.ndarray, x: float = 1.0, tau: float = 1.0) -> np.ndarray:
 
 
 # general parameters
-save_path = f"/home/richard-gast/Documents/data"
+save_path = f"/home/richard/data"
 
 # task parameters
 trials = 10000
@@ -26,7 +26,7 @@ init_scale = 2.0
 
 # plot parameters
 plot_examples = 6
-visualize = True
+visualize = False
 
 # generate targets and inputs
 y0 = 1.0
