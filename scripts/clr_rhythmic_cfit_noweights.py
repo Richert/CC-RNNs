@@ -26,7 +26,7 @@ data = pickle.load(open(load_file, "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
-unique_conditions = np.unique(conditions, axis=0)
+unique_conditions = np.unique(conditions, axis=0).tolist()
 
 # task parameters
 steps = inputs[0].shape[0]
@@ -93,7 +93,7 @@ for rep in range(n_reps):
             # initialize controllers
             conceptors = []
             for c in unique_conditions:
-                rnn.init_new_y_controller(init_value="ones")
+                rnn.init_new_y_controller(init_value="random")
                 rnn.C_y.requires_grad = True
                 rnn.C_y.register_hook(lambda grad: torch.clamp(grad, -gradient_cutoff, gradient_cutoff))
                 rnn.store_y_controller(tuple(c))
@@ -122,7 +122,7 @@ for rep in range(n_reps):
                         target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
                         # get initial state
-                        rnn.activate_y_controller(conditions[trial])
+                        rnn.C_y = conceptors[unique_conditions.index(list(conditions[trial]))]
                         for step in range(init_steps):
                             x = torch.randn(n_in, dtype=dtype, device=device)
                             rnn.forward(x)
@@ -136,7 +136,6 @@ for rep in range(n_reps):
                             if step % truncation_steps == truncation_steps - 1:
                                 rnn.detach()
                             y_col.append(y)
-                        rnn.store_y_controller(conditions[trial])
 
                         # calculate loss
                         y_col = torch.stack(y_col, dim=0)

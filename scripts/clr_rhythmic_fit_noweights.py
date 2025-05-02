@@ -59,12 +59,12 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 1e-2
+lr = 0.1
 betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 0.3
+epsilon = 0.1
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
