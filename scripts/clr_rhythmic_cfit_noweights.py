@@ -49,7 +49,7 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 1e-2
+lr = 0.1
 betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
@@ -95,6 +95,7 @@ for rep in range(n_reps):
             for c in unique_conditions:
                 rnn.init_new_y_controller(init_value="ones")
                 rnn.C_y.requires_grad = True
+                rnn.C_y.register_hook(lambda grad: torch.clamp(grad, -gradient_cutoff, gradient_cutoff))
                 rnn.store_y_controller(tuple(c))
                 conceptors.append(rnn.y_controllers[tuple(c)])
 

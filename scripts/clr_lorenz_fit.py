@@ -2,10 +2,10 @@
 
 Instructions:
 - you don't need to run any input generation scripts. This is self-contained.
-- by default, the following parameters are optimized (see line 102): L (line 90), W_in (line 91), W_r (line 83)
+- by default, the following parameters are optimized (see line 101): L (line 90), W_r (line 83)
 - a conceptor is trained for each condition. Conditions differ in their Lorenz equation parameters (line 44)
 - important parameters to adjust for optimizing the training procedure are in lines 60-74. alpha and lam are the
-  aperture and learning rate for conceptors, respectively. Everything else is backpropagation things.
+  aperture and learning rate for the conceptor update rule, respectively. Everything else is backpropagation things.
 
 """
 import sys
@@ -16,19 +16,19 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-def lorenz(y: torch.Tensor, s: float = 10.0, r: float = 28.0, b: float = 2.667) -> torch.Tensor:
+def lorenz(y: np.ndarray, s: float = 10.0, r: float = 28.0, b: float = 2.667) -> np.ndarray:
     y1, y2, y3 = y
     y1_dot = s*(y2 - y1)
     y2_dot = r*y1 - y2 - y1*y3
     y3_dot = y1*y2 - b*y3
-    return torch.stack([y1_dot, y2_dot, y3_dot], dim=0)
+    return np.asarray([y1_dot, y2_dot, y3_dot])
 
 # parameter definition
 ######################
 
 # general
 dtype = torch.float64
-device = "cpu"
+device = "cuda:0"
 visualize_results = True
 plot_examples = 5
 
@@ -61,12 +61,12 @@ N = int(k * n_dendrites)
 trials = 1000
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
-lr = 1e-2
+lr = 0.1
 betas = (0.9, 0.999)
 batch_size = 20
-gradient_cutoff = 1e4
-truncation_steps = 200
-epsilon = 0.01
+gradient_cutoff = 1e10
+truncation_steps = 100
+epsilon = 1.0
 alpha = 3.0
 lam = 1e-5
 batches = int(train_trials / batch_size)
@@ -87,7 +87,6 @@ rnn = LowRankCRNN(torch.tensor(W*0.0, dtype=dtype, device=device),
                   torch.tensor(L*sigma, dtype=dtype, device=device),
                   torch.tensor(R, device=device, dtype=dtype),
                   W_in, bias, g="ReLU", alpha=alpha, lam=lam)
-rnn.free_param("W_in")
 rnn.free_param("L")
 
 # conceptor initialization
@@ -105,37 +104,37 @@ rnn.clip(gradient_cutoff)
 # training
 train_loss = 0.0
 loss_col = []
-with torch.enable_grad():
-    for batch in range(batches):
+for batch in range(batches):
 
-        loss = torch.zeros((1,), device=device, dtype=dtype)
+    loss = torch.zeros((1,), device=device, dtype=dtype)
 
-        for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
+    for trial in range(batch_size):
 
-            # choose condition randomly
-            c = np.random.choice(conditions)
+        # choose condition randomly
+        c = np.random.choice(list(conditions))
 
-            # get initial state
-            rnn.activate_y_controller(c)
-            for step in range(init_steps):
-                x = torch.randn(n_in, dtype=dtype, device=device)
-                rnn.forward(x)
-                rnn.update_y_controller()
-            rnn.detach()
+        # get initial state
+        rnn.activate_y_controller(c)
+        for step in range(init_steps):
+            x = torch.randn(n_in, dtype=dtype, device=device)
+            rnn.forward(x)
+            rnn.update_y_controller()
+        rnn.detach()
 
-            # get input and target timeseries
-            y = y_init * torch.randn(dim)
-            y_col = []
-            for step in range(integration_steps):
-                y = y + dt * lorenz(y)
-                if step % sampling_rate == 0:
-                    y_col.append(y)
-            y_col = torch.stack(y_col, dim=0)
-            inp = y_col[:-d]
-            target = y_col[d:]
+        # get input and target timeseries
+        y = y_init * np.random.randn(dim)
+        y_col = []
+        for step in range(integration_steps):
+            y = y + dt * lorenz(y)
+            if step % sampling_rate == 0:
+                y_col.append(y)
+        y_col = np.asarray(y_col)
+        inp = torch.tensor(y_col[:-d], device=device, dtype=dtype)
+        target = torch.tensor(y_col[d:], device=device, dtype=dtype)
 
-            # collect loss
-            y_col = []
+        # collect loss
+        y_col = []
+        with torch.enable_grad():
             for step in range(inp.shape[0]):
                 z = rnn.forward(inp[step])
                 rnn.update_y_controller()
@@ -144,33 +143,33 @@ with torch.enable_grad():
                     rnn.detach()
                 y_col.append(y)
 
-            # calculate loss
-            y_col = torch.stack(y_col, dim=0)
-            loss += loss_func(y_col, target)
+        # calculate loss
+        y_col = torch.stack(y_col, dim=0)
+        loss += loss_func(y_col, target)
 
-            # store controller
-            rnn.store_y_controller(conditions[trial])
+        # store controller
+        rnn.store_y_controller(c)
 
-        # make update
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
-        rnn.detach()
+    # make update
+    optim.zero_grad()
+    loss.backward()
+    optim.step()
+    rnn.detach()
 
-        # store and print loss
-        train_loss = loss.item()
-        loss_col.append(train_loss)
-        print(f"Training epoch {batch+1} / {batches}: MSE = {loss_col[-1]}")
-        if train_loss < epsilon:
-            break
+    # store and print loss
+    train_loss = loss.item()
+    loss_col.append(train_loss)
+    print(f"Training epoch {batch+1} / {batches}: MSE = {loss_col[-1]}")
+    if train_loss < epsilon:
+        break
 
 # generate predictions
 test_loss, predictions, targets, dynamics, test_conditions = [], [], [], [], []
 with torch.no_grad():
-    for trial in range(train_trials, trials):
+    for trial in range(test_trials):
 
         # choose condition randomly
-        c = np.random.choice(conditions)
+        c = np.random.choice(list(conditions))
 
         # get initial state
         rnn.activate_y_controller(c)
@@ -179,30 +178,34 @@ with torch.no_grad():
             rnn.forward(x)
 
         # get input and target timeseries
-        y = y_init * torch.randn(dim)
+        y = y_init * np.random.randn(dim)
         y_col = []
         for step in range(integration_steps):
             y = y + dt * lorenz(y)
             if step % sampling_rate == 0:
                 y_col.append(y)
-        y_col = torch.stack(y_col, dim=0)
-        inp = y_col[:-d]
-        target = y_col[d:]
+        y_col = np.asarray(y_col)
+        inp = torch.tensor(y_col[:-d], device=device, dtype=dtype)
+        target = torch.tensor(y_col[d:], device=device, dtype=dtype)
 
         # make prediction
         y_col, z_col = [], []
-        for step in range(steps):
+        for step in range(inp.shape[0]):
             x = inp[step] if step <= auto_steps else y
             z = rnn.forward(x)
             y = W_r @ z
             y_col.append(y)
             z_col.append(z)
-        predictions.append(np.asarray(y_col))
-        dynamics.append(np.asarray(z_col))
 
         # calculate loss
         loss = loss_func(torch.stack(y_col, dim=0), target)
+
+        # store things
+        targets.append(target.detach().cpu().numpy())
+        predictions.append(np.asarray([y.detach().cpu().numpy() for y in y_col]))
+        dynamics.append(np.asarray([z.detach().cpu().numpy() for z in z_col]))
         test_loss.append(loss.item())
+        test_conditions.append(c)
 
 if visualize_results:
 
@@ -210,11 +213,11 @@ if visualize_results:
     fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2 * plot_examples))
     for i, trial in enumerate(np.random.choice(test_trials, size=(plot_examples,))):
         ax = axes[i]
-        ax.plot(targets[train_trials + trial], label="targets", linestyle="dashed")
+        ax.plot(targets[trial], label="targets", linestyle="dashed")
         for j, line in enumerate(ax.get_lines()):
             ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid", color=line.get_color())
         ax.set_ylabel("amplitude")
-        ax.set_title(f"test trial {trial + 1}")
+        ax.set_title(f"test trial {trial + 1}: condition = {test_conditions[trial]}, loss = {test_loss[trial]}")
         if i == plot_examples - 1:
             ax.set_xlabel("steps")
             ax.legend()
@@ -248,12 +251,22 @@ if visualize_results:
     ax.set_title("Conceptors")
     plt.tight_layout()
 
-    # training loss figure
-    fig, ax = plt.subplots(figsize=(12, 4))
+    # loss figure
+    fig, axes = plt.subplots(ncols=2, figsize=(12, 4))
+    ax = axes[0]
     ax.plot(loss_col)
     ax.set_xlabel("training batch")
     ax.set_ylabel("MSE")
     ax.set_title("Training loss")
+    ax = axes[1]
+    condition_losses = []
+    for c in conditions:
+        idx = np.argwhere(test_conditions == c).squeeze()
+        condition_losses.append(np.mean(np.asarray(test_loss)[idx]))
+    ax.bar(x=list(conditions), height=condition_losses)
+    ax.set_xlabel("conditions")
+    ax.set_ylabel("MSE")
+    ax.set_title("Test Loss")
     plt.tight_layout()
 
     plt.show()
