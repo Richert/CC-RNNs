@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 # general
 n_conditions = 3
 dtype = torch.float64
-device = "cuda:0"
+device = "cuda:1"
 state_vars = ["y"]
 path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
