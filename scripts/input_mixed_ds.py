@@ -26,7 +26,7 @@ save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
-ds_dims = [1]
+ds_dims = [1, 2, 3]
 n_conditions = len(ds_dims)
 d = 1
 dt = 0.01

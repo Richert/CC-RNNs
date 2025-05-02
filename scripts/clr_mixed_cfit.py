@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 ######################
 
 # general
-n_conditions = 1
+n_conditions = 3
 dtype = torch.float64
-device = "cpu"
+device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/mixed_{n_conditions}ds.pkl"
@@ -31,6 +31,7 @@ unique_conditions = np.unique(conditions)
 # task parameters
 steps = inputs[0].shape[0]
 init_steps = 20
+auto_steps = 100
 
 # rnn parameters
 k = 100
@@ -41,7 +42,7 @@ density = 0.5
 in_scale = 0.1
 out_scale = 0.2
 Delta = 0.1
-sigma = 0.8
+sigma = 0.9
 N = int(k * n_dendrites)
 
 # training parameters
@@ -52,15 +53,15 @@ augmentation = 1.0
 lr = 1e-2
 betas = (0.9, 0.999)
 batch_size = 20
-gradient_cutoff = 1e4
-truncation_steps = 200
-epsilon = 0.01
-lam = 1e-4
+gradient_cutoff = 1e10
+truncation_steps = 100
+epsilon = 0.05
+lam = 1e-5
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-alphas = [4.0]
-noise_lvls = [1e-3]
+alphas = [3.0]
+noise_lvls = [0.0]
 n_reps = 10
 n_trials = len(alphas)*n_reps
 
@@ -90,7 +91,6 @@ for rep in range(n_reps):
                               torch.tensor(L*sigma, dtype=dtype, device=device),
                               torch.tensor(R, device=device, dtype=dtype),
                               W_in, bias, g="ReLU", alpha=alpha, lam=lam)
-            rnn.free_param("W_in")
             rnn.free_param("L")
 
             # add noise to input
@@ -127,6 +127,7 @@ for rep in range(n_reps):
                         for step in range(init_steps):
                             x = torch.randn(n_in, dtype=dtype, device=device)
                             rnn.forward(x)
+                            rnn.update_y_controller()
                         rnn.detach()
 
                         # collect loss
@@ -169,22 +170,22 @@ for rep in range(n_reps):
                     target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
                     # get initial state
+                    rnn.activate_y_controller(conditions[trial])
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
-                    rnn.activate_y_controller(conditions[trial])
 
                     # make prediction
                     y_col, z_col = [], []
                     for step in range(steps):
-                        x = inp[step] if step <= init_steps else y
+                        x = inp[step] if step <= auto_steps else y
                         z = rnn.forward(x)
                         y = W_r @ z
                         y_col.append(y)
                         z_col.append(z)
-                    predictions.append(np.asarray(y_col))
-                    dynamics.append(np.asarray(z_col))
+                    predictions.append(np.asarray([y.detach().cpu().numpy() for y in y_col]))
+                    dynamics.append(np.asarray([z.detach().cpu().numpy() for z in z_col]))
 
                     # calculate loss
                     loss = loss_func(torch.stack(y_col, dim=0), target)
@@ -222,7 +223,6 @@ for rep in range(n_reps):
                     ax.set_title(f"test trial {trial + 1}")
                     if i == plot_examples - 1:
                         ax.set_xlabel("steps")
-                        ax.legend()
                 fig.suptitle("Model Predictions")
                 plt.tight_layout()
 
@@ -253,12 +253,23 @@ for rep in range(n_reps):
                 ax.set_title("Conceptors")
                 plt.tight_layout()
 
-                # training loss figure
-                fig, ax = plt.subplots(figsize=(12, 4))
+                # loss figure
+                fig, axes = plt.subplots(ncols=2, figsize=(12, 4))
+                ax = axes[0]
                 ax.plot(loss_col)
                 ax.set_xlabel("training batch")
                 ax.set_ylabel("MSE")
                 ax.set_title("Training loss")
+                ax = axes[1]
+                condition_losses = []
+                test_conditions = np.asarray(conditions[train_trials:])
+                for c in unique_conditions:
+                    idx = np.argwhere(test_conditions == c).squeeze()
+                    condition_losses.append(np.mean(np.asarray(test_loss)[idx]))
+                ax.bar(x=unique_conditions, height=condition_losses)
+                ax.set_xlabel("conditions")
+                ax.set_ylabel("MSE")
+                ax.set_title("Test Loss")
                 plt.tight_layout()
 
                 plt.show()
