@@ -15,10 +15,10 @@ n_conditions = 3
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
 save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_cfit.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 5
 
 # load inputs and targets
@@ -51,11 +51,11 @@ test_trials = trials - train_trials
 augmentation = 1.0
 lr = 1e-2
 betas = (0.9, 0.999)
-batch_size = 50
+batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 1.0
-lam = 2e-5
+epsilon = 0.3
+lam = 1e-5
 alpha = 3.0
 batches = int(augmentation * train_trials / batch_size)
 
@@ -66,7 +66,8 @@ n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 
 # prepare results
-results = {"Delta": [], "sigma": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": [], "cdim": []}
+results = {"Delta": [], "sigma": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": [], "cdim": [],
+           "test_conditions": []}
 
 # model training
 ################
@@ -156,7 +157,7 @@ for rep in range(n_reps):
                     rnn.detach()
 
             # generate predictions
-            test_loss, predictions, dynamics = [], [], []
+            test_loss, predictions, dynamics, test_conditions = [], [], [], []
             with torch.no_grad():
                 for trial in range(train_trials, trials):
 
@@ -185,6 +186,7 @@ for rep in range(n_reps):
                     # calculate loss
                     loss = loss_func(torch.stack(y_col, dim=0), target)
                     test_loss.append(loss.item())
+                    test_conditions.append(conditions[trial])
 
             # save results
             c_dim = [torch.mean(c).detach().cpu().numpy() for c in rnn.y_controllers.values()]
@@ -193,8 +195,9 @@ for rep in range(n_reps):
             results["trial"].append(rep)
             results["train_epochs"].append(batch)
             results["train_loss"].append(loss_col)
-            results["test_loss"].append(np.sum(test_loss))
-            results["cdim"].append(np.mean(c_dim))
+            results["test_loss"].append(test_loss)
+            results["cdim"].append(c_dim)
+            results["test_conditions"].append(test_conditions)
 
             # report progress
             n += 1
