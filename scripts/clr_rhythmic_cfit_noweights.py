@@ -15,10 +15,10 @@ n_conditions = 3
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
 save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_cfit_noweights.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 5
 
 # load inputs and targets
@@ -49,7 +49,7 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 0.1
+lr = 0.05
 betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
@@ -59,7 +59,7 @@ batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
 Delta = [0.1]
-sigma = np.arange(start=0.8, stop=1.41, step=0.1)
+sigma = np.arange(start=0.4, stop=1.41, step=0.1)
 n_reps = 10
 n_trials = len(Delta)*len(sigma)*n_reps
 
