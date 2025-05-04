@@ -25,7 +25,10 @@ results = {"condition": [], "sigma": [], "Delta": [], "trial": [], "train_epochs
 for cond in conditions:
     data = pickle.load(open(f"{path}/{task}_{cond}.pkl", "rb"))
     for key, val in data.items():
-        results[key].extend(val)
+        if type(val[0]) is list:
+            val = [np.mean(v) for v in val]
+        if key in results:
+            results[key].extend(val)
     results["condition"].extend([cond]*len(data["trial"]))
 df = DataFrame.from_dict(results)
 

@@ -9,16 +9,12 @@ def vanderpol(y: np.ndarray, x: float = 1.0, tau: float = 1.0) -> np.ndarray:
     y2_dot = (y2*x*(1 - y1**2) - y1) / tau
     return np.asarray([y1_dot, y2_dot])
 
-def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 5.0) -> np.ndarray:
-    y_dot = (x*y - y**3) / tau
-    return y_dot
 
-def lorenz(y: np.ndarray, s: float = 10.0, r: float = 28.0, b: float = 2.667) -> np.ndarray:
-    y1, y2, y3 = y
-    y1_dot = s*(y2 - y1)
-    y2_dot = r*y1 - y2 - y1*y3
-    y3_dot = y1*y2 - b*y3
-    return np.asarray([y1_dot, y2_dot, y3_dot])
+def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 5.0) -> np.ndarray:
+    y1, y2 = y[0], y[1]
+    y1_dot = (x*y1 - y1**3) / tau
+    y2_dot = -y2 / tau
+    return np.asarray([y1_dot, y2_dot])
 
 
 # general parameters
@@ -26,33 +22,33 @@ save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
-ds_dims = [1]
-n_conditions = len(ds_dims)
+mus = [-0.5, 0.5]
 d = 1
 dt = 0.01
-sampling_rate = 5
-steps = 5000
+sampling_rate = 20
+steps = 10000
 init_scale = 2.0
+dim = 2
 
 # plot parameters
 plot_examples = 6
 visualize = True
 
 # define conditions
-rhs_funcs = {1: pitchfork, 2: vanderpol, 3: lorenz}
-inp_channels = {1: [0], 2: [1, 2], 3: [3, 4, 5]}
+rhs_funcs = {1: pitchfork, 2: vanderpol}
 
 # generate targets and inputs
 targets, inputs, conditions = [], [], []
 for n in range(trials):
     successful = False
-    dim = np.random.choice(ds_dims)
-    rhs = rhs_funcs[dim]
+    ds = np.random.choice(list(rhs_funcs))
+    mu = np.random.choice(mus)
+    rhs = rhs_funcs[ds]
     while not successful:
         y = init_scale * np.random.randn(dim)
         y_col = []
         for step in range(steps + d):
-            y = y + dt * rhs(y)
+            y = y + dt * rhs(y, x=mu)
             if step % sampling_rate == 0:
                 y_col.append(y)
             if not np.isfinite(y_col[-1][0]):
@@ -60,16 +56,14 @@ for n in range(trials):
         y_col = np.asarray(y_col)
         if np.isfinite(y_col[-1, 0]):
             successful = True
-    inp = np.zeros((y_col.shape[0], sum(ds_dims)))
-    inp[:, inp_channels[dim]] = y_col
-    inputs.append(inp[:-d, :])
-    targets.append(inp[d:, :])
-    conditions.append(dim)
+    inputs.append(y_col[:-d])
+    targets.append(y_col[d:])
+    conditions.append((ds, mu))
     print(f"Finished trial {n+1} of {trials}.")
 
 # save results
 pickle.dump({"inputs": inputs, "targets": targets, "trial_conditions": conditions},
-            open(f"{save_path}/mixed_{n_conditions}ds.pkl", "wb"))
+            open(f"{save_path}/bifurcations_2ds.pkl", "wb"))
 
 # plot results
 if visualize:

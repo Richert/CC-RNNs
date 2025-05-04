@@ -38,10 +38,10 @@ init_steps = 20
 auto_steps = 100
 y_init = 10.0
 dim = 3
-dt = 0.01
+dt = 0.001
 sampling_rate = 20
 steps = int(integration_steps/sampling_rate)
-conditions = {1: {"s": 10.0, "r": 28.0, "b": 2.667}}
+conditions = {1: {"s": 10.0, "r": 28.0, "b": 8/3}}
 n_conditions = len(conditions)
 d = 1
 
@@ -58,7 +58,7 @@ sigma = 0.8
 N = int(k * n_dendrites)
 
 # training parameters
-trials = 10000
+trials = 20000
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 lr = 0.1
@@ -67,7 +67,7 @@ batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
 epsilon = 1.0
-alpha = 3.0
+alpha = 4.0
 lam = 1e-5
 batches = int(train_trials / batch_size)
 noise_lvl = 0.0
