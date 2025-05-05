@@ -8,6 +8,7 @@ import seaborn as sb
 path = "/home/richard-gast/Documents/results"
 task = "clr_rhythmic_3freqs"
 conditions = ["fit", "cfit", "cfit_noweights"]
+taus = [1.0, 2.0, 3.0]
 
 # matplotlib settings
 plt.rcParams["font.family"] = "Times New Roman"
@@ -24,13 +25,22 @@ markersize = 6
 # collect data
 ##############
 
-results = {"condition": [], "sigma": [], "Delta": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": []}
+results = {"condition": [], "sigma": [], "Delta": [], "trial": [], "train_epochs": [], "train_loss": [],
+           "test_loss": [], "loss_tau1": [], "loss_tau2": [], "loss_tau3": []}
 examples = {}
 
 for cond in conditions:
 
-    # sweep data
     data = pickle.load(open(f"{path}/{task}_{cond}.pkl", "rb"))
+
+    # tau-specific losses
+    test_conds, test_loss = data.pop("test_conditions"), data["test_loss"]
+    for conds, losses in zip(test_conds, test_loss):
+        for tau in taus:
+            l = np.asarray([l for l, c in zip(losses, conds) if c[1] == 1.0])
+            results[f"loss_tau{int(tau)}"].append(np.mean(l))
+
+    # sweep data
     for key, val in data.items():
         if type(val[0]) is list:
             val = [np.mean(v) for v in val]
@@ -75,17 +85,19 @@ ax.set_xlabel(r"$\sigma$")
 
 # plot example test loss for specific conditions
 ax = fig.add_subplot(grid[:2, 3])
-cond_results = {"RNN": [], "tau": [], "MSE": []}
+cond_results = {"architecture": [], "tau": [], "MSE": []}
+sigma = 0.6
+df_tmp = df.loc[df.loc[:, "sigma"] == sigma, :]
 for cond in conditions:
-    test_conds, test_loss = examples[cond]["conditions"], examples[cond]["test_loss"]
-    cond_indices = []
-    for c, loss in zip(test_conds, test_loss):
-        cond_results["RNN"].append(cond)
-        cond_results["tau"].append(c[1])
-        cond_results["MSE"].append(loss)
+    df_tmp2 = df_tmp.loc[df_tmp.loc[:, "condition"] == cond, :]
+    for tau in taus:
+        loss = df_tmp2.loc[:, f"loss_tau{int(tau)}"].values.tolist()
+        cond_results["architecture"].extend([cond] * len(loss))
+        cond_results["tau"].extend([tau] * len(loss))
+        cond_results["MSE"].extend(loss)
 df_tmp = DataFrame.from_dict(cond_results)
-sb.barplot(df_tmp, x="tau", y="MSE", hue="RNN")
-ax.set_title(r"Prediction performance for $\sigma = 0.6$")
+sb.barplot(df_tmp, x="tau", y="MSE", hue="architecture")
+ax.set_title(rf"Prediction performance for $\sigma = {sigma}$")
 ax.set_xlabel(r"$\tau$")
 
 # plot example time series for each condition
