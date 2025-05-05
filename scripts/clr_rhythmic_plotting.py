@@ -7,7 +7,7 @@ import seaborn as sb
 # load data
 path = "/home/richard-gast/Documents/results"
 task = "clr_rhythmic_3freqs"
-conditions = ["fit", "cfit"]
+conditions = ["fit", "cfit", "cfit_noweights"]
 
 # matplotlib settings
 plt.rcParams["font.family"] = "Times New Roman"
@@ -90,7 +90,7 @@ ax.set_xlabel(r"$\tau$")
 
 # plot example time series for each condition
 unique_conditions = np.unique(examples[conditions[0]]["conditions"], axis=0).tolist()
-cond_colors = ["royalblue", "darkorange"]
+cond_colors = ["royalblue", "darkorange", "darkgreen"]
 for j, c1 in enumerate(unique_conditions):
     ax = fig.add_subplot(grid[2+j, :])
     for i, c2 in enumerate(conditions):

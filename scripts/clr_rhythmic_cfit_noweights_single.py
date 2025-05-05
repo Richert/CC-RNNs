@@ -17,7 +17,7 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/vdp_{n_conditions}freqs.pkl"
-save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_cfit_single.pkl"
+save_file = f"{path}/results/clr_rhythmic_{n_conditions}freqs_cfit_noweights_single.pkl"
 visualize_results = True
 plot_examples = 6
 
@@ -26,7 +26,7 @@ data = pickle.load(open(load_file, "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
-unique_conditions = np.unique(conditions, axis=0)
+unique_conditions = np.unique(conditions, axis=0).tolist()
 
 # task parameters
 steps = inputs[0].shape[0]
@@ -51,7 +51,7 @@ trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
-lr = 1e-2
+lr = 0.02
 betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
@@ -76,18 +76,21 @@ rnn = LowRankCRNN(torch.tensor(W*0.0, dtype=dtype, device=device),
                   torch.tensor(L*sigma, dtype=dtype, device=device),
                   torch.tensor(R, device=device, dtype=dtype),
                   W_in, bias, g="ReLU", alpha=alpha, lam=lam)
-rnn.free_param("L")
 
 # initialize controllers
+conceptors = []
 for c in unique_conditions:
     rnn.init_new_y_controller(init_value="random")
+    rnn.C_y.requires_grad = True
+    rnn.C_y.register_hook(lambda grad: torch.clamp(grad, -gradient_cutoff, gradient_cutoff))
     rnn.store_y_controller(tuple(c))
+    conceptors.append(rnn.y_controllers[tuple(c)])
 
 # set up loss function
 loss_func = torch.nn.MSELoss()
 
 # set up optimizer
-optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
+optim = torch.optim.Adam(conceptors + [W_r], lr=lr, betas=betas)
 rnn.clip(gradient_cutoff)
 
 # training
@@ -106,23 +109,20 @@ with torch.enable_grad():
             target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
             # get initial state
-            rnn.activate_y_controller(conditions[trial])
+            rnn.C_y = conceptors[unique_conditions.index(list(conditions[trial]))]
             for step in range(init_steps):
                 x = torch.randn(n_in, dtype=dtype, device=device)
                 rnn.forward(x)
-                rnn.update_y_controller()
             rnn.detach()
 
             # collect loss
             y_col = []
             for step in range(steps):
                 z = rnn.forward(inp[step])
-                rnn.update_y_controller()
                 y = W_r @ z
                 if step % truncation_steps == truncation_steps - 1:
                     rnn.detach()
                 y_col.append(y)
-            rnn.store_y_controller(conditions[trial])
 
             # calculate loss
             y_col = torch.stack(y_col, dim=0)
