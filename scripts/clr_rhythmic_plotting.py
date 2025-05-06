@@ -37,7 +37,7 @@ for cond in conditions:
     test_conds, test_loss = data.pop("test_conditions"), data["test_loss"]
     for conds, losses in zip(test_conds, test_loss):
         for tau in taus:
-            l = np.asarray([l for l, c in zip(losses, conds) if c[1] == 1.0])
+            l = np.asarray([l for l, c in zip(losses, conds) if c[1] == tau])
             results[f"loss_tau{int(tau)}"].append(np.mean(l))
 
     # sweep data
