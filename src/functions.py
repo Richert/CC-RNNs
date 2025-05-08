@@ -85,6 +85,14 @@ def init_dendrites(N: int, n_dendrites: int, normalize: bool = True, min_dendrit
     return W, R
 
 
+def participation_ratio(x: np.ndarray):
+    x_norm = np.asarray([x[:, i] - np.mean(x[:, i]) for i in range(x.shape[1])])
+    cov = x_norm @ x_norm.T
+    lambdas = np.linalg.eigvals(cov)
+    l_real = np.real(lambdas)
+    return np.sum(l_real)**2/np.sum(l_real**2)
+
+
 def nrmse(y: np.ndarray, target: np.ndarray):
     combinedVar = 0.5 * (np.var(target,1) + np.var(y,1))
     error = y-target
