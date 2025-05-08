@@ -15,8 +15,8 @@ dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
-load_file = f"{path}/data/bifurcations_2ds.pkl"
-save_file = f"{path}/results/clr_bifurcations_zfit.pkl"
+load_file = f"{path}/data/nobifurcations_2ds.pkl"
+save_file = f"{path}/results/clr_nobifurcations_zfit.pkl"
 visualize_results = True
 plot_examples = 6
 
@@ -56,7 +56,7 @@ betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 0.9
+epsilon = 0.5
 lam = 1e-5
 batches = int(augmentation * train_trials / batch_size)
 
@@ -200,7 +200,7 @@ for rep in range(n_reps):
         results["trial"].append(rep)
         results["train_epochs"].append(batch)
         results["train_loss"].append(loss_col)
-        results["srl_loss"].append(slr_loss)
+        results["slr_loss"].append(slr_loss)
         results["conceptors"].append(conceptors)
         results["L"].append(rnn.L.detach().cpu().numpy())
         results["R"].append(R)
