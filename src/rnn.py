@@ -181,10 +181,14 @@ class LowRankCRNN(LowRankRNN):
         self.C_y = torch.ones_like(self.y, device=self.device)
 
     def update_z_controller(self):
-        self.C_z = self.C_z + self.lam * (self.z ** 2 - self.C_z * self.z ** 2 - self.C_z * self.alpha_sq)
+        delta = self.z ** 2 - self.C_z * self.z ** 2 - self.C_z * self.alpha_sq
+        self.C_z = self.C_z + self.lam * delta
+        return delta
 
     def update_y_controller(self):
-        self.C_y = self.C_y + self.lam * (self.y ** 2 - self.C_y * self.y ** 2 - self.C_y * self.alpha_sq)
+        delta = self.y ** 2 - self.C_y * self.y ** 2 - self.C_y * self.alpha_sq
+        self.C_y = self.C_y + self.lam * delta
+        return delta
 
     def activate_z_controller(self, key):
         self.C_z = self.z_controllers[key]

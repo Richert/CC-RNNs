@@ -18,11 +18,11 @@ def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 5.0) -> np.ndarray:
 
 
 # general parameters
-save_path = f"/home/richard/data"
+save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
-mus = [-0.5, 0.5]
+mu = 0.5
 d = 1
 dt = 0.01
 sampling_rate = 20
@@ -32,7 +32,7 @@ dim = 2
 
 # plot parameters
 plot_examples = 6
-visualize = False
+visualize = True
 
 # define conditions
 rhs_funcs = {1: pitchfork, 2: vanderpol}
@@ -42,7 +42,6 @@ targets, inputs, conditions = [], [], []
 for n in range(trials):
     successful = False
     ds = np.random.choice(list(rhs_funcs))
-    mu = np.random.uniform(low=mus[0], high=mus[1])
     rhs = rhs_funcs[ds]
     while not successful:
         y = init_scale * np.random.randn(dim)
@@ -56,25 +55,22 @@ for n in range(trials):
         y_col = np.asarray(y_col)
         if np.isfinite(y_col[-1, 0]):
             successful = True
-    inp = np.zeros((y_col.shape[0]-d, y_col.shape[1]+1))
-    inp[:, :-1] = y_col[:-d]
-    inp[:, -1] = mu
-    inputs.append(inp)
+    inputs.append(y_col[:-d])
     targets.append(y_col[d:])
-    conditions.append((ds, mu))
+    conditions.append(ds)
     print(f"Finished trial {n+1} of {trials}.")
 
 # save results
 pickle.dump({"inputs": inputs, "targets": targets, "trial_conditions": conditions},
-            open(f"{save_path}/bifurcations_2ds.pkl", "wb"))
+            open(f"{save_path}/nobifurcations_2ds.pkl", "wb"))
 
 # plot results
 if visualize:
     fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2*plot_examples))
     for i, trial in enumerate(np.random.choice(trials, size=(plot_examples,))):
         ax = axes[i]
-        ax.plot(inputs[trial], label="x")
-        # ax.plot(targets[trial], label="y")
+        # ax.plot(inputs[trial], label="x")
+        ax.plot(targets[trial])
         ax.set_xlabel("time")
         ax.set_ylabel("amplitude")
         ax.set_title(f"training trial {trial+1}: dim = {conditions[trial]}")

@@ -16,7 +16,7 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
-save_file = f"{path}/results/clr_bifurcations_cfit.pkl"
+save_file = f"{path}/results/clr_bifurcations_zfit.pkl"
 visualize_results = True
 plot_examples = 6
 
@@ -48,30 +48,26 @@ N = int(k * n_dendrites)
 
 # training parameters
 trials = len(conditions)
-train_trials = int(0.8 * trials)
-consolidation_trials = int(0.2 * trials)
+train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
 augmentation = 1.0
 lr = 1e-2
-lr2 = 0.1
 betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 0.2
+epsilon = 0.3
 lam = 2e-5
-lam2 = 2e-5
 batches = int(augmentation * train_trials / batch_size)
-c_batches = int(consolidation_trials / batch_size)
 
 # sweep parameters
-alphas = [4.0]
+alphas = [3.0, 3.5, 4.0]
 n_reps = 10
 n_trials = len(alphas)*n_reps
 
 # prepare results
-results = {"alpha": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": [], "consolidation_loss": [],
-           "conceptors": [], "synapses": [], "test_pr": []}
+results = {"alpha": [], "trial": [], "train_epochs": [], "train_loss": [], "srl_loss": [], "conceptors": [],
+           "L": [], "R": [], "W_in": [], "bias": [], "W_out": []}
 
 # model training
 ################
@@ -113,7 +109,7 @@ for rep in range(n_reps):
 
         # training
         train_loss = 0.0
-        loss_col = []
+        loss_col, slr_loss = [], []
         with torch.enable_grad():
             for batch in range(batches):
 
@@ -130,18 +126,18 @@ for rep in range(n_reps):
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
-                        # rnn.update_z_controller()
                     rnn.detach()
 
                     # collect loss
                     y_col = []
                     for step in range(steps):
                         z = rnn.forward(inp[step])
-                        rnn.update_z_controller()
+                        delta_c = rnn.update_z_controller()
                         y = W_r @ z
                         if step % truncation_steps == truncation_steps - 1:
                             rnn.detach()
                         y_col.append(y)
+                        slr_loss.append(delta_c.sum().detach().cpu().numpy())
 
                     # calculate loss
                     y_col = torch.stack(y_col, dim=0)
@@ -163,59 +159,6 @@ for rep in range(n_reps):
                 if train_loss < epsilon:
                     break
 
-        # consolidation
-        optim2 = torch.optim.Adam([W_r], lr=lr2, betas=betas)
-        rnn.fix_param("L")
-        rnn.lam = lam2
-        consolidation_loss = 0.0
-        c_loss_col = []
-        with torch.enable_grad():
-            for batch in range(c_batches):
-
-                loss = torch.zeros((1,), device=device, dtype=dtype)
-
-                for trial in np.random.choice(consolidation_trials, size=(batch_size,), replace=False):
-
-                    # get input and target timeseries
-                    inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
-                    target = torch.tensor(targets[trial], device=device, dtype=dtype)
-
-                    # get initial state
-                    rnn.activate_z_controller(conditions[trial])
-                    for step in range(init_steps):
-                        x = torch.randn(n_in, dtype=dtype, device=device)
-                        rnn.forward(x)
-                        rnn.update_z_controller()
-                    rnn.detach()
-
-                    # collect loss
-                    y_col = []
-                    for step in range(steps):
-                        z = rnn.forward(inp[step])
-                        rnn.update_z_controller()
-                        y = W_r @ z
-                        if step % truncation_steps == truncation_steps - 1:
-                            rnn.detach()
-                        y_col.append(y)
-
-                    # calculate loss
-                    y_col = torch.stack(y_col, dim=0)
-                    loss += loss_func(y_col, target)
-
-                    # store controller
-                    rnn.store_z_controller(conditions[trial])
-
-                # make update
-                optim2.zero_grad()
-                loss.backward()
-                optim2.step()
-                rnn.detach()
-
-                # store and print loss
-                consolidation_loss = loss.item()
-                c_loss_col.append(consolidation_loss)
-                print(f"Consolidation epoch {batch + 1} / {c_batches}: MSE = {c_loss_col[-1]}")
-
         # generate predictions
         test_loss, predictions, dynamics = [], [], []
         with torch.no_grad():
@@ -235,8 +178,9 @@ for rep in range(n_reps):
                 # make prediction
                 y_col, z_col = [], []
                 for step in range(steps):
-                    x = inp[step] if step <= auto_steps else y
-                    z = rnn.forward(x)
+                    if step > auto_steps:
+                        inp[step, :n_out] = y
+                    z = rnn.forward(inp[step])
                     y = W_r @ z
                     y_col.append(y)
                     z_col.append(z)
@@ -247,12 +191,6 @@ for rep in range(n_reps):
                 loss = loss_func(torch.stack(y_col, dim=0), target)
                 test_loss.append(loss.item())
 
-        # calculate participation ratio of network dynamics
-        dims = np.asarray([participation_ratio(z) for z in dynamics])
-        test_conditions = conditions[train_trials:]
-        c_indices = [[tc == tuple(c) for tc in test_conditions] for c in unique_conditions]
-        participation_ratios = [np.mean(dims[idx]) for idx in c_indices]
-
         # calculate conceptor dimensionaltiy
         conceptors = [c.detach().cpu().numpy() for c in rnn.z_controllers.values()]
         c_dim = [np.sum(c**2) for c in conceptors]
@@ -262,11 +200,13 @@ for rep in range(n_reps):
         results["trial"].append(rep)
         results["train_epochs"].append(batch)
         results["train_loss"].append(loss_col)
-        results["consolidation_loss"].append(c_loss_col)
-        results["test_loss"].append(np.sum(test_loss))
+        results["slr_loss"].append(slr_loss)
         results["conceptors"].append(conceptors)
-        results["synapses"].append(rnn.L.detach().cpu().numpy())
-        results["test_pr"].append(participation_ratios)
+        results["L"].append(rnn.L.detach().cpu().numpy())
+        results["R"].append(R)
+        results["bias"].append(bias.detach().cpu().numpy())
+        results["W_in"].append(W_in.detach().cpu().numpy())
+        results["W_out"].append(W_r.detach().cpu().numpy())
 
         # report progress
         n += 1
@@ -313,12 +253,10 @@ for rep in range(n_reps):
             conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.z_controllers.values()])
             fig, axes = plt.subplots(nrows=2, figsize=(12, 6))
             ax = axes[0]
-            ax.bar(np.arange(n_conditions)+0.25, c_dim, width=0.4, color="royalblue", label="dim(c)")
-            ax.bar(np.arange(n_conditions)+0.75, participation_ratios, width=0.4, color="darkorange", label="dim(z)")
+            ax.bar(np.arange(n_conditions)+0.25, c_dim, width=0.4, color="royalblue")
             ax.set_xlabel("task conditions")
-            ax.set_ylabel("dim")
-            ax.set_title("Dimensionalities")
-            ax.legend()
+            ax.set_ylabel("dim(c)")
+            ax.set_title("Conceptor Dimensionalities")
             ax = axes[1]
             im = ax.imshow(conceptors, aspect="auto", interpolation="none", cmap="cividis")
             plt.colorbar(im, ax=ax, shrink=0.8)
