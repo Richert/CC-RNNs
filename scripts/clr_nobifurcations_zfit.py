@@ -57,11 +57,11 @@ batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
 epsilon = 0.5
-lam = 1e-5
+lam = 1e-4
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-alphas = [3.0, 3.5, 4.0]
+alphas = [8.0, 9.0, 10.0, 11.0, 12.0]
 n_reps = 10
 n_trials = len(alphas)*n_reps
 

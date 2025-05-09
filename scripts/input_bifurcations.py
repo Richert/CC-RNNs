@@ -18,7 +18,7 @@ def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 5.0) -> np.ndarray:
 
 
 # general parameters
-save_path = f"/home/richard/data"
+save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
@@ -32,7 +32,7 @@ dim = 2
 
 # plot parameters
 plot_examples = 6
-visualize = False
+visualize = True
 
 # define conditions
 rhs_funcs = {1: pitchfork, 2: vanderpol}
@@ -61,7 +61,7 @@ for n in range(trials):
     inp[:, -1] = mu
     inputs.append(inp)
     targets.append(y_col[d:])
-    conditions.append((ds, mu))
+    conditions.append(ds)
     print(f"Finished trial {n+1} of {trials}.")
 
 # save results
