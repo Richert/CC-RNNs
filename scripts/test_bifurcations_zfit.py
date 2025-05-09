@@ -1,7 +1,7 @@
 import sys
 sys.path.append("../")
 from src.rnn import LowRankCRNN
-from src.functions import init_weights, init_dendrites, participation_ratio
+from src.functions import init_weights, init_dendrites
 import torch
 import numpy as np
 import pickle
@@ -15,13 +15,14 @@ dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
-load_file = f"{path}/data/bifurcations_2ds.pkl"
-save_file = f"{path}/results/clr_bifurcations_zfit.pkl"
+in_file = f"{path}/data/bifurcations_2ds.pkl"
+model_file = f"{path}/results/clr_bifurcations_zfit.pkl"
+save_file = f"{path}/results/test_bifurcations_zfit.pkl"
 visualize_results = True
 plot_examples = 6
 
 # load inputs and targets
-data = pickle.load(open(load_file, "rb"))
+data = pickle.load(open(in_file, "rb"))
 inputs = data["inputs"]
 targets = data["targets"]
 conditions = data["trial_conditions"]
@@ -34,130 +35,57 @@ init_steps = 20
 auto_steps = 200
 noise_lvl = 0.0
 
-# rnn parameters
-k = 100
-n_dendrites = 10
+# load RNN parameters
+params = pickle.load(open(model_file, "rb"))
 n_in = inputs[0].shape[-1]
 n_out = targets[0].shape[-1]
-density = 0.5
-in_scale = 0.1
-out_scale = 0.2
-Delta = 0.1
-sigma = 0.9
-N = int(k * n_dendrites)
+k = len(params["bias"][0])
+N = params["L"][0].shape[0]
 
 # training parameters
 trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
-augmentation = 1.0
-lr = 1e-2
-betas = (0.9, 0.999)
 batch_size = 20
-gradient_cutoff = 1e10
-truncation_steps = 100
-epsilon = 0.3
-lam = 2e-4
-batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-alphas = [7.5, 10.0, 12.5, 15.0]
+alphas = [10.0, 12.5, 15.0]
 n_reps = 10
 n_trials = len(alphas)*n_reps
 
 # prepare results
-results = {"alpha": [], "trial": [], "train_epochs": [], "train_loss": [], "srl_loss": [], "conceptors": [],
-           "L": [], "R": [], "W_in": [], "bias": [], "W_out": []}
+results = {"alpha": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim": [], "c_dim": [], "vf_quality": []}
 
 # model training
 ################
 
-n = 0
-for rep in range(n_reps):
-    for alpha in alphas:
+with torch.no_grad():
+    for n in range(len(params["trial"])):
 
-        print(f"Starting run {n+1} out of {n_trials} training runs (alpha = {alpha}, rep = {rep})")
+        alpha = params["alpha"][n]
+        rep = params["trial"][n]
+        print(f"Testing model fit {n+1} out of {n_trials} (alpha = {alpha}, rep = {rep})")
 
         # initialize rnn matrices
-        bias = torch.tensor(Delta * np.random.randn(k), device=device, dtype=dtype)
-        W_in = torch.tensor(in_scale * np.random.randn(N, n_in), device=device, dtype=dtype)
-        L = init_weights(N, k, density)
-        W, R = init_dendrites(k, n_dendrites)
-        W_r = torch.tensor(out_scale * np.random.randn(n_out, k), device=device, dtype=dtype, requires_grad=True)
+        bias = torch.tensor(params["bias"][n], device=device, dtype=dtype)
+        W_in = torch.tensor(params["W_in"][n], device=device, dtype=dtype)
+        L = torch.tensor(params["L"][n], device=device, dtype=dtype)
+        R = torch.tensor(params["R"][n], device=device, dtype=dtype)
+        W_r = torch.tensor(params["W_out"][n], device=device, dtype=dtype)
 
         # model initialization
-        rnn = LowRankCRNN(torch.tensor(W*0.0, dtype=dtype, device=device),
-                          torch.tensor(L*sigma, dtype=dtype, device=device),
-                          torch.tensor(R, device=device, dtype=dtype),
-                          W_in, bias, g="ReLU", alpha=alpha, lam=lam)
-        rnn.free_param("L")
+        rnn = LowRankCRNN(torch.empty(size=(N, N), dtype=dtype, device=device), L, R, W_in, bias,
+                          g="ReLU")
 
         # add noise to input
         inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
 
-        # initialize controllers
-        for c in unique_conditions:
-            rnn.init_new_z_controller(init_value="random")
-            rnn.store_z_controller(c)
+        # add dendritic gain controllers
+        for key, c in zip(unique_conditions, params["conceptors"][n]):
+            rnn.z_controllers[key] = torch.tensor(c, device=device, dtype=dtype)
 
         # set up loss function
         loss_func = torch.nn.MSELoss()
-
-        # set up optimizer
-        optim = torch.optim.Adam(list(rnn.parameters()) + [W_r], lr=lr, betas=betas)
-        rnn.clip(gradient_cutoff)
-
-        # training
-        train_loss = 0.0
-        loss_col, slr_loss = [], []
-        with torch.enable_grad():
-            for batch in range(batches):
-
-                loss = torch.zeros((1,), device=device, dtype=dtype)
-
-                for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
-
-                    # get input and target timeseries
-                    inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
-                    target = torch.tensor(targets[trial], device=device, dtype=dtype)
-
-                    # get initial state
-                    rnn.activate_z_controller(conditions[trial])
-                    for step in range(init_steps):
-                        x = torch.randn(n_in, dtype=dtype, device=device)
-                        rnn.forward(x)
-                    rnn.detach()
-
-                    # collect loss
-                    y_col = []
-                    for step in range(steps):
-                        z = rnn.forward(inp[step])
-                        delta_c = rnn.update_z_controller()
-                        y = W_r @ z
-                        if step % truncation_steps == truncation_steps - 1:
-                            rnn.detach()
-                        y_col.append(y)
-                        slr_loss.append(delta_c.sum().detach().cpu().numpy())
-
-                    # calculate loss
-                    y_col = torch.stack(y_col, dim=0)
-                    loss += loss_func(y_col, target)
-
-                    # store controller
-                    rnn.store_z_controller(conditions[trial])
-
-                # make update
-                optim.zero_grad()
-                loss.backward()
-                optim.step()
-                rnn.detach()
-
-                # store and print loss
-                train_loss = loss.item()
-                loss_col.append(train_loss)
-                print(f"Training epoch {batch+1} / {batches}: MSE = {loss_col[-1]}")
-                if train_loss < epsilon:
-                    break
 
         # generate predictions
         test_loss, predictions, dynamics = [], [], []
@@ -168,7 +96,7 @@ for rep in range(n_reps):
                 inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
                 target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
-                # get initial state
+                # get random initial state
                 rnn.activate_z_controller(conditions[trial])
                 for step in range(init_steps):
                     x = torch.randn(n_in, dtype=dtype, device=device)
@@ -198,20 +126,11 @@ for rep in range(n_reps):
         # save results
         results["alpha"].append(alpha)
         results["trial"].append(rep)
-        results["train_epochs"].append(batch)
-        results["train_loss"].append(loss_col)
-        results["srl_loss"].append(slr_loss)
-        results["conceptors"].append(conceptors)
-        results["L"].append(rnn.L.detach().cpu().numpy())
-        results["R"].append(R)
-        results["bias"].append(bias.detach().cpu().numpy())
-        results["W_in"].append(W_in.detach().cpu().numpy())
-        results["W_out"].append(W_r.detach().cpu().numpy())
-
-        # report progress
-        n += 1
-        print(f"Finished after {batch + 1} training epochs. Final loss: {loss_col[-1]}.")
-        print(f"Conceptor dimensions: {c_dim}")
+        results["train_loss"].append(params["train_loss"][n][-1] / batch_size)
+        results["test_loss"].append(np.mean(test_loss))
+        results["c_dim"].append(c_dim)
+        #results["z_dim"].append(...)
+        #results["vf_quality"].append(...)
 
         # save results
         pickle.dump(results, open(save_file, "wb"))
@@ -267,18 +186,7 @@ for rep in range(n_reps):
             plt.tight_layout()
 
             # loss figure
-            fig, axes = plt.subplots(ncols=3, figsize=(12, 4))
-            ax = axes[0]
-            ax.plot(loss_col)
-            ax.set_xlabel("training batch")
-            ax.set_ylabel("MSE")
-            ax.set_title("Training loss")
-            ax = axes[1]
-            ax.plot(slr_loss)
-            ax.set_xlabel("training batch")
-            ax.set_ylabel("delta")
-            ax.set_title("Conceptor loss")
-            ax = axes[2]
+            fig, ax = plt.subplots(figsize=(6, 4))
             condition_losses = []
             test_conditions = np.asarray(conditions[train_trials:])
             for c in unique_conditions:
