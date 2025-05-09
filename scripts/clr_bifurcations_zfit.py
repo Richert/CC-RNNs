@@ -14,10 +14,10 @@ import matplotlib.pyplot as plt
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
 save_file = f"{path}/results/clr_bifurcations_zfit.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 6
 
 # load inputs and targets
@@ -56,7 +56,7 @@ betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 0.1
+epsilon = 0.2
 lam = 2e-4
 batches = int(augmentation * train_trials / batch_size)
 

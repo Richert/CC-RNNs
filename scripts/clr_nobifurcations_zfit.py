@@ -14,10 +14,10 @@ import matplotlib.pyplot as plt
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/nobifurcations_2ds.pkl"
 save_file = f"{path}/results/clr_nobifurcations_zfit.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 6
 
 # load inputs and targets
@@ -56,12 +56,12 @@ betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 0.5
-lam = 1e-4
+epsilon = 0.2
+lam = 2e-4
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-alphas = [8.0, 9.0, 10.0, 11.0, 12.0]
+alphas = [7.5, 10.0, 12.5, 15.0]
 n_reps = 10
 n_trials = len(alphas)*n_reps
 
@@ -98,7 +98,7 @@ for rep in range(n_reps):
         # initialize controllers
         for c in unique_conditions:
             rnn.init_new_z_controller(init_value="random")
-            rnn.store_z_controller(tuple(c))
+            rnn.store_z_controller(c)
 
         # set up loss function
         loss_func = torch.nn.MSELoss()
@@ -200,7 +200,7 @@ for rep in range(n_reps):
         results["trial"].append(rep)
         results["train_epochs"].append(batch)
         results["train_loss"].append(loss_col)
-        results["slr_loss"].append(slr_loss)
+        results["srl_loss"].append(slr_loss)
         results["conceptors"].append(conceptors)
         results["L"].append(rnn.L.detach().cpu().numpy())
         results["R"].append(R)
@@ -225,6 +225,7 @@ for rep in range(n_reps):
                 ax.plot(targets[train_trials + trial], label="targets", linestyle="dashed")
                 for j, line in enumerate(ax.get_lines()):
                     ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid", color=line.get_color())
+                ax.axvline(x=auto_steps, color="grey", linestyle="dotted")
                 ax.set_ylabel("amplitude")
                 ax.set_title(f"test trial {trial + 1}")
                 if i == plot_examples - 1:
@@ -253,7 +254,7 @@ for rep in range(n_reps):
             conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.z_controllers.values()])
             fig, axes = plt.subplots(nrows=2, figsize=(12, 6))
             ax = axes[0]
-            ax.bar(np.arange(n_conditions)+0.25, c_dim, width=0.4, color="royalblue")
+            ax.bar(np.arange(n_conditions) + 0.25, c_dim, width=0.4, color="royalblue")
             ax.set_xlabel("task conditions")
             ax.set_ylabel("dim(c)")
             ax.set_title("Conceptor Dimensionalities")
@@ -266,17 +267,22 @@ for rep in range(n_reps):
             plt.tight_layout()
 
             # loss figure
-            fig, axes = plt.subplots(ncols=2, figsize=(12, 4))
+            fig, axes = plt.subplots(ncols=3, figsize=(12, 4))
             ax = axes[0]
             ax.plot(loss_col)
             ax.set_xlabel("training batch")
             ax.set_ylabel("MSE")
             ax.set_title("Training loss")
             ax = axes[1]
+            ax.plot(slr_loss)
+            ax.set_xlabel("training batch")
+            ax.set_ylabel("delta")
+            ax.set_title("Conceptor loss")
+            ax = axes[2]
             condition_losses = []
             test_conditions = np.asarray(conditions[train_trials:])
             for c in unique_conditions:
-                idx = np.argwhere(test_conditions == tuple(c)).squeeze()
+                idx = np.argwhere(test_conditions == c).squeeze()
                 condition_losses.append(np.mean(np.asarray(test_loss)[idx]))
             ax.bar(x=np.arange(len(unique_conditions)), height=condition_losses)
             ax.set_xlabel("conditions")
@@ -286,3 +292,4 @@ for rep in range(n_reps):
             plt.tight_layout()
 
             plt.show()
+
