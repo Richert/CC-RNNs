@@ -1,5 +1,5 @@
 """
-Helper functions class
+Helper functions
 """
 
 import torch

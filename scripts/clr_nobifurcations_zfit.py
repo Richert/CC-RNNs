@@ -5,6 +5,7 @@ from src.functions import init_weights, init_dendrites, participation_ratio
 import torch
 import numpy as np
 import pickle
+from scipy.ndimage import gaussian_filter1d
 import matplotlib.pyplot as plt
 
 # parameter definition
@@ -16,7 +17,7 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/nobifurcations_2ds.pkl"
-save_file = f"{path}/results/clr_nobifurcations_zfit.pkl"
+save_file = f"{path}/results/clr_nobifurcations_zfit2.pkl"
 visualize_results = True
 plot_examples = 6
 
@@ -50,14 +51,14 @@ N = int(k * n_dendrites)
 trials = len(conditions)
 train_trials = int(0.9 * trials)
 test_trials = trials - train_trials
-augmentation = 1.0
+augmentation = 0.5
 lr = 1e-2
 betas = (0.9, 0.999)
 batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
 epsilon = 0.3
-lam = 2e-4
+lam = 5e-4
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -137,7 +138,7 @@ for rep in range(n_reps):
                         if step % truncation_steps == truncation_steps - 1:
                             rnn.detach()
                         y_col.append(y)
-                        slr_loss.append(delta_c.sum().detach().cpu().numpy())
+                        slr_loss.append((delta_c**2).sum().detach().cpu().numpy())
 
                     # calculate loss
                     y_col = torch.stack(y_col, dim=0)
@@ -274,7 +275,7 @@ for rep in range(n_reps):
             ax.set_ylabel("MSE")
             ax.set_title("Training loss")
             ax = axes[1]
-            ax.plot(slr_loss)
+            ax.plot(gaussian_filter1d(slr_loss, sigma=500))
             ax.set_xlabel("training batch")
             ax.set_ylabel("delta")
             ax.set_title("Conceptor loss")

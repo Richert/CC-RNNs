@@ -15,9 +15,9 @@ dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
-in_file = f"{path}/data/bifurcations_2ds.pkl"
-model_file = f"{path}/results/clr_bifurcations_zfit.pkl"
-save_file = f"{path}/results/test_bifurcations_zfit.pkl"
+in_file = f"{path}/data/nobifurcations_2ds.pkl"
+model_file = f"{path}/results/clr_nobifurcations_zfit.pkl"
+save_file = f"{path}/results/test_nobifurcations_zfit.pkl"
 visualize_results = True
 plot_examples = 6
 
@@ -32,7 +32,7 @@ n_conditions = len(unique_conditions)
 # task parameters
 steps = inputs[0].shape[0]
 init_steps = 20
-auto_steps = 200
+auto_steps = 100
 noise_lvl = 0.0
 
 # load RNN parameters
@@ -49,9 +49,7 @@ test_trials = trials - train_trials
 batch_size = 20
 
 # sweep parameters
-alphas = [10.0, 12.5, 15.0]
-n_reps = 10
-n_trials = len(alphas)*n_reps
+n_trials = len(params["trial"])
 
 # prepare results
 results = {"alpha": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim": [], "c_dim": [], "vf_quality": []}
@@ -60,7 +58,7 @@ results = {"alpha": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim":
 ################
 
 with torch.no_grad():
-    for n in range(len(params["trial"])):
+    for n in range(n_trials):
 
         alpha = params["alpha"][n]
         rep = params["trial"][n]
