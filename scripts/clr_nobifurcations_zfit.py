@@ -15,10 +15,10 @@ import matplotlib.pyplot as plt
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/nobifurcations_2ds.pkl"
 save_file = f"{path}/results/clr_nobifurcations_zfit2.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 6
 
 # load inputs and targets
