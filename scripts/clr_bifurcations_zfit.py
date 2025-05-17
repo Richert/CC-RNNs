@@ -15,10 +15,10 @@ from scipy.ndimage import gaussian_filter1d
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
 save_file = f"{path}/results/clr_bifurcations_zfit.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 6
 
 # load inputs and targets
@@ -51,19 +51,19 @@ N = int(k * n_dendrites)
 trials = len(conditions)
 train_trials = int(0.9 * trials)
 batch_size = 20
-test_trials = int(2*batch_size)
+test_trials = int(0.5*batch_size)
 augmentation = 1.0
 lr = 1e-2
 betas = (0.9, 0.999)
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 5.0
-alpha = 10.0
+epsilon = 1.0
+alpha = 15.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-lambdas = [2e-4, 4e-4]
-n_reps = 10
+lambdas = [2e-4, 3e-4, 4e-4, 5e-4, 6e-4]
+n_reps = 20
 n_trials = len(lambdas)*n_reps
 
 # prepare results
@@ -270,7 +270,7 @@ for rep in range(n_reps):
             plt.tight_layout()
 
             # loss figure
-            fig, axes = plt.subplots(ncols=3, figsize=(12, 4))
+            fig, axes = plt.subplots(ncols=2, figsize=(12, 4))
             ax = axes[0]
             ax.plot(loss_col)
             ax.set_xlabel("training batch")
@@ -281,17 +281,17 @@ for rep in range(n_reps):
             ax.set_xlabel("training batch")
             ax.set_ylabel("delta")
             ax.set_title("Conceptor loss")
-            ax = axes[2]
-            condition_losses = []
-            test_conditions = np.asarray(conditions[train_trials:])
-            for c in unique_conditions:
-                idx = np.argwhere(test_conditions == c).squeeze()
-                condition_losses.append(np.mean(np.asarray(test_loss)[idx]))
-            ax.bar(x=np.arange(len(unique_conditions)), height=condition_losses)
-            ax.set_xlabel("conditions")
-            ax.set_ylabel("MSE")
-            ax.set_xticks(np.arange(len(unique_conditions)), labels=[f"{c}" for c in unique_conditions])
-            ax.set_title("Test Loss")
+            # ax = axes[2]
+            # condition_losses = []
+            # test_conditions = np.asarray(conditions[train_trials:])
+            # for c in unique_conditions:
+            #     idx = np.argwhere(test_conditions == c).squeeze()
+            #     condition_losses.append(np.mean(np.asarray(test_loss)[idx]))
+            # ax.bar(x=np.arange(len(unique_conditions)), height=condition_losses)
+            # ax.set_xlabel("conditions")
+            # ax.set_ylabel("MSE")
+            # ax.set_xticks(np.arange(len(unique_conditions)), labels=[f"{c}" for c in unique_conditions])
+            # ax.set_title("Test Loss")
             plt.tight_layout()
 
             plt.show()
