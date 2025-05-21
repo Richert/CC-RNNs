@@ -23,14 +23,15 @@ markersize = 6
 # collect data
 ##############
 
-results = {"lambda": [], "trial": [], "repetition": [], "train_epochs": [], "srl_loss": [], "test_loss": [], "mu": [],
-           "c_dim": []}
+results = {"condition": [], "lambda": [], "trial": [], "repetition": [], "train_epochs": [],
+           "srl_loss": [], "test_loss": [], "mu": [], "c_dim": []}
 conceptors = []
 data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
 
 # sweep data
 for trial in range(len(data["test_loss"])):
     results["trial"].append(trial % 20)
+    results["condition"].append(data["condition"][trial])
     results["lambda"].append(data["lambda"][trial])
     results["repetition"].append(data["repetition"][trial])
     results["train_epochs"].append(data["train_epochs"][trial])
