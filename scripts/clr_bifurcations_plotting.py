@@ -6,7 +6,7 @@ import seaborn as sb
 
 # load data
 path = "/home/richard/results"
-task = "clr_bifurcations"
+task = "test_bifurcations"
 
 # matplotlib settings
 plt.rcParams["font.family"] = "Times New Roman"
@@ -29,11 +29,11 @@ conceptors = []
 data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
 
 # sweep data
-for point in range(len(data["trial"])):
-    for trial in range(data["trial"][point]):
-        results["lambda"].append(data["lambda"][point])
+for point in range(len(data["test_loss"])):
+    for trial in range(len(data["test_loss"][point])):
         results["trial"].append(trial)
-        results["repetition"].append(data["trial"][point][trial])
+        results["lambda"].append(data["lambda"][point][trial])
+        results["repetition"].append(data["repetition"][point][trial])
         results["train_epochs"].append(data["train_epochs"][point][trial])
         results["train_loss"].append(data["train_loss"][point])
         results["test_loss"].append(data["test_loss"][point][trial])
