@@ -14,11 +14,11 @@ import matplotlib.pyplot as plt
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
-in_file = f"{path}/data/nobifurcations_2ds.pkl"
-model_file = f"{path}/results/clr_nobifurcations_zfit.pkl"
-save_file = f"{path}/results/test_nobifurcations_zfit.pkl"
-visualize_results = True
+path = "/home/richard"
+in_file = f"{path}/data/bifurcations_2ds.pkl"
+model_file = f"{path}/results/clr_bifurcations_zfit2.pkl"
+save_file = f"{path}/results/test_bifurcations_zfit2.pkl"
+visualize_results = False
 plot_examples = 6
 
 # load inputs and targets
@@ -52,7 +52,7 @@ batch_size = 20
 n_trials = len(params["trial"])
 
 # prepare results
-results = {"alpha": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim": [], "c_dim": [], "vf_quality": []}
+results = {"alpha": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim": [], "c_dim": []}
 
 # model training
 ################
@@ -127,8 +127,6 @@ with torch.no_grad():
         results["train_loss"].append(params["train_loss"][n][-1] / batch_size)
         results["test_loss"].append(np.mean(test_loss))
         results["c_dim"].append(c_dim)
-        #results["z_dim"].append(...)
-        #results["vf_quality"].append(...)
 
         # save results
         pickle.dump(results, open(save_file, "wb"))
