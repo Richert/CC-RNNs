@@ -82,7 +82,7 @@ ax.set_xlabel(r"$\lambda$")
 ax.set_ylabel("dim(C)")
 
 # plot conceptor loss
-ax = fig.add_subplot(grid[1, 0])
+ax = fig.add_subplot(grid[1, 1])
 sb.barplot(df, x="lambda", y="srl_loss", hue="condition")
 ax.set_title("Conceptor loss")
 ax.set_xlabel(r"$\lambda$")
