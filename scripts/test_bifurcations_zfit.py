@@ -16,8 +16,8 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard"
 in_file = f"{path}/data/bifurcations_2ds.pkl"
-model_file = f"{path}/results/clr_bifurcations_zfit2.pkl"
-save_file = f"{path}/results/test_bifurcations_zfit2.pkl"
+model_file = f"{path}/results/clr_bifurcations_zfit.pkl"
+save_file = f"{path}/results/test_bifurcations_zfit.pkl"
 visualize_results = False
 plot_examples = 6
 
