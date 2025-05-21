@@ -35,7 +35,7 @@ for trial in range(len(data["test_loss"])):
     results["lambda"].append(data["lambda"][trial])
     results["repetition"].append(data["repetition"][trial])
     results["train_epochs"].append(data["train_epochs"][trial])
-    results["srl_loss"].append(data["srl_loss"])
+    results["srl_loss"].append(data["srl_loss"][trial])
     results["test_loss"].append(data["test_loss"][trial])
     results["mu"].append(data["mu"][trial])
     results["c_dim"].append(data["c_dim"][trial])
