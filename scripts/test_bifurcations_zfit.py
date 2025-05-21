@@ -52,7 +52,8 @@ batch_size = 20
 n_trials = len(params["trial"])
 
 # prepare results
-results = {"lambda": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim": [], "c_dim": []}
+results = {"condition": [], "lambda": [], "mu": [], "repetition": [], "train_epochs": [], "test_loss": [],
+           "srl_loss": [], "c_dim": [], "conceptor": []}
 
 # model training
 ################
@@ -79,7 +80,11 @@ with torch.no_grad():
         inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
 
         # add dendritic gain controllers
+        conceptors = {}
+        c_dim = {}
         for key, c in zip(unique_conditions, params["conceptors"][n]):
+            conceptors[key] = c
+            c_dim[key] = np.sum(c ** 2)
             rnn.z_controllers[key] = torch.tensor(c, device=device, dtype=dtype)
 
         # set up loss function
@@ -117,16 +122,16 @@ with torch.no_grad():
                 loss = loss_func(torch.stack(y_col, dim=0), target)
                 test_loss.append(loss.item())
 
-        # calculate conceptor dimensionality
-        conceptors = [c.detach().cpu().numpy() for c in rnn.z_controllers.values()]
-        c_dim = [np.sum(c**2) for c in conceptors]
-
-        # save results
-        results["lambda"].append(lam)
-        results["trial"].append(rep)
-        results["train_loss"].append(params["train_loss"][n][-1] / batch_size)
-        results["test_loss"].append(np.mean(test_loss))
-        results["c_dim"].append(c_dim)
+                # save results
+                results["condition"].append(conditions[trial])
+                results["lambda"].append(lam)
+                results["mu"].append(np.round(inputs[trial][-1, -1], decimals=2))
+                results["repetition"].append(rep)
+                results["train_epochs"].append(params["train_epochs"][n])
+                results["test_loss"].append(test_loss[-1])
+                results["srl_loss"].append(params["srl_loss"][n][-1])
+                results["c_dim"].append(c_dim[conditions[trial]])
+                results["conceptor"].append(conceptors[conditions[trial]])
 
         # save results
         pickle.dump(results, open(save_file, "wb"))
