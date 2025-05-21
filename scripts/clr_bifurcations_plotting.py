@@ -23,23 +23,22 @@ markersize = 6
 # collect data
 ##############
 
-results = {"lambda": [], "trial": [], "repetition": [], "train_epochs": [], "train_loss": [], "test_loss": [], "mu": [],
+results = {"lambda": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": [], "mu": [],
            "c_dim": []}
 conceptors = []
 data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
 
 # sweep data
-for point in range(len(data["test_loss"])):
-    for trial in range(len(data["test_loss"][point])):
-        results["trial"].append(trial)
-        results["lambda"].append(data["lambda"][point][trial])
-        results["repetition"].append(data["repetition"][point][trial])
-        results["train_epochs"].append(data["train_epochs"][point][trial])
-        results["train_loss"].append(data["train_loss"][point])
-        results["test_loss"].append(data["test_loss"][point][trial])
-        results["mu"].append(data["mu"][point][trial])
-        results["c_dim"].append(data["c_dim"][point][trial])
-        conceptors.append(data["conceptor"][point][trial])
+for trial in range(len(data["test_loss"])):
+    results["trial"].append(trial % 20)
+    results["lambda"].append(data["lambda"][trial])
+    results["repetition"].append(data["repetition"][trial])
+    results["train_epochs"].append(data["train_epochs"][trial])
+    results["train_loss"].append(data["train_loss"])
+    results["test_loss"].append(data["test_loss"][trial])
+    results["mu"].append(data["mu"][trial])
+    results["c_dim"].append(data["c_dim"][trial])
+    conceptors.append(data["conceptor"][trial])
 df = DataFrame.from_dict(results)
 conceptors = np.asarray(conceptors)
 
