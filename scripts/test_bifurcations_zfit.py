@@ -52,7 +52,7 @@ batch_size = 20
 n_trials = len(params["trial"])
 
 # prepare results
-results = {"alpha": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim": [], "c_dim": []}
+results = {"lambda": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim": [], "c_dim": []}
 
 # model training
 ################
@@ -60,9 +60,9 @@ results = {"alpha": [], "trial": [], "train_loss": [], "test_loss": [], "z_dim":
 with torch.no_grad():
     for n in range(n_trials):
 
-        alpha = params["alpha"][n]
+        lam = params["lambda"][n]
         rep = params["trial"][n]
-        print(f"Testing model fit {n+1} out of {n_trials} (alpha = {alpha}, rep = {rep})")
+        print(f"Testing model fit {n+1} out of {n_trials} (lambda = {lam}, rep = {rep})")
 
         # initialize rnn matrices
         bias = torch.tensor(params["bias"][n], device=device, dtype=dtype)
@@ -122,7 +122,7 @@ with torch.no_grad():
         c_dim = [np.sum(c**2) for c in conceptors]
 
         # save results
-        results["alpha"].append(alpha)
+        results["lambda"].append(lam)
         results["trial"].append(rep)
         results["train_loss"].append(params["train_loss"][n][-1] / batch_size)
         results["test_loss"].append(np.mean(test_loss))
