@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sb
 
 # load data
-path = "/home/richard-gast/Documents/results"
+path = "/home/richard/results"
 task = "clr_bifurcations"
 
 # matplotlib settings
@@ -13,7 +13,7 @@ plt.rcParams["font.family"] = "Times New Roman"
 plt.rc('text', usetex=True)
 plt.rcParams['figure.constrained_layout.use'] = True
 plt.rcParams['figure.dpi'] = 200
-plt.rcParams['figure.figsize'] = (12.0, 7.0)
+plt.rcParams['figure.figsize'] = (12.0, 6.0)
 plt.rcParams['font.size'] = 10.0
 plt.rcParams['axes.titlesize'] = 12
 plt.rcParams['axes.labelsize'] = 12
@@ -101,5 +101,5 @@ fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.01, hspace=0., wspace=0.)
 
 # saving/plotting
 fig.canvas.draw()
-plt.savefig(f'/home/richard-gast/Documents/results/clr_bifurcations.svg')
-plt.show()
+plt.savefig(f'{path}/{task}.svg')
+# plt.show()
