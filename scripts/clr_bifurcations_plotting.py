@@ -23,7 +23,7 @@ markersize = 6
 # collect data
 ##############
 
-results = {"lambda": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": [], "mu": [],
+results = {"lambda": [], "trial": [], "repetition": [], "train_epochs": [], "train_loss": [], "test_loss": [], "mu": [],
            "c_dim": []}
 conceptors = []
 data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
