@@ -132,7 +132,7 @@ with torch.no_grad():
                 results["srl_loss"].append(params["srl_loss"][n][-1])
                 results["c_dim"].append(c_dim[conditions[trial]])
                 results["conceptor"].append(conceptors[conditions[trial]])
-                results["predictions"].append(predictions)
+                results["predictions"].append(predictions[-1])
                 results["targets"].append(target.detach().cpu().numpy())
 
         # save results
