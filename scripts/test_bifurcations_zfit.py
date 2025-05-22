@@ -53,7 +53,7 @@ n_trials = len(params["trial"])
 
 # prepare results
 results = {"condition": [], "lambda": [], "mu": [], "repetition": [], "train_epochs": [], "test_loss": [],
-           "srl_loss": [], "c_dim": [], "conceptor": []}
+           "srl_loss": [], "c_dim": [], "conceptor": [], "predictions": [], "targets": []}
 
 # model training
 ################
@@ -132,6 +132,8 @@ with torch.no_grad():
                 results["srl_loss"].append(params["srl_loss"][n][-1])
                 results["c_dim"].append(c_dim[conditions[trial]])
                 results["conceptor"].append(conceptors[conditions[trial]])
+                results["predictions"].append(predictions)
+                results["targets"].append(target.detach().cpu().numpy())
 
         # save results
         pickle.dump(results, open(save_file, "wb"))
