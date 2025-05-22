@@ -13,7 +13,7 @@ plt.rcParams["font.family"] = "Times New Roman"
 plt.rc('text', usetex=True)
 plt.rcParams['figure.constrained_layout.use'] = True
 plt.rcParams['figure.dpi'] = 200
-plt.rcParams['figure.figsize'] = (12.0, 6.0)
+plt.rcParams['figure.figsize'] = (12.0, 9.0)
 plt.rcParams['font.size'] = 10.0
 plt.rcParams['axes.titlesize'] = 12
 plt.rcParams['axes.labelsize'] = 12
@@ -25,13 +25,13 @@ markersize = 6
 
 results = {"condition": [], "lambda": [], "trial": [], "repetition": [], "train_epochs": [],
            "srl_loss": [], "test_loss": [], "mu": [], "c_dim": []}
-conceptors = []
+conceptors, predictions, targets = [], [], []
 data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
 
 # sweep data
 for trial in range(len(data["test_loss"])):
     results["trial"].append(trial % 20)
-    results["condition"].append(data["condition"][trial])
+    results["condition"].append("PF" if data["condition"][trial] == 1 else "VDP")
     results["lambda"].append(data["lambda"][trial])
     results["repetition"].append(data["repetition"][trial])
     results["train_epochs"].append(data["train_epochs"][trial])
@@ -40,25 +40,29 @@ for trial in range(len(data["test_loss"])):
     results["mu"].append(data["mu"][trial])
     results["c_dim"].append(data["c_dim"][trial])
     conceptors.append(data["conceptor"][trial])
+    predictions.append(data["predictions"][trial])
+    targets.append(data["targets"][trial])
 df = DataFrame.from_dict(results)
 conceptors = np.asarray(conceptors)
+predictions = np.asarray(predictions)
+targets = np.asarray(targets)
 
 # plotting
 ##########
 
 # create figure
 fig = plt.figure()
-grid = fig.add_gridspec(nrows=2, ncols=4)
+grid = fig.add_gridspec(nrows=3, ncols=8)
 
-# plot number of training epochs
-ax = fig.add_subplot(grid[0, 0])
-sb.barplot(df, x="lambda", y="train_epochs", hue="condition")
-ax.set_title("Number of training epochs")
-ax.set_ylabel("epochs")
+# plot conceptor loss
+ax = fig.add_subplot(grid[0, :2])
+sb.barplot(df, x="lambda", y="srl_loss", hue="condition")
+ax.set_title("Conceptor loss")
 ax.set_xlabel(r"$\lambda$")
+ax.set_ylabel("loss(C)")
 
 # plot test loss
-ax = fig.add_subplot(grid[0, 1])
+ax = fig.add_subplot(grid[0, 2:4])
 sb.barplot(df, x="lambda", y="test_loss", hue="condition")
 ax.set_title("Average prediction performance")
 ax.set_ylabel("MSE")
@@ -68,40 +72,47 @@ ax.set_xlabel(r"$\lambda$")
 unique_conditions = np.unique(df.loc[:, "condition"].values)
 for i, c in enumerate(unique_conditions):
     df_tmp = df.loc[df.loc[:, "condition"] == c, :]
-    ax = fig.add_subplot(grid[0, 2+i])
+    ax = fig.add_subplot(grid[0, 2*(i+2):2*(i+3)])
     sb.lineplot(df_tmp, x="mu", y="test_loss", hue="lambda")
-    ax.set_title(f"Prediction performance for {c}")
+    ax.set_title(f"Prediction performance for {c} system")
     ax.set_xlabel(r"$\mu$")
     ax.set_ylabel("MSE")
 
 # plot conceptor dimensionalities
-ax = fig.add_subplot(grid[1, 0])
+ax = fig.add_subplot(grid[1, :2])
 sb.barplot(df, x="lambda", y="c_dim", hue="condition")
 ax.set_title("Conceptor dimensionalities")
 ax.set_xlabel(r"$\lambda$")
 ax.set_ylabel("dim(C)")
 
-# plot conceptor loss
-ax = fig.add_subplot(grid[1, 1])
-sb.barplot(df, x="lambda", y="srl_loss", hue="condition")
-ax.set_title("Conceptor loss")
-ax.set_xlabel(r"$\lambda$")
-ax.set_ylabel("loss(C)")
-
-# plot example conceptors for each condition
-unique_lambdas = np.unique(df.loc[:, "lambda"].values)[[1, 3]]
-for i, lam in enumerate(unique_lambdas):
-    idx1 = df.loc[:, "lambda"] == lam
-    cs = []
-    for cond in unique_conditions:
-        idx2 = df.loc[:, "condition"] == cond
-        idx = np.argmin(df.loc[idx1 & idx2, "test_loss"].values)
-        cs.append(conceptors[idx1 & idx2][idx])
-    ax = fig.add_subplot(grid[1, 2+i])
-    ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
-    ax.set_ylabel("condition")
-    ax.set_xlabel("soma")
-    ax.set_title(rf"Conceptors for $\lambda = {lam}$")
+# plot example conceptors and time series for each condition
+lam, mu = 4e-4, 0.25
+idx1 = df.loc[:, "lambda"] == lam
+cs = []
+for i, cond in enumerate(unique_conditions):
+    idx2 = df.loc[:, "condition"] == cond
+    for j, m in enumerate([mu, -mu]):
+        idx3 = df.loc[:, "mu"] == mu
+        df_tmp = df.loc[idx1 & idx2 & idx3, :]
+        losses = df_tmp.loc[:, "test_loss"].values
+        min_idx = np.argmin(losses)
+        ax = fig.add_subplot(grid[2+i, 4*j:4*(j+1)])
+        targs = targets[idx1 & idx2 & idx3][min_idx]
+        preds = predictions[idx1 & idx2 & idx3][min_idx]
+        for k in range(targs.shape[1]):
+            l = ax.plot(targs[:, k], label=f"target {k+1}", linestyle="dashed")
+            ax.plot(preds[:, k], label=f"prediction {k+1}", linestyle="solid", color=l[0].get_color())
+        ax.set_xlabel("steps")
+        ax.set_ylabel("y")
+        ax.set_title(rf"Predictions for {cond} system with $\mu = {m}$")
+        ax.legend()
+    cs.append(conceptors[idx1 & idx2 & idx3][min_idx])
+ax = fig.add_subplot(grid[1, 2:])
+ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
+ax.set_yticks([0, 1], labels=unique_conditions)
+ax.set_ylabel("condition")
+ax.set_xlabel("soma")
+ax.set_title(rf"Conceptors for $\lambda = {lam}$")
 
 # padding
 fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.01, hspace=0., wspace=0.)
