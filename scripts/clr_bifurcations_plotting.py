@@ -96,6 +96,8 @@ for i, cond in enumerate(unique_conditions):
     for j, mu in enumerate(mus):
         m = unique_mus[np.argmin(np.abs(unique_mus - mu)).squeeze()]
         idx3 = df.loc[:, "mu"] == m
+        print(idx3)
+        print(m)
         df_tmp = df.loc[idx1 & idx2 & idx3, :]
         losses = df_tmp.loc[:, "test_loss"].values
         min_idx = np.argmin(losses)
