@@ -52,7 +52,7 @@ targets = np.asarray(targets)
 
 # create figure
 fig = plt.figure()
-grid = fig.add_gridspec(nrows=3, ncols=8)
+grid = fig.add_gridspec(nrows=4, ncols=8)
 
 # plot conceptor loss
 ax = fig.add_subplot(grid[0, :2])
