@@ -95,15 +95,13 @@ for i, cond in enumerate(unique_conditions):
     idx2 = df.loc[:, "condition"] == cond
     for j, mu in enumerate(mus):
         m = unique_mus[np.argmin(np.abs(unique_mus - mu)).squeeze()]
-        idx3 = df.loc[:, "mu"] == m
-        print(np.sum(idx3 * idx2 * idx1))
-        print(np.sum(idx3))
-        df_tmp = df.loc[idx1 & idx2 & idx3, :]
-        losses = df_tmp.loc[:, "test_loss"].values
+        df_tmp = df.loc[idx1 & idx2, :]
+        idx3 = df_tmp.loc[:, "mu"] == m
+        losses = df_tmp.loc[idx3, "test_loss"].values
         min_idx = np.argmin(losses)
         ax = fig.add_subplot(grid[2+i, 4*j:4*(j+1)])
-        targs = targets[idx1 & idx2 & idx3][min_idx]
-        preds = predictions[idx1 & idx2 & idx3][min_idx]
+        targs = targets[idx1 & idx2][idx3][min_idx]
+        preds = predictions[idx1 & idx2][idx3][min_idx]
         for k in range(targs.shape[1]):
             l = ax.plot(targs[:, k], label=f"target {k+1}", linestyle="dashed")
             ax.plot(preds[:, k], label=f"prediction {k+1}", linestyle="solid", color=l[0].get_color())
@@ -111,7 +109,7 @@ for i, cond in enumerate(unique_conditions):
         ax.set_ylabel("y")
         ax.set_title(rf"Predictions for {cond} system with $\mu = {np.round(m, decimals=2)}$")
         ax.legend()
-    cs.append(conceptors[idx1 & idx2 & idx3][min_idx])
+    cs.append(conceptors[idx1 & idx2][idx3][min_idx])
 ax = fig.add_subplot(grid[1, 3:])
 im = ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
 plt.colorbar(im, ax=ax, shrink=0.8)
