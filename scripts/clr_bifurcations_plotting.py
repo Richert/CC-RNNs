@@ -13,7 +13,7 @@ plt.rcParams["font.family"] = "Times New Roman"
 plt.rc('text', usetex=True)
 plt.rcParams['figure.constrained_layout.use'] = True
 plt.rcParams['figure.dpi'] = 200
-plt.rcParams['figure.figsize'] = (12.0, 9.0)
+plt.rcParams['figure.figsize'] = (10.0, 7.0)
 plt.rcParams['font.size'] = 10.0
 plt.rcParams['axes.titlesize'] = 12
 plt.rcParams['axes.labelsize'] = 12
@@ -52,17 +52,17 @@ targets = np.asarray(targets)
 
 # create figure
 fig = plt.figure()
-grid = fig.add_gridspec(nrows=4, ncols=8)
+grid = fig.add_gridspec(nrows=4, ncols=12)
 
 # plot conceptor loss
-ax = fig.add_subplot(grid[0, :2])
+ax = fig.add_subplot(grid[0, :3])
 sb.barplot(df, x="lambda", y="srl_loss", hue="condition")
 ax.set_title("Conceptor loss")
 ax.set_xlabel(r"$\lambda$")
 ax.set_ylabel("loss(C)")
 
 # plot test loss
-ax = fig.add_subplot(grid[0, 2:4])
+ax = fig.add_subplot(grid[0, 3:6])
 sb.barplot(df, x="lambda", y="test_loss", hue="condition")
 ax.set_title("Average prediction performance")
 ax.set_ylabel("MSE")
@@ -72,26 +72,27 @@ ax.set_xlabel(r"$\lambda$")
 unique_conditions = np.unique(df.loc[:, "condition"].values)
 for i, c in enumerate(unique_conditions):
     df_tmp = df.loc[df.loc[:, "condition"] == c, :]
-    ax = fig.add_subplot(grid[0, 2*(i+2):2*(i+3)])
+    ax = fig.add_subplot(grid[0, 3*(i+2):3*(i+3)])
     sb.lineplot(df_tmp, x="mu", y="test_loss", hue="lambda")
     ax.set_title(f"Prediction performance for {c} system")
     ax.set_xlabel(r"$\mu$")
     ax.set_ylabel("MSE")
 
 # plot conceptor dimensionalities
-ax = fig.add_subplot(grid[1, :2])
+ax = fig.add_subplot(grid[1, :3])
 sb.barplot(df, x="lambda", y="c_dim", hue="condition")
 ax.set_title("Conceptor dimensionalities")
 ax.set_xlabel(r"$\lambda$")
 ax.set_ylabel("dim(C)")
 
 # plot example conceptors and time series for each condition
-lam, mu = 4e-4, 0.25
+lam = 4e-4
+mus = [-0.1, 0.0, 0.1]
 idx1 = df.loc[:, "lambda"] == lam
 cs = []
 for i, cond in enumerate(unique_conditions):
     idx2 = df.loc[:, "condition"] == cond
-    for j, m in enumerate([mu, -mu]):
+    for j, m in enumerate(mus):
         idx3 = df.loc[:, "mu"] == m
         df_tmp = df.loc[idx1 & idx2 & idx3, :]
         losses = df_tmp.loc[:, "test_loss"].values
@@ -107,8 +108,9 @@ for i, cond in enumerate(unique_conditions):
         ax.set_title(rf"Predictions for {cond} system with $\mu = {m}$")
         ax.legend()
     cs.append(conceptors[idx1 & idx2 & idx3][min_idx])
-ax = fig.add_subplot(grid[1, 2:])
-ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
+ax = fig.add_subplot(grid[1, 3:])
+im = ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
+plt.colorbar(im, ax=ax, shrink=0.8)
 ax.set_yticks([0, 1], labels=unique_conditions)
 ax.set_ylabel("condition")
 ax.set_xlabel("soma")
