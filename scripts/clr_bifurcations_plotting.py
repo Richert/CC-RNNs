@@ -87,7 +87,7 @@ ax.set_ylabel("dim(C)")
 
 # plot example conceptors and time series for each condition
 lam = 4e-4
-mus = [-0.1, 0.0, 0.1]
+mus = [-0.2, 0.0, 0.2]
 idx1 = df.loc[:, "lambda"] == lam
 cs = []
 for i, cond in enumerate(unique_conditions):
