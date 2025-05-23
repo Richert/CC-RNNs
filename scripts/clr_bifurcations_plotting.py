@@ -107,7 +107,7 @@ for i, cond in enumerate(unique_conditions):
             ax.plot(preds[:, k], label=f"prediction {k+1}", linestyle="solid", color=l[0].get_color())
         ax.set_xlabel("steps")
         ax.set_ylabel("y")
-        ax.set_title(rf"Predictions for {cond} system with $\mu = {m}$")
+        ax.set_title(rf"Predictions for {cond} system with $\mu = {np.round(m, decimals=2)}$")
         ax.legend()
     cs.append(conceptors[idx1 & idx2 & idx3][min_idx])
 ax = fig.add_subplot(grid[1, 3:])
