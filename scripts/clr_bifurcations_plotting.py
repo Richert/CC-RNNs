@@ -112,7 +112,7 @@ for i, cond in enumerate(unique_conditions):
     cs.append(conceptors[idx1 & idx2][idx3][min_idx])
 ax = fig.add_subplot(grid[1, 3:])
 im = ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
-plt.colorbar(im, ax=ax, shrink=0.8)
+plt.colorbar(im, ax=ax)
 ax.set_yticks([0, 1], labels=unique_conditions)
 ax.set_ylabel("condition")
 ax.set_xlabel("soma")
