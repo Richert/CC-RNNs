@@ -88,11 +88,13 @@ ax.set_ylabel("dim(C)")
 # plot example conceptors and time series for each condition
 lam = 4e-4
 mus = [-0.1, 0.0, 0.1]
+unique_mus = np.unique(df.loc[:, "mu"].values)
 idx1 = df.loc[:, "lambda"] == lam
 cs = []
 for i, cond in enumerate(unique_conditions):
     idx2 = df.loc[:, "condition"] == cond
-    for j, m in enumerate(mus):
+    for j, mu in enumerate(mus):
+        m = unique_mus[np.argmin(np.abs(unique_mus - mu)).squeeze()]
         idx3 = df.loc[:, "mu"] == m
         df_tmp = df.loc[idx1 & idx2 & idx3, :]
         losses = df_tmp.loc[:, "test_loss"].values
