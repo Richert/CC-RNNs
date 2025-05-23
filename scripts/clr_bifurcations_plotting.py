@@ -92,7 +92,7 @@ cs = []
 for i, cond in enumerate(unique_conditions):
     idx2 = df.loc[:, "condition"] == cond
     for j, m in enumerate([mu, -mu]):
-        idx3 = df.loc[:, "mu"] == mu
+        idx3 = df.loc[:, "mu"] == m
         df_tmp = df.loc[idx1 & idx2 & idx3, :]
         losses = df_tmp.loc[:, "test_loss"].values
         min_idx = np.argmin(losses)
