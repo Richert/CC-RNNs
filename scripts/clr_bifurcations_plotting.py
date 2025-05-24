@@ -13,7 +13,7 @@ plt.rcParams["font.family"] = "Times New Roman"
 plt.rc('text', usetex=True)
 plt.rcParams['figure.constrained_layout.use'] = True
 plt.rcParams['figure.dpi'] = 200
-plt.rcParams['figure.figsize'] = (10.0, 7.0)
+plt.rcParams['figure.figsize'] = (10.0, 8.0)
 plt.rcParams['font.size'] = 10.0
 plt.rcParams['axes.titlesize'] = 12
 plt.rcParams['axes.labelsize'] = 12
@@ -105,7 +105,8 @@ for i, cond in enumerate(unique_conditions):
         for k in range(targs.shape[1]):
             l = ax.plot(targs[:, k], label=f"target {k+1}", linestyle="dashed")
             ax.plot(preds[:, k], label=f"prediction {k+1}", linestyle="solid", color=l[0].get_color())
-        ax.set_xlabel("steps")
+        if i > 0:
+            ax.set_xlabel("steps")
         ax.set_ylabel("y")
         ax.set_title(rf"Predictions for {cond} system with $\mu = {np.round(m, decimals=2)}$")
         ax.legend()
