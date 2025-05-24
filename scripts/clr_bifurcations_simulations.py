@@ -15,14 +15,14 @@ def simulation(model: LowRankCRNN, inp: torch.Tensor, init_steps: int) -> list:
         y = W_r @ z
 
     # get dynamics for PF system
-    z_col = []
+    y_col = []
     for step in range(inp.shape[0]):
         inp[step, :n_out] = y
         z = model.forward(inp[step])
         y = W_r @ z
-        z_col.append(z.detach().cpu().numpy())
+        y_col.append(y.detach().cpu().numpy())
 
-    return z_col
+    return y_col
 
 # parameter definition
 ######################
