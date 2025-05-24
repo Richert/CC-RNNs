@@ -1,11 +1,9 @@
 import sys
 sys.path.append("../")
 from src.rnn import LowRankCRNN
-from src.functions import init_weights, init_dendrites
 import torch
 import numpy as np
 import pickle
-import matplotlib.pyplot as plt
 
 
 def simulation(model: LowRankCRNN, inp: torch.Tensor, init_steps: int) -> list:
