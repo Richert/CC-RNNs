@@ -34,21 +34,21 @@ for i in range(len(data["pf"])):
     ax.plot(data["pf"][i])
     ax.set_title("Pitchfork bifurcation")
     ax.set_xlabel(r"steps")
-    ax.set_ylabel(r"$z$")
+    ax.set_ylabel(r"$zy")
 
     # plot PF dynamics
     ax = fig.add_subplot(grid[1, 0])
     ax.plot(data["vdp"][i])
     ax.set_title("Hopf bifurcation")
     ax.set_xlabel(r"steps")
-    ax.set_ylabel(r"$z$")
+    ax.set_ylabel(r"$y$")
 
     # DS switching
-    ax = fig.add_subplot(grid[1, 0])
+    ax = fig.add_subplot(grid[2, 0])
     ax.plot(data["pf_vdp"][i])
     ax.set_title("Dynamical systems switching")
     ax.set_xlabel(r"steps")
-    ax.set_ylabel(r"$z$")
+    ax.set_ylabel(r"$y$")
 
     # padding
     fig.set_constrained_layout_pads(w_pad=0.01, h_pad=0.01, hspace=0., wspace=0.)
