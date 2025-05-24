@@ -34,7 +34,7 @@ for i in range(len(data["pf"])):
     ax.plot(data["pf"][i])
     ax.set_title("Pitchfork bifurcation")
     ax.set_xlabel(r"steps")
-    ax.set_ylabel(r"$zy")
+    ax.set_ylabel(r"$y$")
 
     # plot PF dynamics
     ax = fig.add_subplot(grid[1, 0])
