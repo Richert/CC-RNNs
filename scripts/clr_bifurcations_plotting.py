@@ -64,7 +64,7 @@ ax.set_ylabel("loss(C)")
 # plot test loss
 ax = fig.add_subplot(grid[0, 3:6])
 sb.barplot(df, x="lambda", y="test_loss", hue="condition")
-ax.set_title("Average prediction performance")
+ax.set_title("Prediction performance")
 ax.set_ylabel("MSE")
 ax.set_xlabel(r"$\lambda$")
 
@@ -74,7 +74,7 @@ for i, c in enumerate(unique_conditions):
     df_tmp = df.loc[df.loc[:, "condition"] == c, :]
     ax = fig.add_subplot(grid[0, 3*(i+2):3*(i+3)])
     sb.lineplot(df_tmp, x="mu", y="test_loss", hue="lambda")
-    ax.set_title(f"Prediction performance for {c} system")
+    ax.set_title(f"Prediction performance for {c}")
     ax.set_xlabel(r"$\mu$")
     ax.set_ylabel("MSE")
 
@@ -107,8 +107,9 @@ for i, cond in enumerate(unique_conditions):
             ax.plot(preds[:, k], label=f"prediction {k+1}", linestyle="solid", color=l[0].get_color())
         if i > 0:
             ax.set_xlabel("steps")
-        ax.set_ylabel("y")
-        ax.set_title(rf"Predictions for {cond} system with $\mu = {np.round(m, decimals=2)}$")
+        if j == 0:
+            ax.set_ylabel("y")
+        ax.set_title(rf"Predictions for {cond} with $\mu = {np.round(m, decimals=1)}$")
         ax.legend()
     cs.append(conceptors[idx1 & idx2][idx3][min_idx])
 ax = fig.add_subplot(grid[1, 3:])
