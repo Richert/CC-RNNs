@@ -13,7 +13,7 @@ plt.rcParams["font.family"] = "Times New Roman"
 plt.rc('text', usetex=True)
 plt.rcParams['figure.constrained_layout.use'] = True
 plt.rcParams['figure.dpi'] = 200
-plt.rcParams['figure.figsize'] = (12.0, 9.0)
+plt.rcParams['figure.figsize'] = (10.0, 10.0)
 plt.rcParams['font.size'] = 10.0
 plt.rcParams['axes.titlesize'] = 12
 plt.rcParams['axes.labelsize'] = 12
@@ -116,7 +116,7 @@ ax = fig.add_subplot(grid[1, 3:])
 im = ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
 # plt.colorbar(im, ax=ax)
 ax.set_yticks([0, 1], labels=unique_conditions)
-ax.set_ylabel("condition")
+# ax.set_ylabel("condition")
 ax.set_xlabel("soma")
 ax.set_title(rf"Conceptors for $\lambda = {lam}$")
 
