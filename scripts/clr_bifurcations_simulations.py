@@ -97,7 +97,7 @@ with torch.no_grad():
 
             # get FP to VDP dynamics for mu = 0.2
             rnn.activate_z_controller(0)
-            inp = torch.zeros((0.25*steps, n_in), device=device, dtype=dtype)
+            inp = torch.zeros((int(0.25*steps), n_in), device=device, dtype=dtype)
             inp[:, -1] = 0.2
             pf1 = simulation(rnn, inp.clone(), init_steps=0)
             rnn.activate_z_controller(1)
