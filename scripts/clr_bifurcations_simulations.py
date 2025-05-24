@@ -6,15 +6,10 @@ import numpy as np
 import pickle
 
 
-def simulation(model: LowRankCRNN, inp: torch.Tensor, init_steps: int) -> list:
-
-    # get initial state
-    for step in range(init_steps):
-        x = torch.randn(inp.shape[1], dtype=dtype, device=device)
-        z = model.forward(x)
-        y = W_r @ z
+def simulation(model: LowRankCRNN, inp: torch.Tensor, W_r: torch.Tensor) -> list:
 
     # get dynamics for PF system
+    y = W_r @ model.z
     y_col = []
     for step in range(inp.shape[0]):
         inp[step, :n_out] = y
@@ -87,25 +82,25 @@ with torch.no_grad():
             mus = torch.linspace(min_mu, max_mu, steps, device=device, dtype=dtype)
             inp[:, -1] = mus
             rnn.activate_z_controller(0)
-            results["pf"].append(simulation(rnn, inp, init_steps=init_steps))
+            results["pf"].append(simulation(rnn, inp, W_r))
 
             # get VDP dynamics
             inp = torch.zeros((steps, n_in), device=device, dtype=dtype)
             inp[:, -1] = mus
             rnn.activate_z_controller(1)
-            results["vdp"].append(simulation(rnn, inp, init_steps=init_steps))
+            results["vdp"].append(simulation(rnn, inp, W_r))
 
             # get FP to VDP dynamics for mu = 0.2
             rnn.activate_z_controller(0)
             inp = torch.zeros((int(0.25*steps), n_in), device=device, dtype=dtype)
             inp[:, -1] = 0.2
-            pf1 = simulation(rnn, inp.clone(), init_steps=1)
+            pf1 = simulation(rnn, inp.clone(), W_r)
             rnn.activate_z_controller(1)
-            vdp1 = simulation(rnn, inp.clone(), init_steps=1)
+            vdp1 = simulation(rnn, inp.clone(), W_r)
             rnn.activate_z_controller(0)
-            pf2 = simulation(rnn, inp.clone(), init_steps=1)
+            pf2 = simulation(rnn, inp.clone(), W_r)
             rnn.activate_z_controller(1)
-            vdp2 = simulation(rnn, inp.clone(), init_steps=1)
+            vdp2 = simulation(rnn, inp.clone(), W_r)
             results["pf_vdp"].append(np.concatenate([pf1, vdp1, pf2, vdp2], axis=0))
 
 # save results
