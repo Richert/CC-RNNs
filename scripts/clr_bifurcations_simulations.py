@@ -16,7 +16,7 @@ def simulation(model: LowRankCRNN, inp: torch.Tensor, init_steps: int) -> list:
 
     # get dynamics for PF system
     z_col = []
-    for step in range(steps):
+    for step in range(inp.shape[0]):
         inp[step, :n_out] = y
         z = model.forward(inp[step])
         y = W_r @ z
