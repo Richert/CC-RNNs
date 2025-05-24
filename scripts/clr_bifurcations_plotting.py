@@ -110,7 +110,8 @@ for i, cond in enumerate(unique_conditions):
         if j == 0:
             ax.set_ylabel("y")
         ax.set_title(rf"Predictions for {cond} with $\mu = {np.round(m, decimals=1)}$")
-        ax.legend()
+        if i == 0 and j == 0:
+            ax.legend()
     cs.append(conceptors[idx1 & idx2][idx3][min_idx])
 ax = fig.add_subplot(grid[1, 3:])
 im = ax.imshow(np.asarray(cs), aspect="auto", interpolation="none", cmap="cividis")
