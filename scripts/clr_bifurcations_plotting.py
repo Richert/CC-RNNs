@@ -121,7 +121,7 @@ ax.set_xlabel("soma")
 ax.set_title(rf"Conceptors for $\lambda = {lam}$")
 
 # padding
-fig.set_constrained_layout_pads(w_pad=0.03, h_pad=0.01, hspace=0., wspace=0.)
+fig.set_constrained_layout_pads(w_pad=0.01, h_pad=0.01, hspace=0., wspace=0.)
 
 # saving/plotting
 fig.canvas.draw()
