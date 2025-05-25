@@ -77,20 +77,19 @@ with torch.no_grad():
         # generate model dynamics
         results[i] = {"mu": [], "y": []}
         for mu in mus:
-            with torch.no_grad():
-                inp = torch.zeros((int(0.25 * steps), n_in), device=device, dtype=dtype)
-                inp[:, -1] = mu
-                rnn.activate_z_controller(0)
-                pf1 = simulation(rnn, inp.clone(), W_r)
-                rnn.activate_z_controller(1)
-                vdp1 = simulation(rnn, inp.clone(), W_r)
-                rnn.activate_z_controller(0)
-                pf2 = simulation(rnn, inp.clone(), W_r)
-                rnn.activate_z_controller(1)
-                vdp2 = simulation(rnn, inp.clone(), W_r)
+            inp = torch.zeros((int(0.25 * steps), n_in), device=device, dtype=dtype)
+            inp[:, -1] = mu
+            rnn.activate_z_controller(0)
+            pf1 = simulation(rnn, inp.clone(), W_r)
+            rnn.activate_z_controller(1)
+            vdp1 = simulation(rnn, inp.clone(), W_r)
+            rnn.activate_z_controller(0)
+            pf2 = simulation(rnn, inp.clone(), W_r)
+            rnn.activate_z_controller(1)
+            vdp2 = simulation(rnn, inp.clone(), W_r)
 
-                results[i]["mu"].append(mu)
-                results[i]["y"].append(np.concatenate([pf1, vdp1, pf2, vdp2], axis=0))
+            results[i]["mu"].append(mu)
+            results[i]["y"].append(np.concatenate([pf1, vdp1, pf2, vdp2], axis=0))
 
 # save results
 pickle.dump(results, open(save_file, "wb"))
