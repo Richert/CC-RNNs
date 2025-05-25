@@ -2,7 +2,7 @@ import pickle
 import matplotlib.pyplot as plt
 
 # load data
-path = "/home/richard/results"
+path = "/home/richard-gast/Documents/results"
 task = "simulations_bifurcations"
 
 # matplotlib settings
@@ -19,6 +19,8 @@ markersize = 6
 
 # collect data
 data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
+
+# best model fit: 93
 
 # plotting
 ##########
@@ -44,4 +46,4 @@ for i in data.keys():
     # saving/plotting
     fig.canvas.draw()
     plt.savefig(f'{path}/{task}_{i+1}.svg')
-    # plt.show()
+    plt.show()
