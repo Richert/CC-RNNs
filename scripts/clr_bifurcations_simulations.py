@@ -75,6 +75,7 @@ with torch.no_grad():
             rnn.z_controllers[key] = torch.tensor(c, device=device, dtype=dtype)
 
         # generate model dynamics
+        results[i] = {"mu": [], "y": []}
         for mu in mus:
             with torch.no_grad():
                 inp = torch.zeros((int(0.25 * steps), n_in), device=device, dtype=dtype)
