@@ -33,7 +33,7 @@ save_file = f"{path}/results/simulations_bifurcations_zfit.pkl"
 # task parameters
 steps = 1000
 init_steps = 20
-min_mu, max_mu = -0.5, 0.5
+mus = np.linspace(-0.5, 0.5, num=4)
 
 # load RNN parameters
 params = pickle.load(open(model_file, "rb"))
@@ -46,7 +46,7 @@ idx = np.argwhere(np.asarray(params["lambda"]) == lam).squeeze()
 n_fits = len(idx)
 
 # prepare results
-results = {"pf": [], "vdp": [], "pf_vdp": []}
+results = {"mu": [], "y": []}
 
 # model training
 ################
@@ -75,33 +75,21 @@ with torch.no_grad():
             rnn.z_controllers[key] = torch.tensor(c, device=device, dtype=dtype)
 
         # generate model dynamics
-        with torch.no_grad():
+        for mu in mus:
+            with torch.no_grad():
+                inp = torch.zeros((int(0.25 * steps), n_in), device=device, dtype=dtype)
+                inp[:, -1] = mu
+                rnn.activate_z_controller(0)
+                pf1 = simulation(rnn, inp.clone(), W_r)
+                rnn.activate_z_controller(1)
+                vdp1 = simulation(rnn, inp.clone(), W_r)
+                rnn.activate_z_controller(0)
+                pf2 = simulation(rnn, inp.clone(), W_r)
+                rnn.activate_z_controller(1)
+                vdp2 = simulation(rnn, inp.clone(), W_r)
 
-            # get PF dynamics
-            inp = torch.zeros((steps, n_in), device=device, dtype=dtype)
-            mus = torch.linspace(min_mu, max_mu, steps, device=device, dtype=dtype)
-            inp[:, -1] = mus
-            rnn.activate_z_controller(0)
-            results["pf"].append(simulation(rnn, inp, W_r))
-
-            # get VDP dynamics
-            inp = torch.zeros((steps, n_in), device=device, dtype=dtype)
-            inp[:, -1] = mus
-            rnn.activate_z_controller(1)
-            results["vdp"].append(simulation(rnn, inp, W_r))
-
-            # get FP to VDP dynamics for mu = 0.2
-            rnn.activate_z_controller(0)
-            inp = torch.zeros((int(0.25*steps), n_in), device=device, dtype=dtype)
-            inp[:, -1] = 0.2
-            pf1 = simulation(rnn, inp.clone(), W_r)
-            rnn.activate_z_controller(1)
-            vdp1 = simulation(rnn, inp.clone(), W_r)
-            rnn.activate_z_controller(0)
-            pf2 = simulation(rnn, inp.clone(), W_r)
-            rnn.activate_z_controller(1)
-            vdp2 = simulation(rnn, inp.clone(), W_r)
-            results["pf_vdp"].append(np.concatenate([pf1, vdp1, pf2, vdp2], axis=0))
+                results["mu"].append(mu)
+                results["y"].append(np.concatenate([pf1, vdp1, pf2, vdp2], axis=0))
 
 # save results
 pickle.dump(results, open(save_file, "wb"))
