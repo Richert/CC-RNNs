@@ -18,7 +18,7 @@ plt.rcParams['lines.linewidth'] = 1.0
 markersize = 6
 
 # collect data
-data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
+data = pickle.load(open(f"{path}/{task}_zfit2.pkl", "rb"))
 
 # best model fit: 93
 

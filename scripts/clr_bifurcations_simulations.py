@@ -33,7 +33,7 @@ save_file = f"{path}/results/simulations_bifurcations_zfit.pkl"
 # task parameters
 steps = 1000
 init_steps = 20
-mus = np.linspace(-0.3, 0.3, num=4)
+mus = np.linspace(-0.45, 0.45, num=4)
 
 # load RNN parameters
 params = pickle.load(open(model_file, "rb"))
