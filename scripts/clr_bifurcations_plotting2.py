@@ -38,7 +38,7 @@ for i in data.keys():
         ax.set_ylabel(r"$y$")
 
     # padding
-    fig.suptitle(f"Model fit #{i+1}")
+    fig.suptitle(f"Model fit {i+1}")
     fig.set_constrained_layout_pads(w_pad=0.01, h_pad=0.01, hspace=0., wspace=0.)
 
     # saving/plotting
