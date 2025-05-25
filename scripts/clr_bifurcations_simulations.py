@@ -46,7 +46,7 @@ idx = np.argwhere(np.asarray(params["lambda"]) == lam).squeeze()
 n_fits = len(idx)
 
 # prepare results
-results = {"mu": [], "y": []}
+results = {}
 
 # model training
 ################
@@ -88,8 +88,8 @@ with torch.no_grad():
                 rnn.activate_z_controller(1)
                 vdp2 = simulation(rnn, inp.clone(), W_r)
 
-                results["mu"].append(mu)
-                results["y"].append(np.concatenate([pf1, vdp1, pf2, vdp2], axis=0))
+                results[i]["mu"].append(mu)
+                results[i]["y"].append(np.concatenate([pf1, vdp1, pf2, vdp2], axis=0))
 
 # save results
 pickle.dump(results, open(save_file, "wb"))

@@ -23,34 +23,22 @@ data = pickle.load(open(f"{path}/{task}_zfit.pkl", "rb"))
 # plotting
 ##########
 
-for i in range(len(data["pf"])):
+for i in data.keys():
 
     # create figure
     fig = plt.figure()
-    grid = fig.add_gridspec(nrows=3, ncols=1)
+    grid = fig.add_gridspec(nrows=len(data[i]["mu"]), ncols=1)
 
     # plot PF dynamics
-    ax = fig.add_subplot(grid[0, 0])
-    ax.plot(data["pf"][i])
-    ax.set_title("Pitchfork bifurcation")
-    ax.set_xlabel(r"steps")
-    ax.set_ylabel(r"$y$")
-
-    # plot PF dynamics
-    ax = fig.add_subplot(grid[1, 0])
-    ax.plot(data["vdp"][i])
-    ax.set_title("Hopf bifurcation")
-    ax.set_xlabel(r"steps")
-    ax.set_ylabel(r"$y$")
-
-    # DS switching
-    ax = fig.add_subplot(grid[2, 0])
-    ax.plot(data["pf_vdp"][i])
-    ax.set_title("Dynamical systems switching")
-    ax.set_xlabel(r"steps")
-    ax.set_ylabel(r"$y$")
+    for j, mu in enumerate(data[i]["mu"]):
+        ax = fig.add_subplot(grid[j, 0])
+        ax.plot(data[i]["y"][j])
+        ax.set_title(rf"$\mu = {mu}$")
+        ax.set_xlabel(r"steps")
+        ax.set_ylabel(r"$y$")
 
     # padding
+    fig.suptitle(f"Model fit #{i+1}")
     fig.set_constrained_layout_pads(w_pad=0.01, h_pad=0.01, hspace=0., wspace=0.)
 
     # saving/plotting
