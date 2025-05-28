@@ -17,7 +17,7 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
-save_file = f"{path}/results/clr_bifurcations_cfit.pkl"
+save_file = f"{path}/results/clr_bifurcations_zfit.pkl"
 visualize_results = True
 plot_examples = 6
 
@@ -32,7 +32,7 @@ n_conditions = len(unique_conditions)
 # task parameters
 steps = inputs[0].shape[0]
 init_steps = 50
-auto_steps = 100
+auto_steps = 50
 noise_lvl = 0.0
 
 # rnn parameters
@@ -46,7 +46,7 @@ out_scale = 0.2
 Delta = 0.1
 sigma = 0.9
 N = int(k * n_dendrites)
-y0 = 0.3
+z0 = 0.1
 
 # training parameters
 trials = len(conditions)
@@ -59,7 +59,7 @@ betas = (0.9, 0.999)
 gradient_cutoff = 1e10
 truncation_steps = 100
 epsilon = 0.04
-alpha = 4.5
+alpha = 15.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -100,7 +100,7 @@ for rep in range(n_reps):
         inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
 
         # initialize controllers
-        rnn.C_y *= y0
+        rnn.C_y *= z0
         rnn.store_z_controller(0)
         for c in unique_conditions:
             rnn.init_new_z_controller(init_value="random")

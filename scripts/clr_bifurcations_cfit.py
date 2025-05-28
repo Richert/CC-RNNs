@@ -15,10 +15,10 @@ from scipy.ndimage import gaussian_filter1d
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard-gast/Documents"
+path = "/home/richard"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
 save_file = f"{path}/results/clr_bifurcations_cfit.pkl"
-visualize_results = True
+visualize_results = False
 plot_examples = 6
 
 # load inputs and targets
@@ -31,9 +31,9 @@ n_conditions = len(unique_conditions)
 
 # task parameters
 steps = inputs[0].shape[0]
-init_steps = 20
-auto_steps = 200
-noise_lvl = 0.0
+init_steps = 50
+auto_steps = 50
+noise_lvl = 0.1
 
 # rnn parameters
 k = 100
@@ -46,7 +46,7 @@ out_scale = 0.2
 Delta = 0.1
 sigma = 0.9
 N = int(k * n_dendrites)
-y0 = 0.3
+y0 = 0.1
 
 # training parameters
 trials = len(conditions)
@@ -96,9 +96,6 @@ for rep in range(n_reps):
         rnn.free_param("W_in")
         rnn.free_param("bias")
 
-        # add noise to input
-        inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
-
         # initialize controllers
         rnn.C_y *= y0
         rnn.store_y_controller(0)
@@ -130,7 +127,7 @@ for rep in range(n_reps):
                     # get initial state
                     rnn.activate_y_controller(0)
                     for step in range(init_steps):
-                        x = torch.randn(n_in, dtype=dtype, device=device)
+                        x = noise_lvl * torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
 
@@ -175,7 +172,7 @@ for rep in range(n_reps):
                     # get initial state
                     rnn.activate_y_controller(0)
                     for step in range(init_steps):
-                        x = torch.randn(n_in, dtype=dtype, device=device)
+                        x = noise_lvl * torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
 
