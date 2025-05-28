@@ -17,7 +17,7 @@ device = "cuda:0"
 state_vars = ["y"]
 path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
-save_file = f"{path}/results/clr_bifurcations_zfit2.pkl"
+save_file = f"{path}/results/clr_bifurcations_cfit.pkl"
 visualize_results = True
 plot_examples = 6
 
@@ -31,8 +31,8 @@ n_conditions = len(unique_conditions)
 
 # task parameters
 steps = inputs[0].shape[0]
-init_steps = 20
-auto_steps = 200
+init_steps = 50
+auto_steps = 100
 noise_lvl = 0.0
 
 # rnn parameters
@@ -46,6 +46,7 @@ out_scale = 0.2
 Delta = 0.1
 sigma = 0.9
 N = int(k * n_dendrites)
+y0 = 0.3
 
 # training parameters
 trials = len(conditions)
@@ -57,8 +58,8 @@ lr = 1e-2
 betas = (0.9, 0.999)
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 0.07
-alpha = 15.0
+epsilon = 0.04
+alpha = 4.5
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -92,11 +93,15 @@ for rep in range(n_reps):
                           torch.tensor(R, device=device, dtype=dtype),
                           W_in, bias, g="ReLU", alpha=alpha, lam=lam)
         rnn.free_param("L")
+        rnn.free_param("W_in")
+        rnn.free_param("bias")
 
         # add noise to input
         inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
 
         # initialize controllers
+        rnn.C_y *= y0
+        rnn.store_z_controller(0)
         for c in unique_conditions:
             rnn.init_new_z_controller(init_value="random")
             rnn.store_z_controller(c)
@@ -123,13 +128,14 @@ for rep in range(n_reps):
                     target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
                     # get initial state
-                    rnn.activate_z_controller(conditions[trial])
+                    rnn.activate_z_controller(0)
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
 
                     # collect loss
+                    rnn.activate_z_controller(conditions[trial])
                     y_col = []
                     for step in range(steps):
                         z = rnn.forward(inp[step])
@@ -167,18 +173,20 @@ for rep in range(n_reps):
                     target = torch.tensor(targets[train_trials + trial], device=device, dtype=dtype)
 
                     # get initial state
-                    rnn.activate_z_controller(conditions[train_trials + trial])
+                    rnn.activate_z_controller(0)
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
 
                     # make prediction
+                    rnn.activate_z_controller(conditions[train_trials + trial])
                     y_col, z_col = [], []
                     for step in range(steps):
                         if step > auto_steps:
                             inp[step, :n_out] = y
                         z = rnn.forward(inp[step])
+                        rnn.update_z_controller()
                         y = W_r @ z
                         y_col.append(y)
                         z_col.append(z)
@@ -195,8 +203,8 @@ for rep in range(n_reps):
                     break
 
         # calculate conceptor dimensionality
-        conceptors = [c.detach().cpu().numpy() for c in rnn.z_controllers.values()]
-        c_dim = [np.sum(c**2) for c in conceptors]
+        conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.z_controllers.values()])
+        c_dim = [np.sum(c**2) for c in conceptors[1:]]
 
         # save results
         results["lambda"].append(lam)
@@ -204,11 +212,11 @@ for rep in range(n_reps):
         results["train_epochs"].append(batch)
         results["train_loss"].append(loss_col)
         results["srl_loss"].append(slr_loss)
-        results["conceptors"].append(conceptors)
+        results["conceptors"].append(conceptors[1:])
         results["L"].append(rnn.L.detach().cpu().numpy())
         results["R"].append(R)
-        results["bias"].append(bias.detach().cpu().numpy())
-        results["W_in"].append(W_in.detach().cpu().numpy())
+        results["bias"].append(rnn.bias.detach().cpu().numpy())
+        results["W_in"].append(rnn.W_in.detach().cpu().numpy())
         results["W_out"].append(W_r.detach().cpu().numpy())
 
         # report progress
@@ -254,7 +262,6 @@ for rep in range(n_reps):
             plt.tight_layout()
 
             # dimensionality figure
-            conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.z_controllers.values()])
             fig, axes = plt.subplots(nrows=2, figsize=(12, 6))
             ax = axes[0]
             ax.bar(np.arange(n_conditions)+0.25, c_dim, width=0.4, color="royalblue")

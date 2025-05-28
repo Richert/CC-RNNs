@@ -59,11 +59,11 @@ betas = (0.9, 0.999)
 gradient_cutoff = 1e10
 truncation_steps = 100
 epsilon = 0.04
-alpha = 4.0
+alpha = 4.5
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-lambdas = [3e-4]
+lambdas = [4e-4]
 n_reps = 10
 n_trials = len(lambdas)*n_reps
 
