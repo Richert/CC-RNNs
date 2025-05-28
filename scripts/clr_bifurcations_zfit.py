@@ -15,10 +15,10 @@ from scipy.ndimage import gaussian_filter1d
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard"
+path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
-save_file = f"{path}/results/clr_bifurcations_zfit.pkl"
-visualize_results = False
+save_file = f"{path}/results/clr_bifurcations_zfit2.pkl"
+visualize_results = True
 plot_examples = 6
 
 # load inputs and targets
@@ -32,7 +32,7 @@ n_conditions = len(unique_conditions)
 # task parameters
 steps = inputs[0].shape[0]
 init_steps = 20
-auto_steps = 100
+auto_steps = 200
 noise_lvl = 0.0
 
 # rnn parameters
@@ -51,19 +51,19 @@ N = int(k * n_dendrites)
 trials = len(conditions)
 train_trials = int(0.9 * trials)
 batch_size = 20
-test_trials = int(0.5*batch_size)
+test_trials = 50
 augmentation = 1.0
 lr = 1e-2
 betas = (0.9, 0.999)
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 1.0
+epsilon = 0.07
 alpha = 15.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-lambdas = [2e-4, 3e-4, 4e-4, 5e-4, 6e-4]
-n_reps = 20
+lambdas = [4e-4]
+n_reps = 10
 n_trials = len(lambdas)*n_reps
 
 # prepare results
@@ -154,7 +154,7 @@ for rep in range(n_reps):
                 rnn.detach()
 
                 # store and print loss
-                train_loss = loss.item()
+                train_loss = loss.item() / batch_size
                 loss_col.append(train_loss)
 
             # generate predictions
@@ -189,7 +189,7 @@ for rep in range(n_reps):
                     loss = loss_func(torch.stack(y_col, dim=0), target)
                     test_loss.append(loss.item())
 
-                test_loss_sum = np.sum(test_loss)
+                test_loss_sum = np.sum(test_loss) / test_trials
                 print(f"Training epoch {batch + 1} / {batches}: Train MSE = {loss_col[-1]}, Test MSE = {test_loss_sum}")
                 if test_loss_sum < epsilon:
                     break

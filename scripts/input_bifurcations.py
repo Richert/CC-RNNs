@@ -10,7 +10,7 @@ def vanderpol(y: np.ndarray, x: float = 1.0, tau: float = 1.0) -> np.ndarray:
     return np.asarray([y1_dot, y2_dot])
 
 
-def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 5.0) -> np.ndarray:
+def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 1.0) -> np.ndarray:
     y1, y2 = y[0], y[1]
     y1_dot = (x*y1 - y1**3) / tau
     y2_dot = -y2 / tau

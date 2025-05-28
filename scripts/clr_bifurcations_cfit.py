@@ -1,11 +1,12 @@
 import sys
 sys.path.append("../")
 from src.rnn import LowRankCRNN
-from src.functions import init_weights, init_dendrites, participation_ratio
+from src.functions import init_weights, init_dendrites
 import torch
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter1d
 
 # parameter definition
 ######################
@@ -31,7 +32,7 @@ n_conditions = len(unique_conditions)
 # task parameters
 steps = inputs[0].shape[0]
 init_steps = 20
-auto_steps = 100
+auto_steps = 200
 noise_lvl = 0.0
 
 # rnn parameters
@@ -45,38 +46,39 @@ out_scale = 0.2
 Delta = 0.1
 sigma = 0.9
 N = int(k * n_dendrites)
+y0 = 0.3
 
 # training parameters
 trials = len(conditions)
 train_trials = int(0.9 * trials)
-test_trials = trials - train_trials
+batch_size = 20
+test_trials = 50
 augmentation = 1.0
 lr = 1e-2
 betas = (0.9, 0.999)
-batch_size = 20
 gradient_cutoff = 1e10
 truncation_steps = 100
-epsilon = 0.2
-lam = 3e-5
+epsilon = 0.04
+alpha = 4.0
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
-alphas = [3.0]
+lambdas = [3e-4]
 n_reps = 10
-n_trials = len(alphas)*n_reps
+n_trials = len(lambdas)*n_reps
 
 # prepare results
-results = {"alpha": [], "trial": [], "train_epochs": [], "train_loss": [], "test_loss": [],
-           "conceptors": [], "synapses": [], "test_pr": []}
+results = {"lambda": [], "trial": [], "train_epochs": [], "train_loss": [], "srl_loss": [], "conceptors": [],
+           "L": [], "R": [], "W_in": [], "bias": [], "W_out": []}
 
 # model training
 ################
 
 n = 0
 for rep in range(n_reps):
-    for alpha in alphas:
+    for lam in lambdas:
 
-        print(f"Starting run {n+1} out of {n_trials} training runs (alpha = {alpha}, rep = {rep})")
+        print(f"Starting run {n+1} out of {n_trials} training runs (lambda = {lam}, rep = {rep})")
 
         # initialize rnn matrices
         bias = torch.tensor(Delta * np.random.randn(k), device=device, dtype=dtype)
@@ -91,14 +93,18 @@ for rep in range(n_reps):
                           torch.tensor(R, device=device, dtype=dtype),
                           W_in, bias, g="ReLU", alpha=alpha, lam=lam)
         rnn.free_param("L")
+        rnn.free_param("W_in")
+        rnn.free_param("bias")
 
         # add noise to input
         inputs = [inp[:, :] + noise_lvl * np.random.randn(inp.shape[0], inp.shape[1]) for inp in inputs]
 
         # initialize controllers
+        rnn.C_y *= y0
+        rnn.store_y_controller(0)
         for c in unique_conditions:
             rnn.init_new_y_controller(init_value="random")
-            rnn.store_y_controller(tuple(c))
+            rnn.store_y_controller(c)
 
         # set up loss function
         loss_func = torch.nn.MSELoss()
@@ -109,11 +115,11 @@ for rep in range(n_reps):
 
         # training
         train_loss = 0.0
-        loss_col = []
-        with torch.enable_grad():
-            for batch in range(batches):
+        loss_col, slr_loss = [], []
+        for batch in range(batches):
 
-                loss = torch.zeros((1,), device=device, dtype=dtype)
+            loss = torch.zeros((1,), device=device, dtype=dtype)
+            with torch.enable_grad():
 
                 for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
 
@@ -122,22 +128,23 @@ for rep in range(n_reps):
                     target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
                     # get initial state
-                    rnn.activate_y_controller(conditions[trial])
+                    rnn.activate_y_controller(0)
                     for step in range(init_steps):
                         x = torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
-                        rnn.update_y_controller()
                     rnn.detach()
 
                     # collect loss
+                    rnn.activate_y_controller(conditions[trial])
                     y_col = []
                     for step in range(steps):
                         z = rnn.forward(inp[step])
-                        rnn.update_y_controller()
+                        delta_c = rnn.update_y_controller()
                         y = W_r @ z
                         if step % truncation_steps == truncation_steps - 1:
                             rnn.detach()
                         y_col.append(y)
+                        slr_loss.append((delta_c**2).sum().detach().cpu().numpy())
 
                     # calculate loss
                     y_col = torch.stack(y_col, dim=0)
@@ -153,62 +160,64 @@ for rep in range(n_reps):
                 rnn.detach()
 
                 # store and print loss
-                train_loss = loss.item()
+                train_loss = loss.item() / batch_size
                 loss_col.append(train_loss)
-                print(f"Training epoch {batch+1} / {batches}: MSE = {loss_col[-1]}")
-                if train_loss < epsilon:
+
+            # generate predictions
+            test_loss, predictions, dynamics = [], [], []
+            with torch.no_grad():
+                for trial in range(test_trials):
+
+                    # get input and target timeseries
+                    inp = torch.tensor(inputs[train_trials + trial], device=device, dtype=dtype)
+                    target = torch.tensor(targets[train_trials + trial], device=device, dtype=dtype)
+
+                    # get initial state
+                    rnn.activate_y_controller(0)
+                    for step in range(init_steps):
+                        x = torch.randn(n_in, dtype=dtype, device=device)
+                        rnn.forward(x)
+                    rnn.detach()
+
+                    # make prediction
+                    rnn.activate_y_controller(conditions[train_trials + trial])
+                    y_col, z_col = [], []
+                    for step in range(steps):
+                        if step > auto_steps:
+                            inp[step, :n_out] = y
+                        z = rnn.forward(inp[step])
+                        rnn.update_y_controller()
+                        y = W_r @ z
+                        y_col.append(y)
+                        z_col.append(z)
+                    predictions.append(np.asarray([y.detach().cpu().numpy() for y in y_col]))
+                    dynamics.append(np.asarray([z.detach().cpu().numpy() for z in z_col]))
+
+                    # calculate loss
+                    loss = loss_func(torch.stack(y_col, dim=0), target)
+                    test_loss.append(loss.item())
+
+                test_loss_sum = np.sum(test_loss) / test_trials
+                print(f"Training epoch {batch + 1} / {batches}: Train MSE = {loss_col[-1]}, Test MSE = {test_loss_sum}")
+                if test_loss_sum < epsilon:
                     break
 
-        # generate predictions
-        test_loss, predictions, dynamics = [], [], []
-        with torch.no_grad():
-            for trial in range(train_trials, trials):
-
-                # get input and target timeseries
-                inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
-                target = torch.tensor(targets[trial], device=device, dtype=dtype)
-
-                # get initial state
-                rnn.activate_y_controller(conditions[trial])
-                for step in range(init_steps):
-                    x = torch.randn(n_in, dtype=dtype, device=device)
-                    rnn.forward(x)
-                rnn.detach()
-
-                # make prediction
-                y_col, z_col = [], []
-                for step in range(steps):
-                    x = inp[step] if step <= auto_steps else y
-                    z = rnn.forward(x)
-                    y = W_r @ z
-                    y_col.append(y)
-                    z_col.append(z)
-                predictions.append(np.asarray([y.detach().cpu().numpy() for y in y_col]))
-                dynamics.append(np.asarray([z.detach().cpu().numpy() for z in z_col]))
-
-                # calculate loss
-                loss = loss_func(torch.stack(y_col, dim=0), target)
-                test_loss.append(loss.item())
-
-        # calculate participation ratio of network dynamics
-        dims = np.asarray([participation_ratio(z) for z in dynamics])
-        test_conditions = conditions[train_trials:]
-        c_indices = [[tc == tuple(c) for tc in test_conditions] for c in unique_conditions]
-        participation_ratios = [np.mean(dims[idx]) for idx in c_indices]
-
-        # calculate conceptor dimensionaltiy
-        conceptors = [c.detach().cpu().numpy() for c in rnn.y_controllers.values()]
-        c_dim = [np.sum(c)**2/np.sum(c**2)/len(c) for c in conceptors]
+        # calculate conceptor dimensionality
+        conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.y_controllers.values()])
+        c_dim = [np.sum(c**2) for c in conceptors[1:]]
 
         # save results
-        results["alpha"].append(alpha)
+        results["lambda"].append(lam)
         results["trial"].append(rep)
         results["train_epochs"].append(batch)
         results["train_loss"].append(loss_col)
-        results["test_loss"].append(np.sum(test_loss))
-        results["conceptors"].append(conceptors)
-        results["synapses"].append(rnn.L.detach().cpu().numpy())
-        results["test_pr"].append(participation_ratios)
+        results["srl_loss"].append(slr_loss)
+        results["conceptors"].append(conceptors[1:])
+        results["L"].append(rnn.L.detach().cpu().numpy())
+        results["R"].append(R)
+        results["bias"].append(rnn.bias.detach().cpu().numpy())
+        results["W_in"].append(rnn.W_in.detach().cpu().numpy())
+        results["W_out"].append(W_r.detach().cpu().numpy())
 
         # report progress
         n += 1
@@ -227,6 +236,7 @@ for rep in range(n_reps):
                 ax.plot(targets[train_trials + trial], label="targets", linestyle="dashed")
                 for j, line in enumerate(ax.get_lines()):
                     ax.plot(predictions[trial][:, j], label="predictions", linestyle="solid", color=line.get_color())
+                ax.axvline(x=auto_steps, color="grey", linestyle="dotted")
                 ax.set_ylabel("amplitude")
                 ax.set_title(f"test trial {trial + 1}")
                 if i == plot_examples - 1:
@@ -252,15 +262,12 @@ for rep in range(n_reps):
             plt.tight_layout()
 
             # dimensionality figure
-            conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.y_controllers.values()])
             fig, axes = plt.subplots(nrows=2, figsize=(12, 6))
             ax = axes[0]
-            ax.bar(np.arange(n_conditions)+0.25, c_dim, width=0.4, color="royalblue", label="dim(c)")
-            ax.bar(np.arange(n_conditions)+0.75, participation_ratios, width=0.4, color="darkorange", label="dim(z)")
+            ax.bar(np.arange(n_conditions)+0.25, c_dim, width=0.4, color="royalblue")
             ax.set_xlabel("task conditions")
-            ax.set_ylabel("dim")
-            ax.set_title("Dimensionalities")
-            ax.legend()
+            ax.set_ylabel("dim(c)")
+            ax.set_title("Conceptor Dimensionalities")
             ax = axes[1]
             im = ax.imshow(conceptors, aspect="auto", interpolation="none", cmap="cividis")
             plt.colorbar(im, ax=ax, shrink=0.8)
@@ -277,16 +284,21 @@ for rep in range(n_reps):
             ax.set_ylabel("MSE")
             ax.set_title("Training loss")
             ax = axes[1]
-            condition_losses = []
-            test_conditions = np.asarray(conditions[train_trials:])
-            for c in unique_conditions:
-                idx = np.argwhere(test_conditions == tuple(c)).squeeze()
-                condition_losses.append(np.mean(np.asarray(test_loss)[idx]))
-            ax.bar(x=np.arange(len(unique_conditions)), height=condition_losses)
-            ax.set_xlabel("conditions")
-            ax.set_ylabel("MSE")
-            ax.set_xticks(np.arange(len(unique_conditions)), labels=[f"{c}" for c in unique_conditions])
-            ax.set_title("Test Loss")
+            ax.plot(gaussian_filter1d(slr_loss, sigma=500))
+            ax.set_xlabel("training batch")
+            ax.set_ylabel("delta")
+            ax.set_title("Conceptor loss")
+            # ax = axes[2]
+            # condition_losses = []
+            # test_conditions = np.asarray(conditions[train_trials:])
+            # for c in unique_conditions:
+            #     idx = np.argwhere(test_conditions == c).squeeze()
+            #     condition_losses.append(np.mean(np.asarray(test_loss)[idx]))
+            # ax.bar(x=np.arange(len(unique_conditions)), height=condition_losses)
+            # ax.set_xlabel("conditions")
+            # ax.set_ylabel("MSE")
+            # ax.set_xticks(np.arange(len(unique_conditions)), labels=[f"{c}" for c in unique_conditions])
+            # ax.set_title("Test Loss")
             plt.tight_layout()
 
             plt.show()
