@@ -27,7 +27,7 @@ in_scale = 0.1
 N = int(k * n_dendrites)
 
 # sweep parameters
-sigmas = np.arange(start=0.0, stop=3.1, step=0.1)
+sigmas = np.arange(start=0.0, stop=2.1, step=0.1)
 lambdas = [0.2, 0.5, 0.8]
 Deltas = [0.0, 0.25, 0.5, 1.0]
 n_reps = 20
@@ -67,9 +67,9 @@ with torch.no_grad():
                 for sigma in sigmas:
 
                     # model initialization
-                    W = torch.tensor(W * lam, dtype=dtype, device=device)
+                    W_tmp = torch.tensor(W*lam*sigma, dtype=dtype, device=device)
                     dendritic_gains = np.random.uniform(low=1.0-Delta, high=1.0+Delta, size=N)
-                    rnn = LowRankCRNN(W, L * (1-lam) * sigma, R, W_in * in_scale, bias, g="ReLU")
+                    rnn = LowRankCRNN(W_tmp, L*(1-lam)*sigma, R, W_in * in_scale, bias, g="ReLU")
                     rnn.C_y = torch.tensor(dendritic_gains, dtype=dtype, device=device)
 
                     # simulation a - zero input
