@@ -18,21 +18,21 @@ def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 5.0) -> np.ndarray:
 
 
 # general parameters
-save_path = f"/home/richard/data"
+save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
-mu = 0.5
+mu = 1.0
 d = 1
 dt = 0.01
-sampling_rate = 20
+sampling_rate = 10
 steps = 10000
 init_scale = 2.0
 dim = 2
 
 # plot parameters
 plot_examples = 6
-visualize = False
+visualize = True
 
 # define conditions
 rhs_funcs = {1: pitchfork, 2: vanderpol}

@@ -15,10 +15,10 @@ from scipy.ndimage import gaussian_filter1d
 dtype = torch.float64
 device = "cuda:0"
 state_vars = ["y"]
-path = "/home/richard"
+path = "/home/richard-gast/Documents"
 load_file = f"{path}/data/bifurcations_2ds.pkl"
 save_file = f"{path}/results/clr_bifurcations_cfit.pkl"
-visualize_results = False
+visualize_results = True
 plot_examples = 6
 
 # load inputs and targets
@@ -31,9 +31,9 @@ n_conditions = len(unique_conditions)
 
 # task parameters
 steps = inputs[0].shape[0]
-init_steps = 50
-auto_steps = 50
-noise_lvl = 0.1
+init_steps = 20
+auto_steps = 150
+noise_lvl = 0.001
 
 # rnn parameters
 k = 100
@@ -46,20 +46,20 @@ out_scale = 0.2
 Delta = 0.1
 sigma = 0.9
 N = int(k * n_dendrites)
-y0 = 0.1
 
 # training parameters
 trials = len(conditions)
 train_trials = int(0.9 * trials)
 batch_size = 20
-test_trials = 50
-augmentation = 1.0
-lr = 1e-2
+test_trials = 10
+augmentation = 0.5
+lr = 5e-3
 betas = (0.9, 0.999)
-gradient_cutoff = 1e10
-truncation_steps = 100
-epsilon = 0.04
+gradient_cutoff = 1e12
+truncation_steps = 250
+epsilon = 0.006
 alpha = 4.5
+gamma = 0.7
 batches = int(augmentation * train_trials / batch_size)
 
 # sweep parameters
@@ -95,10 +95,9 @@ for rep in range(n_reps):
         rnn.free_param("L")
         rnn.free_param("W_in")
         rnn.free_param("bias")
+        rnn.y = (2.0 * torch.rand(N, device=device, dtype=dtype)) - 1.0
 
         # initialize controllers
-        rnn.C_y *= y0
-        rnn.store_y_controller(0)
         for c in unique_conditions:
             rnn.init_new_y_controller(init_value="random")
             rnn.store_y_controller(c)
@@ -112,6 +111,7 @@ for rep in range(n_reps):
 
         # training
         train_loss = 0.0
+        avg_test_loss = 1.0
         loss_col, slr_loss = [], []
         for batch in range(batches):
 
@@ -121,21 +121,23 @@ for rep in range(n_reps):
                 for trial in np.random.choice(train_trials, size=(batch_size,), replace=False):
 
                     # get input and target timeseries
-                    inp = torch.tensor(inputs[trial], device=device, dtype=dtype)
+                    inp = inputs[trial]
                     target = torch.tensor(targets[trial], device=device, dtype=dtype)
 
                     # get initial state
-                    rnn.activate_y_controller(0)
+                    rnn.activate_y_controller(conditions[trial])
                     for step in range(init_steps):
                         x = noise_lvl * torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
 
                     # collect loss
-                    rnn.activate_y_controller(conditions[trial])
                     y_col = []
                     for step in range(steps):
-                        z = rnn.forward(inp[step])
+                        x = torch.tensor(inp[step], device=device, dtype=dtype)
+                        if step > 2*auto_steps:
+                            x[:n_out] = y
+                        z = rnn.forward(x)
                         delta_c = rnn.update_y_controller()
                         y = W_r @ z
                         if step % truncation_steps == truncation_steps - 1:
@@ -170,20 +172,19 @@ for rep in range(n_reps):
                     target = torch.tensor(targets[train_trials + trial], device=device, dtype=dtype)
 
                     # get initial state
-                    rnn.activate_y_controller(0)
+                    rnn.activate_y_controller(conditions[train_trials + trial])
                     for step in range(init_steps):
                         x = noise_lvl * torch.randn(n_in, dtype=dtype, device=device)
                         rnn.forward(x)
                     rnn.detach()
 
                     # make prediction
-                    rnn.activate_y_controller(conditions[train_trials + trial])
                     y_col, z_col = [], []
                     for step in range(steps):
                         if step > auto_steps:
                             inp[step, :n_out] = y
                         z = rnn.forward(inp[step])
-                        rnn.update_y_controller()
+                        #rnn.update_y_controller()
                         y = W_r @ z
                         y_col.append(y)
                         z_col.append(z)
@@ -194,14 +195,14 @@ for rep in range(n_reps):
                     loss = loss_func(torch.stack(y_col, dim=0), target)
                     test_loss.append(loss.item())
 
-                test_loss_sum = np.sum(test_loss) / test_trials
-                print(f"Training epoch {batch + 1} / {batches}: Train MSE = {loss_col[-1]}, Test MSE = {test_loss_sum}")
-                if test_loss_sum < epsilon:
+                avg_test_loss = gamma*avg_test_loss + (1-gamma)*np.sum(test_loss) / test_trials
+                print(f"Training epoch {batch + 1} / {batches}: Train MSE = {loss_col[-1]}, Test MSE = {avg_test_loss}")
+                if train_loss < epsilon:
                     break
 
         # calculate conceptor dimensionality
         conceptors = np.asarray([c.detach().cpu().numpy() for c in rnn.y_controllers.values()])
-        c_dim = [np.sum(c**2) for c in conceptors[1:]]
+        c_dim = [np.sum(c**2) for c in conceptors]
 
         # save results
         results["lambda"].append(lam)

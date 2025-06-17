@@ -18,11 +18,11 @@ def pitchfork(y: np.ndarray, x: float = 1.0, tau: float = 10.0) -> np.ndarray:
 
 
 # general parameters
-save_path = f"/home/richard/data"
+save_path = f"/home/richard-gast/Documents/data"
 
 # task parameters
 trials = 10000
-mus = [-0.5, 0.5]
+mus = [-3.0, 3.0]
 d = 1
 dt = 0.01
 sampling_rate = 20
@@ -31,8 +31,8 @@ init_scale = 2.0
 dim = 2
 
 # plot parameters
-plot_examples = 6
-visualize = False
+plot_examples = 9
+visualize = True
 
 # define conditions
 rhs_funcs = {1: pitchfork, 2: vanderpol}
@@ -70,14 +70,14 @@ pickle.dump({"inputs": inputs, "targets": targets, "trial_conditions": condition
 
 # plot results
 if visualize:
-    fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 2*plot_examples))
+    fig, axes = plt.subplots(nrows=plot_examples, figsize=(12, 1.5*plot_examples))
     for i, trial in enumerate(np.random.choice(trials, size=(plot_examples,))):
         ax = axes[i]
         ax.plot(inputs[trial], label="x")
         # ax.plot(targets[trial], label="y")
-        ax.set_xlabel("time")
-        ax.set_ylabel("amplitude")
-        ax.set_title(f"training trial {trial+1}: dim = {conditions[trial]}")
+        # ax.set_xlabel("time")
+        # ax.set_ylabel("amplitude")
+        # ax.set_title(f"training trial {trial+1}: dim = {conditions[trial]}")
         # ax.legend()
     fig.suptitle("Inputs (x) and Target Waveforms (y)")
     plt.tight_layout()
