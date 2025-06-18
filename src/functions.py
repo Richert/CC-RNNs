@@ -71,7 +71,7 @@ def init_weights(N: int, M: int, density: float):
     return W
 
 
-def init_dendrites(N: int, n_dendrites: int, normalize: bool = True, min_dendrite: float = 0.1):
+def init_dendrites(N: int, n_dendrites: int, normalize: bool = True, min_dendrite: float = 0.0):
     M = N*n_dendrites
     R = np.zeros((N, M))
     W = np.zeros((M, M))
