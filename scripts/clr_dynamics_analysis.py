@@ -72,8 +72,8 @@ def timescale_heterogeneity(x: np.ndarray) -> tuple:
 
 # load data
 path = "/home/richard"
-load_file = f"{path}/data/clr_dynamics.pkl"
-save_file = f"{path}/results/clr_dynamics.csv"
+load_file = f"{path}/data/dendritic_gain_dynamics.pkl"
+save_file = f"{path}/results/dendritic_gain_dynamics.csv"
 data = pickle.load(open(load_file, "rb"))
 
 # prepare data frame
