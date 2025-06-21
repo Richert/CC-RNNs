@@ -16,6 +16,7 @@ file = "/home/richard/data/dendritic_gain_dynamics.pkl"
 
 # task parameters
 steps = 500
+washout = 100
 epsilon = 1e-5
 
 # rnn parameters
@@ -27,9 +28,9 @@ in_scale = 0.1
 N = int(k * n_dendrites)
 
 # sweep parameters
-sigmas = np.arange(start=0.0, stop=2.1, step=0.1)
-lambdas = [0.0, 0.5, 1.0, 1.5, 2.0]
-Deltas = [0.0, 0.25, 0.5, 1.0]
+sigmas = np.arange(start=0.0, stop=1.6, step=0.1)
+lambdas = [0.0, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+Deltas = [0.0, 0.5, 1.0]
 n_reps = 20
 n_trials = len(Deltas) * len(lambdas) * len(sigmas) * n_reps
 
@@ -100,9 +101,9 @@ with torch.no_grad():
                     results["sigma"].append(sigma)
                     results["trial"].append(trial)
                     results["x"].append(inp)
-                    results["z_noinp"].append(np.asarray(z0s))
-                    results["z_inp"].append(np.asarray(z1s))
-                    results["z_inp_p"].append(np.asarray(z2s))
+                    results["z_noinp"].append(np.asarray(z0s)[washout:])
+                    results["z_inp"].append(np.asarray(z1s)[washout:])
+                    results["z_inp_p"].append(np.asarray(z2s)[washout:])
 
                     # report progress
                     n += 1

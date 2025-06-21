@@ -24,11 +24,12 @@ markersize = 6
 ##################################
 
 # choose a particular parameter
-value = 0.8
-results_tmp = results.loc[results.loc[:, "lambda"] == value, :]
+value = 0.25
+results_tmp = results.loc[results.loc[:, "Delta"] == value, :]
 
 # reduce data to the plotting selection
-deltas = np.unique(results_tmp.loc[:, "Delta"].values)
+hue_param = "lambda"
+hue_vals = np.unique(results_tmp.loc[:, hue_param].values)
 sigmas = np.unique(results_tmp.loc[:, "sigma"].values)
 
 # create 2D matrix of MC, PR, and TS
@@ -50,9 +51,9 @@ sigmas = np.unique(results_tmp.loc[:, "sigma"].values)
 
 # create LE figure
 fig, ax = plt.subplots()
-sb.lineplot(results_tmp, ax=ax, x="sigma", y="lyapunov", hue="Delta", err_style="band", palette="viridis")
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="lyapunov", hue=hue_param, err_style="band", palette="viridis")
 zero_crossings = []
-for line, _ in zip(ax.get_lines(), deltas):
+for line, _ in zip(ax.get_lines(), hue_vals):
     x, y = line.get_data()
     zero_crossings.append(x[np.argmin(np.abs(y))])
 ax.set_ylim([-0.06, 0.025])
@@ -69,7 +70,7 @@ fig, ax = plt.subplots()
 # ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
 # ax.set_ylabel(r"neural heterogeneity $\Delta$")
 # ax.set_title("Memory Capacity")
-sb.lineplot(results_tmp, ax=ax, x="sigma", y="memory", hue="Delta", err_style="band", palette="viridis")
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="memory", hue=hue_param, err_style="band", palette="viridis")
 for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
@@ -82,7 +83,7 @@ fig.savefig(f"{path}/results/{data_set}_mc.svg")
 
 # create TS figure
 fig, ax = plt.subplots()
-sb.lineplot(results_tmp, ax=ax, x="sigma", y="entropy", hue="Delta", err_style="band", palette="viridis")
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="entropy", hue=hue_param, err_style="band", palette="viridis")
 for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
@@ -94,7 +95,7 @@ fig.savefig(f"{path}/results/{data_set}_ts.svg")
 
 # create PSD figure
 fig, ax = plt.subplots()
-sb.lineplot(results_tmp, ax=ax, x="sigma", y="psd", hue="Delta", err_style="band", palette="viridis")
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="psd", hue=hue_param, err_style="band", palette="viridis")
 for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
@@ -106,7 +107,7 @@ fig.savefig(f"{path}/results/{data_set}_spectral_pr.svg")
 
 # create PR figure
 fig, ax = plt.subplots()
-sb.lineplot(results_tmp, ax=ax, x="sigma", y="dimensionality", hue="Delta", err_style="band", palette="viridis")
+sb.lineplot(results_tmp, ax=ax, x="sigma", y="dimensionality", hue=hue_param, err_style="band", palette="viridis")
 for line, idx in zip(ax.get_lines(), zero_crossings):
     ax.axvline(x=idx, color=line.get_color(), linestyle="dotted")
 ax.set_xlabel(r"synaptic heterogeneity $\sigma$")
