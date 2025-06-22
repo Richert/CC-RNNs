@@ -98,7 +98,7 @@ for n in range(n_trials):
     le = np.log(d1/d0) / len(z)
 
     # calculate memory capacity
-    x, z = data["x"][n], data["z_inp"][n]
+    x, z = data["x"][n][100:], data["z_inp"][n]
     mc = memory_capacity(x, z, d_max, alpha=alpha)
 
     # calculate time scale heterogeneity

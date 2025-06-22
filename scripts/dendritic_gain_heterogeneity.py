@@ -100,7 +100,7 @@ with torch.no_grad():
                     results["lambda"].append(lam)
                     results["sigma"].append(sigma)
                     results["trial"].append(trial)
-                    results["x"].append(inp)
+                    results["x"].append(inp[washout:])
                     results["z_noinp"].append(np.asarray(z0s)[washout:])
                     results["z_inp"].append(np.asarray(z1s)[washout:])
                     results["z_inp_p"].append(np.asarray(z2s)[washout:])
