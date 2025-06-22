@@ -37,7 +37,7 @@ def timescale_heterogeneity(x: np.ndarray) -> tuple:
     fourier_transforms = []
     for i in range(x.shape[1]):
         x_max = np.max(np.abs(x[:, i]))
-        if x_max > 0:
+        if x_max > 0.1:
             x_norm = x[:, i] / x_max
         else:
             x_norm = x[:, i]
@@ -106,7 +106,7 @@ for n in range(n_trials):
     H, psd = timescale_heterogeneity(z)
 
     # calculate dimensionality
-    z = data["z_inp"][n]
+    z = data["z_noinp"][n]
     dim = participation_ratio(z)
 
     # store results

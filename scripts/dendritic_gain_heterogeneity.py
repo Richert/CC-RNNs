@@ -24,7 +24,7 @@ k = 200
 n_in = 1
 n_dendrites = 10
 density = 0.5
-in_scale = 0.1
+in_scale = 0.2
 N = int(k * n_dendrites)
 
 # sweep parameters

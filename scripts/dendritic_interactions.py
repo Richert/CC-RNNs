@@ -23,11 +23,11 @@ k = 200
 n_in = 1
 n_dendrites = 10
 density = 0.5
-in_scale = 0.2
+in_scale = 0.1
 N = int(k * n_dendrites)
 sigma = 1.0
-lam = 3.2
-Delta = 0.0
+lam = 6.4
+Delta = 1.0
 
 # simulations
 #############
