@@ -33,11 +33,11 @@ def participation_ratio(x: np.ndarray):
     return np.sum(l_real)**2/np.sum(l_real**2)/cov.shape[0]
 
 
-def timescale_heterogeneity(x: np.ndarray) -> tuple:
+def timescale_heterogeneity(x: np.ndarray, normalize: bool = False) -> tuple:
     fourier_transforms = []
     for i in range(x.shape[1]):
         x_max = np.max(np.abs(x[:, i]))
-        if x_max > 0.1:
+        if x_max > 0.1 and normalize:
             x_norm = x[:, i] / x_max
         else:
             x_norm = x[:, i]
