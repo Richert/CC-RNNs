@@ -89,12 +89,17 @@ df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 # analysis of model dynamics
 d_max = 40
 alpha = 1e-4
+epsilon = 1e-12
 for n in range(n_trials):
 
     # calculate maximum lyapunov exponent
     z, z_p = data["z_inp"][n], data["z_inp_p"][n]
     d0 = np.sqrt(np.sum((z[0] - z_p[0])**2))
+    if d0 < epsilon:
+        d0 = epsilon
     d1 = np.sqrt(np.sum((z[-1] - z_p[-1])**2))
+    if d1 < epsilon:
+        d1 = epsilon
     le = np.log(d1/d0) / len(z)
 
     # calculate memory capacity
