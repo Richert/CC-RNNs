@@ -24,7 +24,7 @@ markersize = 6
 ##################################
 
 # choose a particular parameter
-value = 0.25
+value = 1.0
 results_tmp = results.loc[results.loc[:, "Delta"] == value, :]
 
 # reduce data to the plotting selection
