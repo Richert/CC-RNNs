@@ -90,6 +90,7 @@ df = DataFrame(columns=columns + measures, index=np.arange(0, len(lyapunov)))
 d_max = 40
 alpha = 1e-4
 epsilon = 1e-12
+washout = 100
 for n in range(n_trials):
 
     # calculate maximum lyapunov exponent
@@ -104,15 +105,15 @@ for n in range(n_trials):
 
     # calculate memory capacity
     x, z = data["x"][n], data["z_inp"][n]
-    mc = memory_capacity(x, z, d_max, alpha=alpha)
+    mc = memory_capacity(x[washout:], z[washout:], d_max, alpha=alpha)
 
     # calculate time scale heterogeneity
     z = data["z_noinp"][n]
-    H, psd = timescale_heterogeneity(z)
+    H, psd = timescale_heterogeneity(z[washout:])
 
     # calculate dimensionality
     z = data["z_noinp"][n]
-    dim = participation_ratio(z)
+    dim = participation_ratio(z[washout:])
 
     # store results
     for c in columns:

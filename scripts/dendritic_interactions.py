@@ -23,11 +23,11 @@ k = 200
 n_in = 1
 n_dendrites = 10
 density = 0.5
-in_scale = 0.1
+in_scale = 0.2
 N = int(k * n_dendrites)
-sigma = 1.0
+sigma = 1.1
 lam = 6.4
-Delta = 1.0
+Delta = 0.4
 
 # simulations
 #############
@@ -35,7 +35,7 @@ Delta = 1.0
 with torch.no_grad():
 
     # initialize rnn matrices
-    bias = torch.zeros(k, device=device, dtype=dtype)
+    bias = torch.tensor(np.random.randn(k), device=device, dtype=dtype)
     W_in = torch.tensor(np.random.randn(N, n_in), device=device, dtype=dtype)
     L = torch.tensor(init_weights(N, k, density), device=device, dtype=dtype)
     W, R = init_dendrites(k, n_dendrites)
@@ -56,9 +56,7 @@ with torch.no_grad():
 
     # model initialization
     W_tmp = torch.tensor(W*lam, dtype=dtype, device=device)
-    dendritic_gains = np.random.uniform(low=1.0-Delta, high=1.0+Delta, size=N)
-    rnn = LowRankCRNN(W_tmp, L*sigma, R, W_in * in_scale, bias, g="ReLU")
-    rnn.C_y = torch.tensor(dendritic_gains, dtype=dtype, device=device)
+    rnn = LowRankCRNN(W_tmp, L*sigma, R, W_in * in_scale, bias*Delta, g="ReLU")
 
     # simulation a - zero input
     rnn.set_state(init_state)
@@ -89,23 +87,26 @@ cmap = "plasma"
 fig = plt.figure(figsize=(12, 9))
 grid = fig.add_gridspec(nrows=3)
 
-ax = fig.add_subplot(grid[0])
-im = ax.imshow(np.asarray(z0s)[washout:].T, aspect="auto", interpolation="none", cmap=cmap)
-plt.colorbar(im, ax=ax)
-ax.set_ylabel("neurons")
-ax.set_title("no input")
+ax1 = fig.add_subplot(grid[0])
+im = ax1.imshow(np.asarray(z0s)[washout:].T, aspect="auto", interpolation="none", cmap=cmap)
+plt.colorbar(im, ax=ax1)
+ax1.set_ylabel("neurons")
+ax1.set_title("no input")
 
 ax = fig.add_subplot(grid[1])
+ax.sharex(ax1)
 im = ax.imshow(np.asarray(z1s)[washout:].T, aspect="auto", interpolation="none", cmap=cmap)
 plt.colorbar(im, ax=ax)
 ax.set_ylabel("neurons")
 ax.set_title("random input")
 
 ax = fig.add_subplot(grid[2])
+ax.sharex(ax1)
 im = ax.imshow(np.asarray(z2s)[washout:].T, aspect="auto", interpolation="none", cmap=cmap)
 plt.colorbar(im, ax=ax)
 ax.set_ylabel("neurons")
 ax.set_title("random input + initial state perturbation")
 ax.set_xlabel("steps")
+
 plt.tight_layout()
 plt.show()
