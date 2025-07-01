@@ -24,8 +24,9 @@ markersize = 6
 ##################################
 
 # choose a particular parameter
-value = 0.4
-results_tmp = results.loc[results.loc[:, "Delta"] == value, :]
+choose_param = "Delta"
+value = 0.6
+results_tmp = results.loc[results.loc[:, choose_param] == value, :]
 
 # reduce data to the plotting selection
 hue_param = "lambda"
